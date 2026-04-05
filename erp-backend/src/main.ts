@@ -19,7 +19,7 @@ async function bootstrap() {
 
   // 2. SWAGGER CONFIGURATION
   const config = new DocumentBuilder()
-    .setTitle('ERP API')
+    .setTitle('MANIFEST ERP API')
     .setDescription('The core engine for Inventory, Orders, and Procurement.')
     .setVersion('1.0')
     .addBearerAuth(

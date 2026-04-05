@@ -35,7 +35,7 @@ export function AppSidebar() {
       <div className="flex items-center h-14 px-4 border-b border-sidebar-border">
         {!collapsed && (
           <span className="text-lg font-bold text-sidebar-primary-foreground tracking-tight">
-            Acme<span className="text-sidebar-primary">ERP</span>
+            Manifest
           </span>
         )}
         <button

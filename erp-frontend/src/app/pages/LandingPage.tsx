@@ -1,38 +1,61 @@
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowUpRight, Boxes, Factory, Package2, ShieldCheck, Truck, Warehouse } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Boxes,
+  Factory,
+  FileText,
+  Package2,
+  Shield,
+  ShieldCheck,
+  Truck,
+  Upload,
+  Warehouse,
+} from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { useAuth } from '@/app/providers/AuthContext';
 
 const featureCards = [
   {
-    title: 'Inventory That Stays Calm',
-    description: 'Track stock across locations with fewer interruptions, clear thresholds, and an interface that keeps signal ahead of noise.',
+    title: 'Inventory',
+    description:
+      'Track stock across warehouses with a calmer interface and clear operational context.',
     icon: Warehouse,
-    className: 'md:col-span-7',
   },
   {
-    title: 'Order Operations',
-    description: 'Move from draft to fulfillment with structured workflows built for real teams, not improvised spreadsheets.',
+    title: 'Orders',
+    description:
+      'Move from draft to fulfillment with structured workflows built for real operations teams.',
     icon: Truck,
-    className: 'md:col-span-5',
   },
   {
-    title: 'Procurement Visibility',
-    description: 'See supplier activity, inbound purchases, and warehouse impact in one steady control layer.',
+    title: 'Procurement',
+    description:
+      'Keep suppliers, purchase intake, and warehouse impact visible in one place.',
     icon: Factory,
-    className: 'md:col-span-4',
   },
   {
-    title: 'Enterprise-Ready Controls',
-    description: 'Support role-aware access, shared operational context, and ERP structure that feels professional from the first login.',
+    title: 'Control',
+    description:
+      'Support role-aware access and a dependable ERP foundation from day one.',
     icon: ShieldCheck,
-    className: 'md:col-span-4',
+  },
+];
+
+const heroBenefits = [
+  {
+    title: 'Upload your data',
+    description: 'Prepare products, suppliers, and warehouse records in one place.',
+    icon: Upload,
   },
   {
-    title: 'Product Intelligence',
-    description: 'Keep products, customers, suppliers, and warehouses connected through a single operating system for the business.',
-    icon: Package2,
-    className: 'md:col-span-4',
+    title: 'Control the workflow',
+    description: 'Structured approvals and clearer operational checkpoints across teams.',
+    icon: Shield,
+  },
+  {
+    title: 'Keep distribution smooth',
+    description: 'Track inventory movement and fulfillment with reliable visibility.',
+    icon: FileText,
   },
 ];
 
@@ -44,133 +67,134 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_0%_0%,rgba(245,176,65,0.18),transparent_24%),radial-gradient(circle_at_100%_0%,rgba(84,126,255,0.16),transparent_28%),radial-gradient(circle_at_20%_100%,rgba(106,201,164,0.10),transparent_22%),linear-gradient(180deg,#fcfaf5_0%,#ffffff_42%,#fbfcff_100%)]">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-24 top-16 h-72 w-72 rounded-full bg-[#f7d9a7]/35 blur-3xl" />
-        <div className="absolute right-[-80px] top-[-20px] h-80 w-80 rounded-full bg-[#d6e5ff]/65 blur-3xl" />
-        <div className="absolute bottom-[-120px] left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[#edf3ff] blur-3xl" />
-      </div>
-
-      <header className="fixed inset-x-0 top-4 z-40">
-        <div className="mx-auto flex w-[min(1180px,calc(100%-24px))] items-center justify-between gap-6 rounded-full border border-white/70 bg-background/78 px-5 py-3 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:px-6">
-          <Link to="/" className="flex items-center gap-4 text-foreground">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-foreground text-background shadow-sm">
-              <Boxes className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-base font-semibold tracking-tight">AcmeERP</p>
-              <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Operations Platform</p>
-            </div>
-          </Link>
-
-          <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground lg:flex">
-            <a href="#overview" className="transition-colors hover:text-foreground">Overview</a>
-            <a href="#features" className="transition-colors hover:text-foreground">Features</a>
-            <a href="#access" className="transition-colors hover:text-foreground">Access</a>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link to="/login">
-              <Button variant="ghost" className="hidden h-10 px-4 sm:inline-flex">Sign In</Button>
-            </Link>
-            <Link to="/login">
-              <Button className="h-10 px-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_8px_20px_rgba(67,97,238,0.18)]">Open ERP</Button>
-            </Link>
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="w-full">
+        <section className="relative overflow-hidden border-b border-border bg-card">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_62%)]" />
+            <div className="absolute inset-x-0 bottom-0 h-56 bg-[linear-gradient(180deg,transparent,rgba(59,130,246,0.06))]" />
+            <div className="absolute left-0 top-[18%] h-px w-40 bg-border/80" />
+            <div className="absolute right-0 top-[18%] h-px w-40 bg-border/80" />
+            <div className="absolute left-[10%] top-[18%] h-16 w-16 rounded-bl-[28px] border-b border-l border-border/70" />
+            <div className="absolute right-[10%] top-[18%] h-16 w-16 rounded-br-[28px] border-b border-r border-border/70" />
+            <div className="absolute left-0 bottom-[28%] h-px w-44 bg-border/70" />
+            <div className="absolute right-0 bottom-[28%] h-px w-44 bg-border/70" />
           </div>
-        </div>
-      </header>
 
-      <main className="relative mx-auto flex w-full max-w-7xl flex-col gap-20 px-6 pb-20 pt-32 lg:px-10">
-        <section id="overview" className="grid grid-cols-1 gap-y-10 py-20 md:py-24 lg:grid-cols-12">
-          <div className="lg:col-span-8 lg:col-start-3">
-            <div className="flex flex-col items-center text-center">
-              <h1 className="max-w-5xl text-5xl font-extrabold tracking-[-0.04em] text-slate-950 sm:text-6xl lg:text-7xl" style={{ lineHeight: 1.2 }}>
- Manage inventory, orders, and purchasing in one unified workspace
-               </h1>
+          <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-5 lg:px-10">
+            <Link to="/" className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <Boxes className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Manifest</p>
+                <p className="text-xs text-muted-foreground">for Operations</p>
+              </div>
+            </Link>
 
-              <p className="mt-6 max-w-3xl text-lg text-slate-500 sm:text-xl" style={{ lineHeight: 1.6 }}>
-                AcmeERP brings inventory, warehouse management, purchasing, suppliers, and order execution into one refined operating surface designed for fast-moving B2B teams.
+            <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
+              <a href="#features" className="transition-colors hover:text-foreground">
+                Products
+              </a>
+              <a href="#overview" className="transition-colors hover:text-foreground">
+                Docs
+              </a>
+              <a href="#changes" className="transition-colors hover:text-foreground">
+                Changelog
+              </a>
+              <a href="#blog" className="transition-colors hover:text-foreground">
+                Blog
+              </a>
+            </nav>
+
+            <Link to="/login">
+              <Button variant="outline" className="h-9 rounded-full px-4 text-xs">
+                Log in
+              </Button>
+            </Link>
+          </header>
+
+          <div className="relative z-10 mx-auto max-w-7xl px-6 pb-8 pt-10 lg:px-10 lg:pb-10">
+            <div id="overview" className="mx-auto max-w-4xl text-center">
+               
+              <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+                Release, organize and scale your business operations in one place.
+              </h1>
+              <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                Effortless inventory control, procurement visibility, customer workflows,
+                and warehouse coordination inside a single ERP experience.
               </p>
 
-              <div id="access" className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
                 <Link to="/login">
-                  <Button
-                    size="lg"
-                    className="w-full border border-white/30 bg-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_4px_12px_rgba(67,97,238,0.15)] sm:w-auto"
-                  >
-                    Sign In
+                  <Button className="rounded-full px-6">
+                    Start free trial
                     <ArrowUpRight className="h-4 w-4" />
                   </Button>
                 </Link>
                 <Link to="/login">
-                  <Button
-                    size="lg"
-                    variant="ghost"
-                    className="w-full border border-[#e8e8e8] bg-white/60 text-slate-700 hover:bg-white sm:w-auto"
-                  >
-                    Seeded Admin Access
+                  <Button variant="outline" className="rounded-full px-6">
+                    Read docs
                   </Button>
                 </Link>
               </div>
+            </div>
 
-              <div className="mt-12 w-full overflow-hidden rounded-[28px] border border-[#f1f1f1] bg-white/90 p-4 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-                <div className="rounded-[24px] border border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                    <div>
-                      <p className="text-sm font-medium text-slate-400">Operations Overview</p>
-                      <p className="mt-1 text-2xl font-semibold text-slate-950">Calm, high-signal ERP workspace</p>
-                    </div>
-                    <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
-                      Live ERP Preview
+            <div className="mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-3">
+              {heroBenefits.map((item) => (
+                <div key={item.title} className="text-center">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background">
+                    <item.icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="mt-4 text-sm font-medium">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mx-auto mt-12 max-w-4xl overflow-hidden rounded-[24px] border border-border bg-background shadow-sm">
+              <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
+                <span>Operations Console</span>
+                <span>Thu 8 May 15:09</span>
+              </div>
+              <div className="bg-[linear-gradient(180deg,rgba(96,165,250,0.28),rgba(255,255,255,0.75)_38%,rgba(255,255,255,1)_100%)] p-6 sm:p-8">
+                <div className="mx-auto max-w-3xl rounded-[20px] border border-border bg-card shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                    <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
+                    <div className="ml-3 rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground">
+                      /erp/ops/dashboard
                     </div>
                   </div>
-
-                  <div className="mt-5 grid gap-4 lg:grid-cols-12">
-                    <div className="rounded-[22px] bg-slate-950 p-6 text-white lg:col-span-7">
-                      <div className="mb-8 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-white/60">Inventory pulse</p>
-                          <p className="mt-2 text-3xl font-semibold">4 warehouses in sync</p>
-                        </div>
-                        <div className="rounded-2xl bg-white/10 px-3 py-2 text-sm text-white/80">Stable</div>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-4 p-4 md:grid-cols-[1.2fr_0.8fr]">
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Workflow status</p>
+                      <div className="mt-4 space-y-3">
                         {[
-                          ['Orders', '182'],
-                          ['Suppliers', '46'],
-                          ['Stock Alerts', '08'],
+                          ['Purchase intake', '14 pending'],
+                          ['Warehouse sync', 'Stable'],
+                          ['Fulfillment pace', 'On schedule'],
                         ].map(([label, value]) => (
-                          <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-left">
-                            <p className="text-xs uppercase tracking-[0.18em] text-white/45">{label}</p>
-                            <p className="mt-3 text-2xl font-semibold">{value}</p>
+                          <div key={label} className="flex items-center justify-between rounded-xl border border-border/70 px-4 py-3">
+                            <span className="text-sm text-muted-foreground">{label}</span>
+                            <span className="text-sm font-medium">{value}</span>
                           </div>
                         ))}
                       </div>
                     </div>
-
-                    <div className="space-y-4 lg:col-span-5">
-                      <div className="rounded-[22px] border border-[#f1f1f1] bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-400">Workflow health</p>
-                        <div className="mt-4 space-y-3">
-                          {[
-                            ['Purchase intake', '14 pending'],
-                            ['Warehouse capacity', '82% utilized'],
-                            ['Fulfillment pace', 'On schedule'],
-                          ].map(([label, value]) => (
-                            <div key={label} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                              <span className="text-sm text-slate-500">{label}</span>
-                              <span className="text-sm font-medium text-slate-900">{value}</span>
-                            </div>
-                          ))}
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-border bg-background p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Warehouse view</p>
+                        <div className="mt-4 flex h-24 items-center justify-center rounded-xl bg-muted/40">
+                          <Warehouse className="h-8 w-8 text-primary" />
                         </div>
                       </div>
-
-                      <div className="rounded-[22px] border border-[#f1f1f1] bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-400">Executive summary</p>
-                        <p className="mt-3 text-2xl font-semibold text-slate-950">Unified purchasing, stock, and order flow.</p>
-                        <p className="mt-3 text-sm leading-7 text-slate-500">
-                          Designed to feel premium, dependable, and quiet enough for real operational focus.
-                        </p>
+                      <div className="rounded-2xl border border-border bg-background p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Product sync</p>
+                        <div className="mt-4 flex h-24 items-center justify-center rounded-xl bg-muted/40">
+                          <Package2 className="h-8 w-8 text-primary" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -180,19 +204,113 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="features" className="grid grid-cols-1 gap-4 md:grid-cols-12">
-          {featureCards.map((card) => (
-            <div key={card.title} className={`rounded-[22px] border border-[#f1f1f1] bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)] ${card.className}`}>
-              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-primary">
-                <card.icon className="h-5 w-5" />
+        <section id="features" className="mx-auto max-w-7xl px-6 py-14 lg:px-10 lg:py-18">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              More than just a tool
+            </h2>
+            <p className="mt-3 text-base text-muted-foreground">
+              Explore what else Manifest can do for your operations team.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {featureCards.map((card, index) => (
+              <div
+                key={card.title}
+                className="rounded-2xl border border-border bg-card px-6 py-8 text-center shadow-sm"
+              >
+                <div
+                  className={[
+                    'mx-auto flex h-20 w-20 items-center justify-center rounded-full',
+                    index === 0 && 'bg-blue-50 text-blue-600',
+                    index === 1 && 'bg-violet-50 text-violet-600',
+                    index === 2 && 'bg-rose-50 text-rose-600',
+                    index === 3 && 'bg-emerald-50 text-emerald-600',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
+                  <card.icon className="h-8 w-8" />
+                </div>
+                <h3 className="mt-6 text-xl font-semibold">{card.title}</h3>
+                <p className="mt-4 text-sm leading-7 text-muted-foreground">
+                  {card.description}
+                </p>
               </div>
-              <h2 className="mb-3 text-xl font-semibold text-slate-950">{card.title}</h2>
-              <p className="text-sm leading-7 text-slate-500">{card.description}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
+
+        <footer className="overflow-hidden border-t border-border bg-card">
+          <div className="mx-auto max-w-7xl px-6 py-10 lg:px-8">
+            <div className="flex flex-col gap-8 border-b border-border/70 pb-8 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                  <Boxes className="h-5 w-5" />
+                </div>
+                <div className="flex items-center gap-3">
+                  
+                  <div>
+                    <p className="text-sm font-medium">Manifest</p>
+                    <p className="text-xs text-muted-foreground">Operations Platform</p>
+                  </div>
+                </div>
+              </div>
+
+             </div>
+
+            <div className="grid gap-8 border-b border-border/70 py-10 md:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Product</p>
+                <div className="mt-4 space-y-3 text-sm">
+                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Inventory Management</a>
+                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Order Management</a>
+                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Procurement Flow</a>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Docs & Resources</p>
+                <div className="mt-4 space-y-3 text-sm">
+                  <a href="#overview" className="block text-foreground/90 transition-colors hover:text-foreground">Platform Docs</a>
+                  <a href="#overview" className="block text-foreground/90 transition-colors hover:text-foreground">Implementation Guide</a>
+                  <a href="#changes" className="block text-foreground/90 transition-colors hover:text-foreground">Changelog</a>
+                  <a href="#blog" className="block text-foreground/90 transition-colors hover:text-foreground">Blog</a>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Security & Legal</p>
+                <div className="mt-4 space-y-3 text-sm">
+                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Security Overview</a>
+                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Privacy Policy</a>
+                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Terms</a>
+                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Compliance</a>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Company & Contact</p>
+                <div className="mt-4 space-y-3 text-sm">
+                  <Link to="/login" className="block text-foreground/90 transition-colors hover:text-foreground">Contact Sales</Link>
+                  <a href="#blog" className="block text-foreground/90 transition-colors hover:text-foreground">Updates</a>
+                  <a href="#changes" className="block text-foreground/90 transition-colors hover:text-foreground">Release Notes</a>
+                  <Link to="/login" className="block text-foreground/90 transition-colors hover:text-foreground">Get Access</Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <p>&copy; 2026 Manifest, Inc.</p>
+              <p>Built for modern operations teams.</p>
+            </div>
+          </div>
+        </footer>
+
+        <section id="changes" className="sr-only" />
+        <section id="blog" className="sr-only" />
       </main>
     </div>
   );
 }
-

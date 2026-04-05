@@ -1,3 +1,3 @@
-# Welcome to your Lovable project
+# Manifest Frontend
 
-TODO: Document your project here
+Frontend application for Manifest, an ERP platform for inventory, procurement, warehouse, and order operations.

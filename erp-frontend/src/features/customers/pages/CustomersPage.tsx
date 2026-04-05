@@ -130,7 +130,7 @@ export default function CustomersPage() {
 
   function handleDownloadTemplate() {
     const csvTemplate =
-      'name,email,phone,address\nAcme Corp,billing@acme.com,+1234567890,123 Business Lane\nNorthwind Ltd,ops@northwind.com,+2348012345678,42 Marina Road\n';
+      'name,email,phone,address\nManifest Corp,billing@manifest.com,+1234567890,123 Business Lane\nNorthwind Ltd,ops@northwind.com,+2348012345678,42 Marina Road\n';
     const blob = new Blob([csvTemplate], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

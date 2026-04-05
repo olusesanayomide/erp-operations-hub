@@ -8,7 +8,7 @@ export class CustomerImportDto {
   @ApiProperty({
     description: 'Raw CSV content containing customer rows.',
     example:
-      'name,email,phone,address\nAcme Corp,billing@acme.com,+1234567890,123 Business Lane',
+      'name,email,phone,address\nManifest Corp,billing@manifest.com,+1234567890,123 Business Lane',
   })
   @IsString()
   @MinLength(1)

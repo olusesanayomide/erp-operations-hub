@@ -6,12 +6,12 @@ import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { toast } from 'sonner';
-import { Boxes, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('sarah@acme.com');
+  const [email, setEmail] = useState('sarah@manifest.com');
   const [password, setPassword] = useState('password');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,31 +33,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-muted">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary items-center justify-center p-12">
-        <div className="max-w-md text-primary-foreground">
-          <div className="flex items-center gap-3 mb-8">
-            <Boxes className="h-10 w-10" />
-            <span className="text-3xl font-bold tracking-tight">AcmeERP</span>
-          </div>
-          <h1 className="text-4xl font-bold leading-tight mb-4">
-            Streamline your operations
-          </h1>
-          <p className="text-primary-foreground/80 text-lg leading-relaxed">
-            Manage inventory, orders, purchases, and your entire supply chain from one powerful platform.
-          </p>
-        </div>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <Boxes className="h-7 w-7 text-primary" />
-            <span className="text-2xl font-bold">AcmeERP</span>
-          </div>
-
+    <div className="min-h-screen bg-muted flex items-center justify-center p-6 sm:p-8">
+      <div className="w-full max-w-md">
+        <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="text-2xl font-bold mb-1">Sign in</h2>
           <p className="text-muted-foreground mb-6">Enter your credentials to access the platform</p>
 
@@ -91,7 +69,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-8 p-4 rounded-xl bg-card border">
+          <div className="mt-8 rounded-xl border bg-background p-4">
             <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Backend Login</p>
             <div className="space-y-2">
               {[

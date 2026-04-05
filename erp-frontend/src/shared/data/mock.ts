@@ -1,10 +1,10 @@
 import type { User, Product, Customer, Supplier, Warehouse, InventoryItem, Order, Purchase, StockMovement } from '@/shared/types/erp';
 
 export const mockUsers: User[] = [
-  { id: 'u1', name: 'Sarah Chen', email: 'sarah@acme.com', role: 'admin', createdAt: '2024-01-15' },
-  { id: 'u2', name: 'Marcus Rivera', email: 'marcus@acme.com', role: 'manager', createdAt: '2024-02-10' },
-  { id: 'u3', name: 'Emily Park', email: 'emily@acme.com', role: 'staff', createdAt: '2024-03-20' },
-  { id: 'u4', name: 'James Wilson', email: 'james@acme.com', role: 'staff', createdAt: '2024-04-05' },
+  { id: 'u1', name: 'Sarah Chen', email: 'sarah@manifest.com', role: 'admin', createdAt: '2024-01-15' },
+  { id: 'u2', name: 'Marcus Rivera', email: 'marcus@manifest.com', role: 'manager', createdAt: '2024-02-10' },
+  { id: 'u3', name: 'Emily Park', email: 'emily@manifest.com', role: 'staff', createdAt: '2024-03-20' },
+  { id: 'u4', name: 'James Wilson', email: 'james@manifest.com', role: 'staff', createdAt: '2024-04-05' },
 ];
 
 export const mockProducts: Product[] = [

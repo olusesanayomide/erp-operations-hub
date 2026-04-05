@@ -17,7 +17,7 @@ const pageTitles: Record<string, string> = {
 
 function getTitle(pathname: string) {
   const match = Object.entries(pageTitles).find(([path]) => pathname.startsWith(path));
-  return match ? match[1] : 'AcmeERP';
+  return match ? match[1] : 'Manifest';
 }
 
 export function AppLayout() {
