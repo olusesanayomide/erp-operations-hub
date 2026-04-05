@@ -1,0 +1,8 @@
+export enum OrderLifecycleStatus {
+  DRAFT = 'DRAFT',
+  CONFIRMED = 'CONFIRMED',
+  PICKED = 'PICKED',
+  SHIPPED = 'SHIPPED',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+}

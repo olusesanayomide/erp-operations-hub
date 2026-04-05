@@ -1,0 +1,60 @@
+# Workspace logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and build output
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/build/
+**/coverage/
+**/.nyc_output/
+
+# Local environment files
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+*.local
+
+# Temp and runtime files
+**/.temp/
+**/.tmp/
+pids
+*.pid
+*.pid.lock
+*.seed
+report.*.*.*.*.json
+
+# Editor and OS files
+.DS_Store
+.idea/
+.project
+.classpath
+.settings/
+.c9/
+*.launch
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Generated backend artifacts
+**/generated/prisma/
+
+# Archived child repositories kept for history reference
+erp-frontend/.git-archive/
+erp-backend/.git-archive/

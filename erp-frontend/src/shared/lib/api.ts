@@ -1,0 +1,110 @@
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3000";
+
+const TOKEN_STORAGE_KEY = "erp.auth.token";
+const USER_STORAGE_KEY = "erp.auth.user";
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+export function getApiBaseUrl() {
+  return API_BASE_URL;
+}
+
+export function getStoredToken() {
+  return localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setStoredToken(token: string | null) {
+  if (token) {
+    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    return;
+  }
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+export function getStoredUser<T>() {
+  const raw = localStorage.getItem(USER_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    localStorage.removeItem(USER_STORAGE_KEY);
+    return null;
+  }
+}
+
+export function setStoredUser(user: unknown) {
+  if (user) {
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    return;
+  }
+  localStorage.removeItem(USER_STORAGE_KEY);
+}
+
+type RequestInitWithJson = RequestInit & {
+  body?: BodyInit | object | null;
+};
+
+export async function apiRequest<T>(
+  path: string,
+  init: RequestInitWithJson = {},
+): Promise<T> {
+  const token = getStoredToken();
+  const headers = new Headers(init.headers);
+
+  if (!headers.has("Content-Type") && init.body && typeof init.body === "object" && !(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+    body:
+      init.body && typeof init.body === "object" && !(init.body instanceof FormData)
+        ? JSON.stringify(init.body)
+        : init.body ?? undefined,
+  });
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+
+    try {
+      const errorData = await response.json();
+      if (typeof errorData?.message === "string") {
+        message = errorData.message;
+      } else if (Array.isArray(errorData?.message)) {
+        message = errorData.message.join(", ");
+      } else if (typeof errorData?.error === "string") {
+        message = errorData.error;
+      }
+    } catch {
+      try {
+        const text = await response.text();
+        if (text) message = text;
+      } catch {
+        // ignore secondary parsing errors
+      }
+    }
+
+    throw new ApiError(message, response.status);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}

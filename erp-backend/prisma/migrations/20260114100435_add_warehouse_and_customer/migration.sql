@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Customer" ADD COLUMN     "address" TEXT,
+ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "phone" TEXT;
+
+-- AlterTable
+ALTER TABLE "Warehouse" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "location" TEXT;

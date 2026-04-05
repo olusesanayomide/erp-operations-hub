@@ -1,0 +1,721 @@
+import type {
+  Customer,
+  InventoryItem,
+  Order,
+  Product,
+  Purchase,
+  StockMovement,
+  Supplier,
+  User,
+  UserRole,
+  Warehouse,
+} from "@/shared/types/erp";
+import { apiRequest } from "./api";
+
+type BackendUser = {
+  email: string;
+  name?: string | null;
+  roles?: string[];
+};
+
+type LoginResponse = {
+  access_token: string;
+  user: BackendUser;
+  message: string;
+};
+
+type BackendProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  createdAt: string;
+  updatedAt?: string | null;
+  inventoryItems?: Array<{
+    id: string;
+    productId: string;
+    warehouseId: string;
+    quantity: number;
+    product?: BackendProduct;
+    warehouse?: BackendWarehouse;
+  }>;
+  stockMovements?: BackendStockMovement[];
+  orderItems?: Array<{
+    id: string;
+    orderId: string;
+    warehouseId: string;
+    quantity: number;
+    price: number;
+  }>;
+};
+
+type ProductImportMode = "create" | "upsert";
+
+type ProductImportRowPreview = {
+  rowNumber: number;
+  name: string;
+  sku: string;
+  price: number | null;
+  action: "create" | "update" | null;
+  issues: string[];
+};
+
+type ProductImportPreview = {
+  mode: ProductImportMode;
+  totals: {
+    rows: number;
+    valid: number;
+    invalid: number;
+    creates: number;
+    updates: number;
+  };
+  rows: ProductImportRowPreview[];
+};
+
+type ProductImportCommitResult = {
+  mode: ProductImportMode;
+  totals: ProductImportPreview["totals"] & {
+    imported: number;
+  };
+  rows: ProductImportRowPreview[];
+};
+
+type CustomerImportMode = "create" | "upsert";
+
+type CustomerImportRowPreview = {
+  rowNumber: number;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  action: "create" | "update" | null;
+  issues: string[];
+};
+
+type CustomerImportPreview = {
+  mode: CustomerImportMode;
+  totals: {
+    rows: number;
+    valid: number;
+    invalid: number;
+    creates: number;
+    updates: number;
+  };
+  rows: CustomerImportRowPreview[];
+};
+
+type CustomerImportCommitResult = {
+  mode: CustomerImportMode;
+  totals: CustomerImportPreview["totals"] & {
+    imported: number;
+  };
+  rows: CustomerImportRowPreview[];
+};
+
+type BackendWarehouse = {
+  id: string;
+  name: string;
+  location?: string | null;
+  createdAt: string;
+  inventoryItems?: Array<{
+    id: string;
+    productId: string;
+    warehouseId: string;
+    quantity: number;
+    product?: BackendProduct;
+  }>;
+  _count?: {
+    inventoryItems?: number;
+    purchases?: number;
+  };
+};
+
+type BackendCustomer = {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  address?: string | null;
+  createdAt: string;
+  orders?: BackendOrder[];
+  _count?: {
+    orders?: number;
+  };
+};
+
+type BackendSupplier = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  createdAt: string;
+  purchases?: BackendPurchase[];
+  _count?: {
+    purchases?: number;
+  };
+};
+
+type BackendOrder = {
+  id: string;
+  status: string;
+  customerId?: string | null;
+  customer?: BackendCustomer | null;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  items: Array<{
+    id: string;
+    productId: string;
+    warehouseId: string;
+    quantity: number;
+    price: number;
+    product?: BackendProduct;
+  }>;
+};
+
+type BackendPurchase = {
+  id: string;
+  purchaseOrder: string;
+  supplierId: string;
+  supplier?: BackendSupplier;
+  warehouseId: string;
+  warehouse?: BackendWarehouse;
+  status: string;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  receivedAt?: string | null;
+  items: Array<{
+    id: string;
+    productId: string;
+    quantity: number;
+    price: number;
+    product?: BackendProduct;
+  }>;
+  _count?: {
+    items?: number;
+  };
+};
+
+type BackendStockMovement = {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  quantity: number;
+  type: string;
+  reference?: string | null;
+  createdAt: string;
+  product?: BackendProduct;
+  warehouse?: BackendWarehouse;
+};
+
+type BackendInventorySummary = {
+  product: string;
+  location: string;
+  availableStock: number;
+  status: string;
+};
+
+function formatDate(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeRole(role?: string | null): UserRole {
+  const normalized = role?.toLowerCase();
+  if (normalized === "admin" || normalized === "manager" || normalized === "staff") {
+    return normalized;
+  }
+  return "staff";
+}
+
+function createOrderNumber(id: string) {
+  return `ORD-${id.slice(0, 8).toUpperCase()}`;
+}
+
+function createPurchaseNumber(id: string, purchaseOrder?: string | null) {
+  return purchaseOrder || `PO-${id.slice(0, 8).toUpperCase()}`;
+}
+
+function getOrderStatusRank(status: Order["status"]) {
+  const ranks: Record<Order["status"], number> = {
+    draft: 0,
+    confirmed: 1,
+    picked: 2,
+    shipped: 3,
+    delivered: 4,
+    cancelled: -1,
+  };
+
+  return ranks[status];
+}
+
+export function normalizeUser(raw: BackendUser): User {
+  return {
+    id: raw.email,
+    name: raw.name || raw.email,
+    email: raw.email,
+    role: normalizeRole(raw.roles?.[0]),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function normalizeProduct(raw: BackendProduct): Product {
+  return {
+    id: raw.id,
+    name: raw.name,
+    sku: raw.sku,
+    description: "",
+    basePrice: raw.price,
+    category: "General",
+    unit: "unit",
+    createdAt: formatDate(raw.createdAt),
+    updatedAt: formatDate(raw.updatedAt || raw.createdAt),
+  };
+}
+
+export function normalizeWarehouse(raw: BackendWarehouse): Warehouse {
+  return {
+    id: raw.id,
+    name: raw.name,
+    location: raw.location || "Unspecified location",
+    description: "",
+    itemCount: raw.inventoryItems?.length ?? raw._count?.inventoryItems ?? 0,
+    createdAt: formatDate(raw.createdAt),
+  };
+}
+
+export function normalizeCustomer(raw: BackendCustomer): Customer {
+  return {
+    id: raw.id,
+    name: raw.name,
+    email: raw.email,
+    phone: raw.phone || "N/A",
+    address: raw.address || "N/A",
+    orderCount: raw._count?.orders ?? raw.orders?.length ?? 0,
+    createdAt: formatDate(raw.createdAt),
+  };
+}
+
+export function normalizeSupplier(raw: BackendSupplier): Supplier {
+  return {
+    id: raw.id,
+    name: raw.name,
+    email: raw.email || "N/A",
+    phone: raw.phone || "N/A",
+    address: raw.address || "N/A",
+    purchaseCount: raw._count?.purchases ?? raw.purchases?.length ?? 0,
+    createdAt: formatDate(raw.createdAt),
+  };
+}
+
+export function normalizeInventoryItem(
+  raw:
+    | BackendInventorySummary
+    | {
+        id: string;
+        productId: string;
+        warehouseId: string;
+        quantity: number;
+        product?: BackendProduct;
+        warehouse?: BackendWarehouse;
+      },
+  productsById: Map<string, Product>,
+  warehousesById: Map<string, Warehouse>,
+): InventoryItem {
+  const productId = "product" in raw ? raw.product : raw.productId;
+  const warehouseId = "location" in raw ? raw.location : raw.warehouseId;
+  const quantity = "availableStock" in raw ? raw.availableStock : raw.quantity;
+
+  return {
+    id: "id" in raw ? raw.id : `${productId}-${warehouseId}`,
+    productId,
+    warehouseId,
+    quantity,
+    minStock: 10,
+    product: "product" in raw ? productsById.get(productId) : raw.product ? normalizeProduct(raw.product) : productsById.get(productId),
+    warehouse:
+      "warehouse" in raw
+        ? raw.warehouse
+          ? normalizeWarehouse(raw.warehouse)
+          : warehousesById.get(warehouseId)
+        : warehousesById.get(warehouseId),
+  };
+}
+
+export function normalizeOrder(raw: BackendOrder): Order {
+  const warehouseId = raw.items[0]?.warehouseId || "";
+  const normalizedStatus = raw.status.toLowerCase() as Order["status"];
+  const statusRank = getOrderStatusRank(normalizedStatus);
+
+  return {
+    id: raw.id,
+    orderNumber: createOrderNumber(raw.id),
+    customerId: raw.customerId || "",
+    warehouseId,
+    status: normalizedStatus,
+    items: raw.items.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      product: item.product ? normalizeProduct(item.product) : undefined,
+    })),
+    totalAmount: raw.totalAmount,
+    notes: "",
+    createdAt: formatDate(raw.createdAt),
+    updatedAt: formatDate(raw.updatedAt),
+    confirmedAt: statusRank >= 1 ? formatDate(raw.updatedAt) : undefined,
+    pickedAt: statusRank >= 2 ? formatDate(raw.updatedAt) : undefined,
+    shippedAt: statusRank >= 3 ? formatDate(raw.updatedAt) : undefined,
+    deliveredAt: statusRank >= 4 ? formatDate(raw.updatedAt) : undefined,
+    customer: raw.customer ? normalizeCustomer(raw.customer) : undefined,
+  };
+}
+
+export function normalizePurchase(raw: BackendPurchase): Purchase {
+  return {
+    id: raw.id,
+    purchaseNumber: createPurchaseNumber(raw.id, raw.purchaseOrder),
+    supplierId: raw.supplierId,
+    warehouseId: raw.warehouseId,
+    status: raw.status.toLowerCase() as Purchase["status"],
+    items: (raw.items || []).map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      receivedQuantity: raw.status === "RECEIVED" ? item.quantity : 0,
+      product: item.product ? normalizeProduct(item.product) : undefined,
+    })),
+    totalAmount: raw.totalAmount,
+    notes: "",
+    createdAt: formatDate(raw.createdAt),
+    updatedAt: formatDate(raw.updatedAt),
+    receivedAt: raw.receivedAt ? formatDate(raw.receivedAt) : undefined,
+    supplier: raw.supplier ? normalizeSupplier(raw.supplier) : undefined,
+    warehouse: raw.warehouse ? normalizeWarehouse(raw.warehouse) : undefined,
+  };
+}
+
+export function normalizeMovement(raw: BackendStockMovement): StockMovement {
+  const normalizedType =
+    raw.type === "IN" ? "stock-in" : raw.type === "OUT" ? "stock-out" : "adjustment";
+
+  return {
+    id: raw.id,
+    productId: raw.productId,
+    warehouseId: raw.warehouseId,
+    type: normalizedType,
+    quantity: raw.quantity,
+    notes: raw.reference || "",
+    createdAt: formatDate(raw.createdAt),
+    createdBy: "system",
+    product: raw.product ? normalizeProduct(raw.product) : undefined,
+    warehouse: raw.warehouse ? normalizeWarehouse(raw.warehouse) : undefined,
+  };
+}
+
+export async function loginRequest(email: string, password: string) {
+  return apiRequest<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: { email, password },
+  });
+}
+
+export async function getCurrentUser() {
+  const data = await apiRequest<{
+    email: string;
+    sub: string;
+    roles: string[];
+  }>("/auth/me");
+
+  return {
+    id: data.sub,
+    name: data.email,
+    email: data.email,
+    role: normalizeRole(data.roles?.[0]),
+    createdAt: new Date().toISOString(),
+  } satisfies User;
+}
+
+export async function listProducts() {
+  const items = await apiRequest<BackendProduct[]>("/products");
+  return items.map(normalizeProduct);
+}
+
+export async function listRawProducts() {
+  return apiRequest<BackendProduct[]>("/products");
+}
+
+export async function getProductById(id: string) {
+  const item = await apiRequest<BackendProduct>(`/products/${id}`);
+  return {
+    product: normalizeProduct(item),
+    inventory: (item.inventoryItems || []).map((inventoryItem) => ({
+      id: inventoryItem.id,
+      productId: inventoryItem.productId,
+      warehouseId: inventoryItem.warehouseId,
+      quantity: inventoryItem.quantity,
+      minStock: 10,
+    })),
+    movements: (item.stockMovements || []).map(normalizeMovement),
+    relatedOrderIds: Array.from(new Set((item.orderItems || []).map((orderItem) => orderItem.orderId))),
+  };
+}
+
+export async function createProduct(payload: { name: string; sku: string; price: number }) {
+  const item = await apiRequest<BackendProduct>("/products", {
+    method: "POST",
+    body: payload,
+  });
+  return normalizeProduct(item);
+}
+
+export async function previewProductImport(payload: {
+  csv: string;
+  mode?: ProductImportMode;
+}) {
+  return apiRequest<ProductImportPreview>("/products/import/preview", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function commitProductImport(payload: {
+  csv: string;
+  mode?: ProductImportMode;
+}) {
+  return apiRequest<ProductImportCommitResult>("/products/import/commit", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function listCustomers() {
+  const items = await apiRequest<BackendCustomer[]>("/customers");
+  return items.map(normalizeCustomer);
+}
+
+export async function getCustomerById(id: string) {
+  const item = await apiRequest<BackendCustomer>(`/customers/${id}`);
+  return {
+    customer: normalizeCustomer(item),
+    orders: (item.orders || []).map(normalizeOrder),
+  };
+}
+
+export async function createCustomer(payload: {
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+}) {
+  const item = await apiRequest<BackendCustomer>("/customers", {
+    method: "POST",
+    body: payload,
+  });
+  return normalizeCustomer(item);
+}
+
+export async function previewCustomerImport(payload: {
+  csv: string;
+  mode?: CustomerImportMode;
+}) {
+  return apiRequest<CustomerImportPreview>("/customers/import/preview", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function commitCustomerImport(payload: {
+  csv: string;
+  mode?: CustomerImportMode;
+}) {
+  return apiRequest<CustomerImportCommitResult>("/customers/import/commit", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function listSuppliers() {
+  const items = await apiRequest<BackendSupplier[]>("/suppliers");
+  return items.map(normalizeSupplier);
+}
+
+export async function getSupplierById(id: string) {
+  const item = await apiRequest<BackendSupplier>(`/suppliers/${id}`);
+  return {
+    supplier: normalizeSupplier(item),
+    purchases: (item.purchases || []).map(normalizePurchase),
+  };
+}
+
+export async function createSupplier(payload: {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+}) {
+  const item = await apiRequest<BackendSupplier>("/suppliers", {
+    method: "POST",
+    body: payload,
+  });
+  return normalizeSupplier(item);
+}
+
+export async function listWarehouses() {
+  const items = await apiRequest<BackendWarehouse[]>("/warehouses");
+  return items.map(normalizeWarehouse);
+}
+
+export async function getWarehouseById(id: string) {
+  const item = await apiRequest<BackendWarehouse>(`/warehouses/${id}`);
+  return {
+    warehouse: normalizeWarehouse(item),
+    inventory: (item.inventoryItems || []).map((inventoryItem) => ({
+      id: inventoryItem.id,
+      productId: inventoryItem.productId,
+      warehouseId: inventoryItem.warehouseId,
+      quantity: inventoryItem.quantity,
+      minStock: 10,
+      product: inventoryItem.product ? normalizeProduct(inventoryItem.product) : undefined,
+    })),
+  };
+}
+
+export async function createWarehouse(payload: { name: string; location?: string }) {
+  const item = await apiRequest<BackendWarehouse>("/warehouses", {
+    method: "POST",
+    body: payload,
+  });
+  return normalizeWarehouse(item);
+}
+
+export async function listOrders() {
+  const items = await apiRequest<BackendOrder[]>("/orders");
+  return items.map(normalizeOrder);
+}
+
+export async function getOrderById(id: string) {
+  const item = await apiRequest<BackendOrder>(`/orders/${id}`);
+  return normalizeOrder(item);
+}
+
+export async function createOrder(payload: {
+  customerId: string;
+  warehouseId: string;
+  items: Array<{ productId: string; quantity: number }>;
+}) {
+  const order = await apiRequest<BackendOrder>("/orders", {
+    method: "POST",
+    body: { customerId: payload.customerId },
+  });
+
+  for (const item of payload.items) {
+    await apiRequest(`/orders/${order.id}/items`, {
+      method: "POST",
+      body: {
+        productId: item.productId,
+        warehouseId: payload.warehouseId,
+        quantity: item.quantity,
+      },
+    });
+  }
+
+  const completed = await apiRequest<BackendOrder>(`/orders/${order.id}`);
+  return normalizeOrder(completed);
+}
+
+export async function updateOrderStatus(
+  id: string,
+  status: "CONFIRMED" | "PICKED" | "SHIPPED" | "DELIVERED" | "CANCELLED",
+) {
+  const item = await apiRequest<BackendOrder>(`/orders/${id}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+  return normalizeOrder(item);
+}
+
+export async function listPurchases() {
+  const items = await apiRequest<BackendPurchase[]>("/purchases");
+  return items.map((item) =>
+    normalizePurchase({
+      ...item,
+      items: item.items || [],
+    }),
+  );
+}
+
+export async function getPurchaseById(id: string) {
+  const item = await apiRequest<BackendPurchase>(`/purchases/${id}`);
+  return normalizePurchase(item);
+}
+
+export async function createPurchase(payload: {
+  supplierId: string;
+  warehouseId: string;
+  items: Array<{ productId: string; quantity: number; price: number }>;
+}) {
+  const purchaseOrder = `PO-${Date.now()}`;
+  const item = await apiRequest<BackendPurchase>("/purchases", {
+    method: "POST",
+    body: {
+      purchaseOrder,
+      supplierId: payload.supplierId,
+      warehouseId: payload.warehouseId,
+      items: payload.items,
+    },
+  });
+  return normalizePurchase({
+    ...item,
+    purchaseOrder,
+    items: item.items || [],
+  });
+}
+
+export async function receivePurchase(id: string) {
+  await apiRequest(`/purchases/${id}/receive`, {
+    method: "PATCH",
+  });
+}
+
+export async function listInventory() {
+  const [summary, rawProducts, warehouses] = await Promise.all([
+    apiRequest<BackendInventorySummary[]>("/inventory"),
+    listRawProducts(),
+    listWarehouses(),
+  ]);
+
+  const productsById = new Map(rawProducts.map((product) => [product.id, normalizeProduct(product)]));
+  const warehousesById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
+
+  return summary.map((item) => normalizeInventoryItem(item, productsById, warehousesById));
+}
+
+export async function stockIn(payload: {
+  productId: string;
+  warehouseId: string;
+  quantity: number;
+}) {
+  await apiRequest("/inventory/stock-in", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function stockOut(payload: {
+  productId: string;
+  warehouseId: string;
+  quantity: number;
+}) {
+  await apiRequest("/inventory/stock-out", {
+    method: "POST",
+    body: payload,
+  });
+}
+
