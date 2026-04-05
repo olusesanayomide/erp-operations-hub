@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,42 +6,42 @@
 
 @layer base {
   :root {
-    --background: 40 20% 98%;
-    --foreground: 220 25% 10%;
+    --background: 228 45% 99%;
+    --foreground: 224 18% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 25% 10%;
+    --card-foreground: 224 18% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 25% 10%;
+    --popover-foreground: 224 18% 12%;
 
-    --primary: 230 65% 52%;
+    --primary: 223 100% 61%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 94%;
-    --secondary-foreground: 220 25% 18%;
+    --secondary: 223 30% 96%;
+    --secondary-foreground: 224 18% 12%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 10% 46%;
+    --muted: 220 30% 96%;
+    --muted-foreground: 223 13% 43%;
 
-    --accent: 220 14% 94%;
-    --accent-foreground: 220 25% 18%;
+    --accent: 220 30% 96%;
+    --accent-foreground: 224 18% 12%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 359 54% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 60% 40%;
+    --success: 175 59% 57%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    --warning: 252 100% 74%;
     --warning-foreground: 38 92% 14%;
 
-    --info: 210 80% 52%;
+    --info: 223 100% 61%;
     --info-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 230 65% 52%;
+    --border: 220 28% 89%;
+    --input: 220 28% 89%;
+    --ring: 223 100% 61%;
 
     --radius: 0.75rem;
 
@@ -100,19 +100,24 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    @apply text-foreground font-sans antialiased;
+    background:
+      radial-gradient(circle at 12% 14%, rgba(140, 124, 255, 0.10), transparent 24%),
+      radial-gradient(circle at 88% 18%, rgba(79, 209, 197, 0.10), transparent 26%),
+      radial-gradient(circle at 72% 76%, rgba(59, 107, 255, 0.10), transparent 28%),
+      linear-gradient(180deg, #fbfbff 0%, #edf2f9 100%);
+    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
     @apply font-semibold tracking-tight;
   }
 }
 
 @layer components {
   .erp-card {
-    @apply bg-card text-card-foreground rounded-xl border shadow-sm;
+    @apply bg-card/90 text-card-foreground rounded-xl border shadow-sm backdrop-blur-sm;
   }
 
   .erp-table-header {
@@ -124,7 +129,7 @@
   }
 
   .erp-kpi-card {
-    @apply bg-card rounded-xl border p-5 shadow-sm transition-shadow hover:shadow-md;
+    @apply bg-card/90 rounded-xl border p-5 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md;
   }
 
   .erp-page-header {
@@ -177,5 +182,25 @@
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
+  }
+
+  .text-brand-muted {
+    color: #5f6779;
+  }
+
+  .text-brand-dark {
+    color: #1a1d25;
+  }
+
+  .bg-brand-purple-soft {
+    background-color: rgba(140, 124, 255, 0.12);
+  }
+
+  .bg-brand-teal-soft {
+    background-color: rgba(79, 209, 197, 0.14);
+  }
+
+  .bg-brand-maroon-soft {
+    background-color: rgba(186, 59, 62, 0.12);
   }
 }
