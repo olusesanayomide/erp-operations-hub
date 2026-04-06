@@ -1,11 +1,22 @@
 import { PageHeader } from '@/shared/components/PageComponents';
 import { RoleBadge } from '@/shared/components/StatusBadge';
-import { mockUsers } from '@/shared/data/mock';
 import { useAuth } from '@/app/providers/AuthContext';
-import { UserCircle, Shield } from 'lucide-react';
+import { Shield, Users } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { listUsers } from '@/shared/lib/erp-api';
 
 export default function UsersPage() {
   const { user, hasRole } = useAuth();
+  const {
+    data: users = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['users'],
+    queryFn: listUsers,
+    enabled: hasRole('admin'),
+  });
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -38,7 +49,7 @@ export default function UsersPage() {
                   <th className="text-left p-3">Actions</th>
                 </tr></thead>
                 <tbody>
-                  {mockUsers.map(u => (
+                  {users.map(u => (
                     <tr key={u.id} className="erp-table-row">
                       <td className="p-3">
                         <div className="flex items-center gap-2">
@@ -59,6 +70,23 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
+            {isLoading && (
+              <p className="p-4 text-sm text-muted-foreground">Loading users...</p>
+            )}
+            {isError && (
+              <p className="p-4 text-sm text-destructive">
+                {(error as Error).message || 'Unable to load users.'}
+              </p>
+            )}
+            {!isLoading && !isError && users.length === 0 && (
+              <div className="p-8 text-center">
+                <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+                <h3 className="font-semibold mb-1">No users found</h3>
+                <p className="text-sm text-muted-foreground">
+                  Registered users will appear here once they exist in the system.
+                </p>
+              </div>
+            )}
           </div>
         </>
       )}

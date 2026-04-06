@@ -2,7 +2,6 @@ import { Link, Navigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowUpRight,
-  Boxes,
   CheckCircle2,
   Factory,
   FileText,
@@ -222,13 +221,11 @@ export default function LandingPage() {
             variants={sectionVariants}
           >
             <Link to="/" className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                <Boxes className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-brand-dark">Manifest</p>
-                <p className="text-xs text-brand-muted">for Operations</p>
-              </div>
+              <img
+                src="/manifest-logo-lockup.svg"
+                alt="Manifest Operations Platform"
+                className="h-10 w-auto sm:h-12"
+              />
             </Link>
 
             <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
@@ -285,22 +282,12 @@ export default function LandingPage() {
                 Manage procurement, inventory, and fulfillment in one unified interface.
               </p>
 
-              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <div className="mt-8 flex justify-center">
                 <Link to="/login">
                   <motion.div whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.02 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}>
                     <Button className="rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] px-6 shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105">
                       Start free trial
                       <ArrowUpRight className="h-4 w-4" />
-                    </Button>
-                  </motion.div>
-                </Link>
-                <Link to="/login">
-                  <motion.div whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.02 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}>
-                    <Button
-                      variant="outline"
-                      className="rounded-full border-slate-200 bg-white px-6 text-brand-dark shadow-[0_8px_24px_rgba(26,29,37,0.06),inset_0_1px_0_rgba(255,255,255,0.95)] hover:bg-slate-50"
-                    >
-                      Read docs
                     </Button>
                   </motion.div>
                 </Link>
@@ -483,7 +470,7 @@ export default function LandingPage() {
           </div>
         </motion.section>
 
-        <motion.section className="mx-auto max-w-7xl px-6 py-16 lg:px-10" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
+        <motion.section className="mx-auto max-w-7xl px-6 pb-8 pt-16 lg:px-10" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
           <div className="max-w-2xl">
             <p className="text-sm font-medium text-muted-foreground">How it works</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -589,78 +576,16 @@ export default function LandingPage() {
             ))}
           </motion.div>
         </motion.section>
-
-        <motion.section className="border-t border-border/70 bg-card" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={sectionVariants}>
-          <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[0.9fr_1.1fr] lg:px-10">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Reliability</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                A more trustworthy foundation for ERP work.
-              </h2>
-              <p className="mt-4 text-sm leading-7 text-muted-foreground">
-                Manifest is designed to reduce ambiguity, improve coordination, and give teams a more dependable place to work.
-              </p>
-            </div>
-
-            <motion.div className="grid gap-3 sm:grid-cols-2" variants={sectionVariants}>
-              {trustItems.map((item) => (
-                <motion.div key={item} variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { y: -4 }} className="rounded-2xl border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(246,250,255,0.72))] p-5 shadow-[0_14px_30px_rgba(59,107,255,0.06),inset_0_1px_0_rgba(255,255,255,0.94)]">
-                  <div className="flex items-start gap-3">
-                    <ShieldCheck className="mt-0.5 h-5 w-5 text-primary" />
-                    <p className="text-sm leading-7 text-foreground/90">{item}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        </motion.section>
-
        
-        <motion.section className="border-t border-border/70 bg-card" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.25 }} variants={sectionVariants}>
-          <div className="mx-auto max-w-7xl px-6 py-16 lg:px-10">
-            <motion.div className="rounded-3xl border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(246,250,255,0.74))] px-6 py-12 text-center shadow-[0_16px_34px_rgba(59,107,255,0.06),inset_0_1px_0_rgba(255,255,255,0.94)] sm:px-10" variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { y: -4 }}>
-              <p className="text-sm font-medium text-muted-foreground">Start using Manifest</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Bring your operations into one structured workspace.
-              </h2>
-              <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Access inventory, warehouse, procurement, supplier, customer, and order workflows from one place.
-              </p>
-              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-                <Link to="/login">
-                  <motion.div whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.02 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}>
-                    <Button size="lg">
-                      Open ERP
-                      <ArrowUpRight className="h-4 w-4" />
-                    </Button>
-                  </motion.div>
-                </Link>
-                <Link to="/login">
-                  <motion.div whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.02 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}>
-                    <Button size="lg" variant="outline">
-                      View login access
-                    </Button>
-                  </motion.div>
-                </Link>
-              </div>
-            </motion.div>
-          </div>
-        </motion.section>
-
         <footer className="overflow-hidden border-t border-border bg-card">
           <div className="mx-auto max-w-7xl px-6 py-10 lg:px-8">
             <div className="flex flex-col gap-8 border-b border-border/70 pb-8 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-                  <Boxes className="h-5 w-5" />
-                </div>
-                <div className="flex items-center gap-3">
-                  
-                  <div>
-                    <p className="text-sm font-medium">Manifest</p>
-                    <p className="text-xs text-muted-foreground">Operations Platform</p>
-                  </div>
-                </div>
+                <img
+                  src="/manifest-logo-lockup.svg"
+                  alt="Manifest Operations Platform"
+                  className="h-11 w-auto"
+                />
               </div>
 
              </div>

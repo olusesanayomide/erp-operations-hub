@@ -1,3 +1,5 @@
+import { AUTH_MODE, supabase } from "./supabase";
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3000";
 
@@ -50,6 +52,18 @@ export function setStoredUser(user: unknown) {
   localStorage.removeItem(USER_STORAGE_KEY);
 }
 
+async function resolveAuthToken() {
+  if (AUTH_MODE === "supabase" && supabase) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    return session?.access_token ?? null;
+  }
+
+  return getStoredToken();
+}
+
 type RequestInitWithJson = RequestInit & {
   body?: BodyInit | object | null;
 };
@@ -58,7 +72,7 @@ export async function apiRequest<T>(
   path: string,
   init: RequestInitWithJson = {},
 ): Promise<T> {
-  const token = getStoredToken();
+  const token = await resolveAuthToken();
   const headers = new Headers(init.headers);
 
   if (!headers.has("Content-Type") && init.body && typeof init.body === "object" && !(init.body instanceof FormData)) {

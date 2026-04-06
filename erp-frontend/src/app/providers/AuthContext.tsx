@@ -6,11 +6,19 @@ import {
   setStoredToken,
   setStoredUser,
 } from '@/shared/lib/api';
-import { getCurrentUser, loginRequest, normalizeUser } from '@/shared/lib/erp-api';
+import {
+  getCurrentUser,
+  loginRequest,
+  loginWithSupabase,
+  logoutSupabase,
+  normalizeUser,
+} from '@/shared/lib/erp-api';
+import { AUTH_MODE, isSupabaseAuthConfigured, supabase } from '@/shared/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   hasRole: (role: UserRole | UserRole[]) => boolean;
@@ -45,9 +53,90 @@ const rolePermissions: Record<UserRole, string[]> = {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => getStoredUser<User>());
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (AUTH_MODE === 'supabase') {
+      if (!isSupabaseAuthConfigured || !supabase) {
+        console.warn('Supabase auth mode is enabled, but the client is not configured.');
+        setStoredToken(null);
+        setStoredUser(null);
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      let mounted = true;
+
+      supabase.auth
+        .getSession()
+        .then(({ data, error }) => {
+          if (!mounted) return;
+
+          if (error || !data.session?.user) {
+            setStoredUser(null);
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+
+          return getCurrentUser()
+            .then((nextUser) => {
+              if (!mounted) return;
+              setStoredUser(nextUser);
+              setUser(nextUser);
+            })
+            .catch(() => {
+              if (!mounted) return;
+              setStoredUser(null);
+              setUser(null);
+            })
+            .finally(() => {
+              if (mounted) setIsLoading(false);
+            });
+        })
+        .finally(() => {
+          if (mounted) setIsLoading(false);
+        });
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!mounted) return;
+
+        if (!session?.user) {
+          setStoredUser(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
+        void getCurrentUser()
+          .then((nextUser) => {
+            if (!mounted) return;
+            setStoredUser(nextUser);
+            setUser(nextUser);
+          })
+          .catch(() => {
+            if (!mounted) return;
+            setStoredUser(null);
+            setUser(null);
+          })
+          .finally(() => {
+            if (mounted) setIsLoading(false);
+          });
+      });
+
+      return () => {
+        mounted = false;
+        subscription.unsubscribe();
+      };
+    }
+
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
     getCurrentUser()
       .then((nextUser) => {
@@ -61,11 +150,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setStoredToken(null);
         setStoredUser(null);
         setUser(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
+      if (AUTH_MODE === 'supabase') {
+        if (!isSupabaseAuthConfigured) {
+          console.warn('Supabase auth mode is enabled, but VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are missing.');
+          return false;
+        }
+
+        const nextUser = await loginWithSupabase(email, password);
+        setStoredToken(null);
+        setStoredUser(nextUser);
+        setUser(nextUser);
+        return true;
+      }
+
       const result = await loginRequest(email, password);
       const nextUser = normalizeUser(result.user);
       setStoredToken(result.access_token);
@@ -81,6 +186,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    if (AUTH_MODE === 'supabase') {
+      void logoutSupabase();
+    }
+
     setStoredToken(null);
     setStoredUser(null);
     setUser(null);
@@ -99,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, hasRole, canPerform }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasRole, canPerform }}>
       {children}
     </AuthContext.Provider>
   );

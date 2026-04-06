@@ -75,4 +75,38 @@ export class AuthService {
       },
     };
   }
+
+  async getCurrentUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { roles: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Authenticated user was not found');
+    }
+
+    return {
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      roles: user.roles.map((role) => role.name),
+      createdAt: user.createdAt,
+    };
+  }
+
+  async listUsers() {
+    const users = await this.prisma.user.findMany({
+      orderBy: { createdAt: 'asc' },
+      include: { roles: true },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      roles: user.roles.map((role) => role.name),
+      createdAt: user.createdAt,
+    }));
+  }
 }

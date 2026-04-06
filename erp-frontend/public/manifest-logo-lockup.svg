@@ -1,0 +1,36 @@
+<svg width="900" height="240" viewBox="0 0 900 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="manifestCube" x1="34" y1="22" x2="172" y2="198" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DE7E3"/>
+      <stop offset="0.38" stop-color="#467BFF"/>
+      <stop offset="1" stop-color="#102B66"/>
+    </linearGradient>
+    <linearGradient id="manifestStroke" x1="18" y1="34" x2="182" y2="182" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B6BFF"/>
+      <stop offset="1" stop-color="#6BE2DD"/>
+    </linearGradient>
+    <filter id="manifestGlow" x="0" y="0" width="220" height="220" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feOffset dy="10"/>
+      <feGaussianBlur stdDeviation="10"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.231373 0 0 0 0 0.419608 0 0 0 0 1 0 0 0 0.22 0"/>
+      <feBlend in2="SourceGraphic" result="shape"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#manifestGlow)" transform="translate(16 18)">
+    <path d="M92 14L138 40V144L92 170L46 144V40L92 14Z" fill="url(#manifestCube)" fill-opacity="0.28" stroke="#284B99" stroke-width="5"/>
+    <path d="M92 14L138 40L92 66L46 40L92 14Z" fill="#9CF0ED" fill-opacity="0.5"/>
+    <path d="M92 66V170" stroke="#8AE5E0" stroke-opacity="0.55" stroke-width="4"/>
+    <path d="M46 40V144L92 170" stroke="#1E4DB2" stroke-opacity="0.8" stroke-width="4"/>
+    <path d="M138 40V144L92 170" stroke="#5CD7D0" stroke-opacity="0.75" stroke-width="4"/>
+    <path d="M16 126V54C16 45.1634 23.1634 38 32 38H36C40.2434 38 44.3131 39.6857 47.3137 42.6863L83 78.3726C88.1597 83.5323 96.6126 83.5323 101.772 78.3726L142.686 37.4584C145.686 34.4578 149.757 32.7721 154 32.7721H166.5L148.5 79.5" stroke="url(#manifestStroke)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M148.5 79.5L176 52" stroke="url(#manifestStroke)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M168 148V92" stroke="url(#manifestStroke)" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="168" cy="160" r="9" fill="#6BE2DD"/>
+  </g>
+
+  <g transform="translate(236 42)">
+    <text x="0" y="92" fill="#131A27" font-family="Poppins, Inter, Arial, sans-serif" font-size="92" font-weight="700" letter-spacing="-3">Manifest</text>
+    <text x="4" y="148" fill="#70788C" font-family="Poppins, Inter, Arial, sans-serif" font-size="38" font-weight="500" letter-spacing="8">OPERATIONS PLATFORM</text>
+  </g>
+</svg>

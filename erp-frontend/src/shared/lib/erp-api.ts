@@ -11,11 +11,43 @@ import type {
   Warehouse,
 } from "@/shared/types/erp";
 import { apiRequest } from "./api";
+import { AUTH_MODE, supabase } from "./supabase";
 
 type BackendUser = {
   email: string;
   name?: string | null;
   roles?: string[];
+};
+
+type BackendAuthUser = {
+  sub: string;
+  email: string;
+  name?: string | null;
+  roles: string[];
+  createdAt?: string;
+};
+
+type BackendUserListItem = {
+  id: string;
+  email: string;
+  name?: string | null;
+  roles: string[];
+  createdAt: string;
+};
+
+type SupabaseUserShape = {
+  id: string;
+  email?: string | null;
+  user_metadata?: {
+    full_name?: string;
+    name?: string;
+    role?: string;
+  };
+  app_metadata?: {
+    role?: string;
+    roles?: string[];
+  };
+  created_at?: string;
 };
 
 type LoginResponse = {
@@ -263,6 +295,22 @@ export function normalizeUser(raw: BackendUser): User {
   };
 }
 
+export function normalizeSupabaseUser(raw: SupabaseUserShape): User {
+  const email = raw.email || "";
+  const derivedRole =
+    raw.app_metadata?.role ||
+    raw.app_metadata?.roles?.[0] ||
+    raw.user_metadata?.role;
+
+  return {
+    id: raw.id,
+    name: raw.user_metadata?.full_name || raw.user_metadata?.name || email,
+    email,
+    role: normalizeRole(derivedRole),
+    createdAt: raw.created_at || new Date().toISOString(),
+  };
+}
+
 export function normalizeProduct(raw: BackendProduct): Product {
   return {
     id: raw.id,
@@ -427,19 +475,69 @@ export async function loginRequest(email: string, password: string) {
 }
 
 export async function getCurrentUser() {
-  const data = await apiRequest<{
-    email: string;
-    sub: string;
-    roles: string[];
-  }>("/auth/me");
+  if (AUTH_MODE === "supabase" && supabase) {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!user) {
+      throw new Error("No active Supabase user session found.");
+    }
+
+    return normalizeSupabaseUser(user);
+  }
+
+  const data = await apiRequest<BackendAuthUser>("/auth/me");
 
   return {
     id: data.sub,
-    name: data.email,
+    name: data.name || data.email,
     email: data.email,
     role: normalizeRole(data.roles?.[0]),
-    createdAt: new Date().toISOString(),
+    createdAt: data.createdAt || new Date().toISOString(),
   } satisfies User;
+}
+
+export async function listUsers() {
+  const items = await apiRequest<BackendUserListItem[]>("/auth/users");
+  return items.map((item) => ({
+    id: item.id,
+    name: item.name || item.email,
+    email: item.email,
+    role: normalizeRole(item.roles?.[0]),
+    createdAt: formatDate(item.createdAt),
+  })) satisfies User[];
+}
+
+export async function loginWithSupabase(email: string, password: string) {
+  if (!supabase) {
+    throw new Error("Supabase auth is not configured.");
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data.user) {
+    throw new Error("Supabase did not return a user.");
+  }
+
+  return normalizeSupabaseUser(data.user);
+}
+
+export async function logoutSupabase() {
+  if (!supabase) return;
+  await supabase.auth.signOut();
 }
 
 export async function listProducts() {

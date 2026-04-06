@@ -7,6 +7,7 @@ import { Label } from '@/shared/ui/label';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
+import { AUTH_MODE, isSupabaseAuthConfigured } from '@/shared/lib/supabase';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const isSupabaseMode = AUTH_MODE === 'supabase';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +30,11 @@ export default function LoginPage() {
       toast.success('Welcome back!');
       navigate('/dashboard');
     } else {
-      setError('Invalid credentials or backend unavailable.');
+      setError(
+        isSupabaseMode
+          ? 'Unable to sign in with Supabase. Check your credentials and Supabase configuration.'
+          : 'Invalid credentials or backend unavailable.',
+      );
     }
   };
 
@@ -37,7 +43,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
           <h2 className="text-2xl font-bold mb-1">Sign in</h2>
-          <p className="text-muted-foreground mb-6">Enter your credentials to access the platform</p>
+          <p className="text-muted-foreground mb-6">
+            {isSupabaseMode
+              ? 'Sign in with your Supabase-backed workspace account.'
+              : 'Enter your credentials to access the platform'}
+          </p>
+
+          {isSupabaseMode && !isSupabaseAuthConfigured && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Supabase auth mode is enabled, but `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are not configured yet.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -69,20 +85,22 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-8 rounded-xl border bg-background p-4">
-            <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Backend Login</p>
-            <div className="space-y-2">
-              {[
-                { email: 'admin@erp.com', role: 'Seeded Admin', color: 'text-primary' },
-              ].map(a => (
-                <button key={a.email} onClick={() => { setEmail(a.email); setPassword('AdminPassword123!'); }}
-                  className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors flex items-center justify-between group">
-                  <span className="text-sm">{a.email}</span>
-                  <span className={`text-xs font-medium ${a.color}`}>{a.role}</span>
-                </button>
-              ))}
+          {!isSupabaseMode && (
+            <div className="mt-8 rounded-xl border bg-background p-4">
+              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Backend Login</p>
+              <div className="space-y-2">
+                {[
+                  { email: 'admin@erp.com', role: 'Seeded Admin', color: 'text-primary' },
+                ].map(a => (
+                  <button key={a.email} onClick={() => { setEmail(a.email); setPassword('AdminPassword123!'); }}
+                    className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors flex items-center justify-between group">
+                    <span className="text-sm">{a.email}</span>
+                    <span className={`text-xs font-medium ${a.color}`}>{a.role}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
