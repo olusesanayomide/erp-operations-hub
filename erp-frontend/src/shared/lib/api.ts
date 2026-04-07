@@ -1,7 +1,16 @@
 import { AUTH_MODE, supabase } from "./supabase";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3000";
+const DEFAULT_LOCAL_API_BASE_URL = "http://localhost:3000";
+
+const API_BASE_URL = (() => {
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/$/, "");
+  }
+
+  return DEFAULT_LOCAL_API_BASE_URL;
+})();
 
 const TOKEN_STORAGE_KEY = "erp.auth.token";
 const USER_STORAGE_KEY = "erp.auth.user";

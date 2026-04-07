@@ -1,10 +1,42 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from 'prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { StockMovementType } from '@prisma/client';
 
 @Injectable()
 export class InventoryService {
   constructor(private prisma: PrismaService) {}
+
+  private async validateProductAndWarehouse(productId: string, warehouseId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw new BadRequestException('Product does not exist');
+    }
+
+    const warehouse = await this.prisma.warehouse.findUnique({
+      where: { id: warehouseId },
+    });
+    if (!warehouse) {
+      throw new BadRequestException('Warehouse does not exist');
+    }
+
+    return { product, warehouse };
+  }
+
+  private async getAvailableStock(productId: string, warehouseId: string) {
+    const summary = await this.prisma.stockMovement.aggregate({
+      where: {
+        productId,
+        warehouseId,
+      },
+      _sum: {
+        quantity: true,
+      },
+    });
+
+    return summary._sum.quantity || 0;
+  }
 
   // Get all inventory items
   async getInventory() {
@@ -45,19 +77,7 @@ export class InventoryService {
     if (quantity <= 0) {
       throw new BadRequestException('Quantity must be greater than 0');
     }
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
-    });
-    if (!product) {
-      throw new BadRequestException('Product does not exist');
-    }
-
-    const warehouse = await this.prisma.warehouse.findUnique({
-      where: { id: warehouseId },
-    });
-    if (!warehouse) {
-      throw new BadRequestException('Warehouse does not exist');
-    }
+    await this.validateProductAndWarehouse(productId, warehouseId);
 
     return this.prisma.$transaction([
       // Record the stock movement
@@ -93,6 +113,8 @@ export class InventoryService {
     if (quantity <= 0)
       throw new BadRequestException('Quantity must be greater than 0');
 
+    await this.validateProductAndWarehouse(productId, warehouseId);
+
     // Check if inventory exists and has enough stock
     const inventory = await this.prisma.inventoryItem.findUnique({
       where: { productId_warehouseId: { productId, warehouseId } },
@@ -118,6 +140,131 @@ export class InventoryService {
         data: { quantity: { decrement: quantity } },
       }),
     ]);
+  }
+
+  async transferStock(
+    productId: string,
+    sourceWarehouseId: string,
+    destinationWarehouseId: string,
+    quantity: number,
+    note: string,
+  ) {
+    if (quantity <= 0) {
+      throw new BadRequestException('Quantity must be greater than 0');
+    }
+
+    const trimmedNote = note.trim();
+    if (!trimmedNote) {
+      throw new BadRequestException('Transfer note is required');
+    }
+
+    if (sourceWarehouseId === destinationWarehouseId) {
+      throw new BadRequestException(
+        'Source and destination warehouses must be different',
+      );
+    }
+
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw new BadRequestException('Product does not exist');
+    }
+
+    const [sourceWarehouse, destinationWarehouse] = await Promise.all([
+      this.prisma.warehouse.findUnique({
+        where: { id: sourceWarehouseId },
+      }),
+      this.prisma.warehouse.findUnique({
+        where: { id: destinationWarehouseId },
+      }),
+    ]);
+
+    if (!sourceWarehouse) {
+      throw new BadRequestException('Source warehouse does not exist');
+    }
+
+    if (!destinationWarehouse) {
+      throw new BadRequestException('Destination warehouse does not exist');
+    }
+
+    const [sourceAvailableStock, destinationAvailableStock] = await Promise.all([
+      this.getAvailableStock(productId, sourceWarehouseId),
+      this.getAvailableStock(productId, destinationWarehouseId),
+    ]);
+
+    if (sourceAvailableStock < quantity) {
+      throw new BadRequestException('Insufficient stock in source warehouse');
+    }
+
+    const transferReferenceId = `TRANSFER-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)
+      .toUpperCase()}`;
+    const sourceReference = `${transferReferenceId} | TO:${destinationWarehouse.name} (${destinationWarehouse.id}) | NOTE:${trimmedNote}`;
+    const destinationReference = `${transferReferenceId} | FROM:${sourceWarehouse.name} (${sourceWarehouse.id}) | NOTE:${trimmedNote}`;
+
+    const operations = [
+      this.prisma.stockMovement.create({
+        data: {
+          productId,
+          warehouseId: sourceWarehouseId,
+          quantity: -quantity,
+          type: StockMovementType.OUT,
+          reference: sourceReference,
+        },
+      }),
+      this.prisma.stockMovement.create({
+        data: {
+          productId,
+          warehouseId: destinationWarehouseId,
+          quantity,
+          type: StockMovementType.IN,
+          reference: destinationReference,
+        },
+      }),
+      this.prisma.inventoryItem.upsert({
+        where: {
+          productId_warehouseId: {
+            productId,
+            warehouseId: sourceWarehouseId,
+          },
+        },
+        update: {
+          quantity: sourceAvailableStock - quantity,
+        },
+        create: {
+          productId,
+          warehouseId: sourceWarehouseId,
+          quantity: sourceAvailableStock - quantity,
+        },
+      }),
+      this.prisma.inventoryItem.upsert({
+        where: {
+          productId_warehouseId: {
+            productId,
+            warehouseId: destinationWarehouseId,
+          },
+        },
+        update: {
+          quantity: destinationAvailableStock + quantity,
+        },
+        create: {
+          productId,
+          warehouseId: destinationWarehouseId,
+          quantity: destinationAvailableStock + quantity,
+        },
+      }),
+    ];
+
+    const [outMovement, inMovement] = await this.prisma.$transaction(operations);
+
+    return {
+      success: true,
+      message: 'Stock transferred successfully',
+      transferReference: transferReferenceId,
+      movements: [outMovement, inMovement],
+    };
   }
 
   // // Get all stock movements

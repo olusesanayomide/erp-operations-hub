@@ -31,7 +31,7 @@ const rolePermissions: Record<UserRole, string[]> = {
   admin: ['*'],
   manager: [
     'products.create', 'products.edit', 'products.view',
-    'inventory.view', 'inventory.stock-in', 'inventory.stock-out', 'inventory.adjust',
+    'inventory.view', 'inventory.stock-in', 'inventory.stock-out', 'inventory.transfer', 'inventory.adjust',
     'orders.view', 'orders.create', 'orders.confirm', 'orders.pick', 'orders.ship', 'orders.deliver', 'orders.cancel',
     'purchases.view', 'purchases.create', 'purchases.confirm', 'purchases.receive',
     'customers.view', 'customers.create', 'customers.edit',

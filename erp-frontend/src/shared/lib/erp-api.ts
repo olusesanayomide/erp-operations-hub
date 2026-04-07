@@ -817,3 +817,16 @@ export async function stockOut(payload: {
   });
 }
 
+export async function transferStock(payload: {
+  productId: string;
+  sourceWarehouseId: string;
+  destinationWarehouseId: string;
+  quantity: number;
+  note: string;
+}) {
+  await apiRequest("/inventory/transfer", {
+    method: "POST",
+    body: payload,
+  });
+}
+

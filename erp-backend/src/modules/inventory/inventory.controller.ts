@@ -16,6 +16,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { StockMovementDto } from './dto/stock-movement.dto';
+import { TransferStockDto } from './dto/transfer-stock.dto';
 import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/auth/decorator/role.decorator';
@@ -101,5 +102,35 @@ export class InventoryController {
   async stockOut(@Body() dto: StockMovementDto) {
     const { productId, warehouseId, quantity } = dto;
     return this.inventoryService.stockOut(productId, warehouseId, quantity);
+  }
+
+  @Post('transfer')
+  @Roles(Role.MANAGER, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Transfer stock between warehouses',
+    description:
+      'Immediately moves stock from one warehouse to another and records paired stock movement entries for auditability.',
+  })
+  @ApiResponse({ status: 201, description: 'Stock transferred successfully.' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid transfer request, same warehouse selected, or insufficient stock.',
+  })
+  async transfer(@Body() dto: TransferStockDto) {
+    const {
+      productId,
+      sourceWarehouseId,
+      destinationWarehouseId,
+      quantity,
+      note,
+    } = dto;
+    return this.inventoryService.transferStock(
+      productId,
+      sourceWarehouseId,
+      destinationWarehouseId,
+      quantity,
+      note,
+    );
   }
 }

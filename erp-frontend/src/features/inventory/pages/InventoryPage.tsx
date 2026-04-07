@@ -7,11 +7,12 @@ import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
+import { Textarea } from '@/shared/ui/textarea';
 import { getStockStatus } from '@/shared/types/erp';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Search, Boxes, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { Search, Boxes, ArrowDownRight, ArrowUpRight, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
-import { listInventory, listProducts, listWarehouses, stockIn, stockOut } from '@/shared/lib/erp-api';
+import { listInventory, listProducts, listWarehouses, stockIn, stockOut, transferStock } from '@/shared/lib/erp-api';
 
 function StockDialog({
   type,
@@ -84,6 +85,106 @@ function StockDialog({
   );
 }
 
+function TransferDialog({
+  open,
+  onOpenChange,
+  transferForm,
+  setTransferForm,
+  products,
+  warehouses,
+  onSubmit,
+  isSubmitting,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  transferForm: {
+    productId: string;
+    sourceWarehouseId: string;
+    destinationWarehouseId: string;
+    quantity: string;
+    note: string;
+  };
+  setTransferForm: React.Dispatch<
+    React.SetStateAction<{
+      productId: string;
+      sourceWarehouseId: string;
+      destinationWarehouseId: string;
+      quantity: string;
+      note: string;
+    }>
+  >;
+  products: Array<{ id: string; name: string }>;
+  warehouses: Array<{ id: string; name: string }>;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  isSubmitting: boolean;
+}) {
+  const isReady =
+    Boolean(transferForm.productId) &&
+    Boolean(transferForm.sourceWarehouseId) &&
+    Boolean(transferForm.destinationWarehouseId) &&
+    transferForm.sourceWarehouseId !== transferForm.destinationWarehouseId &&
+    Number(transferForm.quantity) > 0 &&
+    Boolean(transferForm.note.trim());
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Transfer Stock</DialogTitle></DialogHeader>
+        <form className="space-y-4 py-2" onSubmit={onSubmit}>
+          <div className="space-y-2">
+            <Label>Product</Label>
+            <Select value={transferForm.productId} onValueChange={(value) => setTransferForm((current) => ({ ...current, productId: value }))}>
+              <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+              <SelectContent>{products.map((product) => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Source Warehouse</Label>
+              <Select value={transferForm.sourceWarehouseId} onValueChange={(value) => setTransferForm((current) => ({ ...current, sourceWarehouseId: value }))}>
+                <SelectTrigger><SelectValue placeholder="Select source warehouse" /></SelectTrigger>
+                <SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Destination Warehouse</Label>
+              <Select value={transferForm.destinationWarehouseId} onValueChange={(value) => setTransferForm((current) => ({ ...current, destinationWarehouseId: value }))}>
+                <SelectTrigger><SelectValue placeholder="Select destination warehouse" /></SelectTrigger>
+                <SelectContent>{warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Quantity</Label>
+            <Input
+              type="number"
+              min="1"
+              inputMode="numeric"
+              placeholder="0"
+              value={transferForm.quantity}
+              onChange={(e) => setTransferForm((current) => ({ ...current, quantity: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Transfer Note</Label>
+            <Textarea
+              placeholder="Why is this stock being moved?"
+              value={transferForm.note}
+              onChange={(e) => setTransferForm((current) => ({ ...current, note: e.target.value }))}
+            />
+          </div>
+          {transferForm.sourceWarehouseId && transferForm.sourceWarehouseId === transferForm.destinationWarehouseId && (
+            <p className="text-sm text-destructive">Source and destination warehouses must be different.</p>
+          )}
+          <Button className="w-full" type="submit" disabled={!isReady || isSubmitting}>
+            {isSubmitting ? 'Saving...' : 'Transfer Stock'}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function InventoryPage() {
   const { canPerform } = useAuth();
   const queryClient = useQueryClient();
@@ -92,8 +193,16 @@ export default function InventoryPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [stockInOpen, setStockInOpen] = useState(false);
   const [stockOutOpen, setStockOutOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [stockInForm, setStockInForm] = useState({ productId: '', warehouseId: '', quantity: '1' });
   const [stockOutForm, setStockOutForm] = useState({ productId: '', warehouseId: '', quantity: '1' });
+  const [transferForm, setTransferForm] = useState({
+    productId: '',
+    sourceWarehouseId: '',
+    destinationWarehouseId: '',
+    quantity: '1',
+    note: '',
+  });
 
   const { data: inventory = [], isLoading } = useQuery({
     queryKey: ['inventory'],
@@ -134,6 +243,25 @@ export default function InventoryPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const transferMutation = useMutation({
+    mutationFn: transferStock,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      setTransferOpen(false);
+      setTransferForm({
+        productId: '',
+        sourceWarehouseId: '',
+        destinationWarehouseId: '',
+        quantity: '1',
+        note: '',
+      });
+      toast.success('Stock transferred');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   useEffect(() => {
     if (products.length === 0 || warehouses.length === 0) {
       return;
@@ -149,6 +277,17 @@ export default function InventoryPage() {
       productId: current.productId || products[0].id,
       warehouseId: current.warehouseId || warehouses[0].id,
       quantity: current.quantity || '1',
+    }));
+
+    setTransferForm((current) => ({
+      productId: current.productId || products[0].id,
+      sourceWarehouseId: current.sourceWarehouseId || warehouses[0].id,
+      destinationWarehouseId:
+        current.destinationWarehouseId ||
+        warehouses.find((warehouse) => warehouse.id !== (current.sourceWarehouseId || warehouses[0].id))?.id ||
+        warehouses[0].id,
+      quantity: current.quantity || '1',
+      note: current.note,
     }));
   }, [products, warehouses]);
 
@@ -206,6 +345,41 @@ export default function InventoryPage() {
     stockOutMutation.mutate(payload);
   };
 
+  const handleTransferSubmit = (form: typeof transferForm) => {
+    if (products.length === 0) {
+      toast.error('Create at least one product before transferring stock.');
+      return;
+    }
+
+    if (warehouses.length < 2) {
+      toast.error('Create at least two warehouses before transferring stock.');
+      return;
+    }
+
+    if (!form.productId || !form.sourceWarehouseId || !form.destinationWarehouseId || Number(form.quantity) <= 0) {
+      toast.error('Product, source warehouse, destination warehouse, and quantity are required');
+      return;
+    }
+
+    if (form.sourceWarehouseId === form.destinationWarehouseId) {
+      toast.error('Source and destination warehouses must be different');
+      return;
+    }
+
+    if (!form.note.trim()) {
+      toast.error('Transfer note is required');
+      return;
+    }
+
+    transferMutation.mutate({
+      productId: form.productId,
+      sourceWarehouseId: form.sourceWarehouseId,
+      destinationWarehouseId: form.destinationWarehouseId,
+      quantity: Number(form.quantity),
+      note: form.note.trim(),
+    });
+  };
+
   return (
     <div className="animate-fade-in">
       <PageHeader title="Inventory" description={`${inventory.length} records across ${warehouses.length} warehouses`}>
@@ -217,6 +391,11 @@ export default function InventoryPage() {
         {canPerform('inventory.stock-out') && (
           <Button variant="outline" onClick={() => setStockOutOpen(true)}>
             <ArrowUpRight className="h-4 w-4 mr-2" />Stock Out
+          </Button>
+        )}
+        {canPerform('inventory.transfer') && (
+          <Button variant="outline" onClick={() => setTransferOpen(true)}>
+            <ArrowRightLeft className="h-4 w-4 mr-2" />Transfer Stock
           </Button>
         )}
       </PageHeader>
@@ -247,6 +426,19 @@ export default function InventoryPage() {
         onSubmit={(event) => {
           event.preventDefault();
           handleSubmit('out', stockOutForm);
+        }}
+      />
+      <TransferDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        transferForm={transferForm}
+        setTransferForm={setTransferForm}
+        products={products}
+        warehouses={warehouses}
+        isSubmitting={transferMutation.isPending}
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleTransferSubmit(transferForm);
         }}
       />
 
