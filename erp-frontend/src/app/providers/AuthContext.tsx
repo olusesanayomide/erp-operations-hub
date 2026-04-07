@@ -3,17 +3,14 @@ import type { User, UserRole } from '@/shared/types/erp';
 import {
   ApiError,
   getStoredUser,
-  setStoredToken,
   setStoredUser,
 } from '@/shared/lib/api';
 import {
   getCurrentUser,
-  loginRequest,
   loginWithSupabase,
   logoutSupabase,
-  normalizeUser,
 } from '@/shared/lib/erp-api';
-import { AUTH_MODE, isSupabaseAuthConfigured, supabase } from '@/shared/lib/supabase';
+import { isSupabaseAuthConfigured, supabase } from '@/shared/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -56,66 +53,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (AUTH_MODE === 'supabase') {
-      if (!isSupabaseAuthConfigured || !supabase) {
-        console.warn('Supabase auth mode is enabled, but the client is not configured.');
-        setStoredToken(null);
-        setStoredUser(null);
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
+    if (!isSupabaseAuthConfigured || !supabase) {
+      console.warn('Supabase auth is enabled, but the client is not configured.');
+      setStoredUser(null);
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
 
-      let mounted = true;
+    let mounted = true;
 
-      supabase.auth
-        .getSession()
-        .then(({ data, error }) => {
-          if (!mounted) return;
-
-          if (error || !data.session?.user) {
-            setStoredUser(null);
-            setUser(null);
-            setIsLoading(false);
-            return;
-          }
-
-          return getCurrentUser()
-            .then((nextUser) => {
-              if (!mounted) return;
-              setStoredUser(nextUser);
-              setUser(nextUser);
-            })
-            .catch(() => {
-              if (!mounted) return;
-              setStoredUser(null);
-              setUser(null);
-            })
-            .finally(() => {
-              if (mounted) setIsLoading(false);
-            });
-        })
-        .finally(() => {
-          if (mounted) setIsLoading(false);
-        });
-
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
         if (!mounted) return;
 
-        if (!session?.user) {
+        if (error || !data.session?.user) {
           setStoredUser(null);
           setUser(null);
           setIsLoading(false);
           return;
         }
 
-        void getCurrentUser()
+        return getCurrentUser()
           .then((nextUser) => {
             if (!mounted) return;
-            setStoredUser(nextUser);
             setUser(nextUser);
+            setStoredUser(nextUser);
           })
           .catch(() => {
             if (!mounted) return;
@@ -125,55 +89,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .finally(() => {
             if (mounted) setIsLoading(false);
           });
-      });
-
-      return () => {
-        mounted = false;
-        subscription.unsubscribe();
-      };
-    }
-
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
-
-    getCurrentUser()
-      .then((nextUser) => {
-        setUser((current) => {
-          if (!current) return current;
-          setStoredUser(nextUser);
-          return nextUser;
-        });
-      })
-      .catch(() => {
-        setStoredToken(null);
-        setStoredUser(null);
-        setUser(null);
       })
       .finally(() => {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+
+      if (!session?.user) {
+        setStoredUser(null);
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      void getCurrentUser()
+        .then((nextUser) => {
+          if (!mounted) return;
+          setStoredUser(nextUser);
+          setUser(nextUser);
+        })
+        .catch(() => {
+          if (!mounted) return;
+          setStoredUser(null);
+          setUser(null);
+        })
+        .finally(() => {
+          if (mounted) setIsLoading(false);
+        });
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      if (AUTH_MODE === 'supabase') {
-        if (!isSupabaseAuthConfigured) {
-          console.warn('Supabase auth mode is enabled, but VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are missing.');
-          return false;
-        }
-
-        const nextUser = await loginWithSupabase(email, password);
-        setStoredToken(null);
-        setStoredUser(nextUser);
-        setUser(nextUser);
-        return true;
+      if (!isSupabaseAuthConfigured) {
+        console.warn('Supabase auth is enabled, but VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are missing.');
+        return false;
       }
 
-      const result = await loginRequest(email, password);
-      const nextUser = normalizeUser(result.user);
-      setStoredToken(result.access_token);
+      const nextUser = await loginWithSupabase(email, password);
       setStoredUser(nextUser);
       setUser(nextUser);
       return true;
@@ -186,11 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    if (AUTH_MODE === 'supabase') {
-      void logoutSupabase();
-    }
-
-    setStoredToken(null);
+    void logoutSupabase();
     setStoredUser(null);
     setUser(null);
   }, []);

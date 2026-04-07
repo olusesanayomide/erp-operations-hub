@@ -11,13 +11,7 @@ import type {
   Warehouse,
 } from "@/shared/types/erp";
 import { apiRequest } from "./api";
-import { AUTH_MODE, supabase } from "./supabase";
-
-type BackendUser = {
-  email: string;
-  name?: string | null;
-  roles?: string[];
-};
+import { supabase } from "./supabase";
 
 type BackendAuthUser = {
   sub: string;
@@ -33,27 +27,6 @@ type BackendUserListItem = {
   name?: string | null;
   roles: string[];
   createdAt: string;
-};
-
-type SupabaseUserShape = {
-  id: string;
-  email?: string | null;
-  user_metadata?: {
-    full_name?: string;
-    name?: string;
-    role?: string;
-  };
-  app_metadata?: {
-    role?: string;
-    roles?: string[];
-  };
-  created_at?: string;
-};
-
-type LoginResponse = {
-  access_token: string;
-  user: BackendUser;
-  message: string;
 };
 
 type BackendProduct = {
@@ -285,32 +258,6 @@ function getOrderStatusRank(status: Order["status"]) {
   return ranks[status];
 }
 
-export function normalizeUser(raw: BackendUser): User {
-  return {
-    id: raw.email,
-    name: raw.name || raw.email,
-    email: raw.email,
-    role: normalizeRole(raw.roles?.[0]),
-    createdAt: new Date().toISOString(),
-  };
-}
-
-export function normalizeSupabaseUser(raw: SupabaseUserShape): User {
-  const email = raw.email || "";
-  const derivedRole =
-    raw.app_metadata?.role ||
-    raw.app_metadata?.roles?.[0] ||
-    raw.user_metadata?.role;
-
-  return {
-    id: raw.id,
-    name: raw.user_metadata?.full_name || raw.user_metadata?.name || email,
-    email,
-    role: normalizeRole(derivedRole),
-    createdAt: raw.created_at || new Date().toISOString(),
-  };
-}
-
 export function normalizeProduct(raw: BackendProduct): Product {
   return {
     id: raw.id,
@@ -467,31 +414,7 @@ export function normalizeMovement(raw: BackendStockMovement): StockMovement {
   };
 }
 
-export async function loginRequest(email: string, password: string) {
-  return apiRequest<LoginResponse>("/auth/login", {
-    method: "POST",
-    body: { email, password },
-  });
-}
-
 export async function getCurrentUser() {
-  if (AUTH_MODE === "supabase" && supabase) {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error) {
-      throw error;
-    }
-
-    if (!user) {
-      throw new Error("No active Supabase user session found.");
-    }
-
-    return normalizeSupabaseUser(user);
-  }
-
   const data = await apiRequest<BackendAuthUser>("/auth/me");
 
   return {
@@ -532,7 +455,7 @@ export async function loginWithSupabase(email: string, password: string) {
     throw new Error("Supabase did not return a user.");
   }
 
-  return normalizeSupabaseUser(data.user);
+  return getCurrentUser();
 }
 
 export async function logoutSupabase() {

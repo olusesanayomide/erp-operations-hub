@@ -1,4 +1,4 @@
-import { AUTH_MODE, supabase } from "./supabase";
+import { supabase } from "./supabase";
 
 const DEFAULT_LOCAL_API_BASE_URL = "http://localhost:3000";
 
@@ -12,7 +12,6 @@ const API_BASE_URL = (() => {
   return DEFAULT_LOCAL_API_BASE_URL;
 })();
 
-const TOKEN_STORAGE_KEY = "erp.auth.token";
 const USER_STORAGE_KEY = "erp.auth.user";
 
 export class ApiError extends Error {
@@ -27,18 +26,6 @@ export class ApiError extends Error {
 
 export function getApiBaseUrl() {
   return API_BASE_URL;
-}
-
-export function getStoredToken() {
-  return localStorage.getItem(TOKEN_STORAGE_KEY);
-}
-
-export function setStoredToken(token: string | null) {
-  if (token) {
-    localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    return;
-  }
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
 }
 
 export function getStoredUser<T>() {
@@ -62,15 +49,15 @@ export function setStoredUser(user: unknown) {
 }
 
 async function resolveAuthToken() {
-  if (AUTH_MODE === "supabase" && supabase) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    return session?.access_token ?? null;
+  if (!supabase) {
+    return null;
   }
 
-  return getStoredToken();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  return session?.access_token ?? null;
 }
 
 type RequestInitWithJson = RequestInit & {

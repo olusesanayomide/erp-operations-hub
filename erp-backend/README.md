@@ -4,7 +4,7 @@ A robust ERP backend built with **NestJS, Prisma, and PostgreSQL**. Unlike basic
 
 ##  Recent Updates
 
-* **Authentication & Security:** Implemented Global JWT Authentication with `Passport.js`.
+* **Authentication & Security:** Implemented global bearer-token authentication with `Passport.js`, using Supabase as the active identity provider.
 * **RBAC (Role-Based Access Control):** Added a custom `@Roles()` decorator system (Admin, Manager, Staff) to protect sensitive procurement and financial routes.
 * **Standardized Error Handling:** Refined Guards to return proper HTTP exceptions (`401 Unauthorized`, `403 Forbidden`) instead of generic server errors.
 * **Full Procurement Cycle:** Implemented Purchase Orders with automated stock-in on receipt.
@@ -25,7 +25,7 @@ The system follows a strict **Event Sourcing** mindset for physical goods:
 
 ##  Security & Roles
 
-The API is locked by default. Access requires a valid JWT Bearer Token.
+The API is locked by default. Access requires a valid Supabase Bearer Token.
 
 | Role | Permissions |
 | --- | --- |
@@ -72,7 +72,7 @@ remove(@Param('id') id: string) { ... }
 
 ##  Getting Started
 
-1. **Environment Setup:** Create a `.env` file with `DATABASE_URL` and `JWT_SECRET`.
+1. **Environment Setup:** Create a `.env` file with `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, and `SUPABASE_SERVICE_ROLE_KEY` for admin-user seeding. Add `SUPABASE_JWT_SECRET` only if your Supabase project still signs tokens with HS256.
 2. **Install:** `npm install`
 3. **Database:** `npx prisma migrate dev`
 4. **Run:** `npm run start:dev`

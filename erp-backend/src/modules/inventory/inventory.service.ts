@@ -6,7 +6,10 @@ import { StockMovementType } from '@prisma/client';
 export class InventoryService {
   constructor(private prisma: PrismaService) {}
 
-  private async validateProductAndWarehouse(productId: string, warehouseId: string) {
+  private async validateProductAndWarehouse(
+    productId: string,
+    warehouseId: string,
+  ) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
     });
@@ -188,10 +191,12 @@ export class InventoryService {
       throw new BadRequestException('Destination warehouse does not exist');
     }
 
-    const [sourceAvailableStock, destinationAvailableStock] = await Promise.all([
-      this.getAvailableStock(productId, sourceWarehouseId),
-      this.getAvailableStock(productId, destinationWarehouseId),
-    ]);
+    const [sourceAvailableStock, destinationAvailableStock] = await Promise.all(
+      [
+        this.getAvailableStock(productId, sourceWarehouseId),
+        this.getAvailableStock(productId, destinationWarehouseId),
+      ],
+    );
 
     if (sourceAvailableStock < quantity) {
       throw new BadRequestException('Insufficient stock in source warehouse');
@@ -257,7 +262,8 @@ export class InventoryService {
       }),
     ];
 
-    const [outMovement, inMovement] = await this.prisma.$transaction(operations);
+    const [outMovement, inMovement] =
+      await this.prisma.$transaction(operations);
 
     return {
       success: true,

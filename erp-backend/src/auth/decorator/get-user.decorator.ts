@@ -1,5 +1,4 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-// Make sure to import Request from express specifically
 import { Request } from 'express';
 
 export class UserPayload {
@@ -8,7 +7,6 @@ export class UserPayload {
   roles: string[];
 }
 
-// Extend the Express Request to include our user
 interface RequestWithUser extends Request {
   user: UserPayload;
 }

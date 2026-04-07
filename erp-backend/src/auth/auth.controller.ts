@@ -2,8 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  HttpCode,
-  HttpStatus,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -30,24 +28,18 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiResponse({ status: 201, description: 'User successfully created.' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden / Email already exists.',
-  })
-  register(@Body() dto: CreateUserDto) {
-    return this.authService.register(dto);
+  @ApiOperation({ summary: 'Deprecated: user creation is handled by Supabase auth' })
+  @ApiResponse({ status: 410, description: 'Authentication is managed by Supabase.' })
+  register(@Body() _dto: CreateUserDto) {
+    return this.authService.assertSupabaseManagedAuth();
   }
 
-  @HttpCode(HttpStatus.OK)
   @Public()
   @Post('login')
-  @ApiOperation({ summary: 'Login user and return JWT' })
-  @ApiResponse({ status: 200, description: 'Login successful.' })
-  @ApiResponse({ status: 401, description: 'Invalid credentials.' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  @ApiOperation({ summary: 'Deprecated: login is handled by Supabase auth' })
+  @ApiResponse({ status: 410, description: 'Authentication is managed by Supabase.' })
+  login(@Body() _dto: LoginDto) {
+    return this.authService.assertSupabaseManagedAuth();
   }
 
   @Get('me')

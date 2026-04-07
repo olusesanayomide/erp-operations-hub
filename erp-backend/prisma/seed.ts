@@ -3,15 +3,55 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '');
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@erp.com';
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'AdminPassword123!';
 const adminName = process.env.SEED_ADMIN_NAME ?? 'System Admin';
+const recreateSupabaseAuth =
+  process.env.SEED_RECREATE_SUPABASE_AUTH?.toLowerCase() === 'true';
 
-async function ensureSupabaseAuthUser(
-  email: string,
-  password: string,
-  name: string,
-) {
+function getSupabaseAdminHeaders() {
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error(
+      'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required to seed Supabase auth users.',
+    );
+  }
+
+  return {
+    apikey: supabaseServiceRoleKey,
+    Authorization: `Bearer ${supabaseServiceRoleKey}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function supabaseAdminRequest<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`${supabaseUrl}${path}`, {
+    ...init,
+    headers: {
+      ...getSupabaseAdminHeaders(),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Supabase admin request failed (${response.status} ${response.statusText}): ${text}`,
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+async function findSupabaseAuthUserByEmail(email: string) {
   const existingUsers = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT id::text
     FROM auth.users
@@ -19,71 +59,47 @@ async function ensureSupabaseAuthUser(
     LIMIT 1
   `;
 
-  if (existingUsers[0]?.id) {
-    return existingUsers[0].id;
+  return existingUsers[0]?.id ?? null;
+}
+
+async function deleteSupabaseAuthUser(userId: string) {
+  await supabaseAdminRequest<void>(`/auth/v1/admin/users/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+async function createSupabaseAuthUser(
+  email: string,
+  password: string,
+  name: string,
+) {
+  const result = await supabaseAdminRequest<{ id: string }>('/auth/v1/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name },
+    }),
+  });
+
+  return result.id;
+}
+
+async function ensureSupabaseAuthUser(
+  email: string,
+  password: string,
+  name: string,
+) {
+  const existingUserId = await findSupabaseAuthUserByEmail(email);
+
+  if (existingUserId && recreateSupabaseAuth) {
+    await deleteSupabaseAuthUser(existingUserId);
+  } else if (existingUserId) {
+    return existingUserId;
   }
 
-  const createdUsers = await prisma.$queryRaw<Array<{ id: string }>>`
-    WITH new_user AS (
-      INSERT INTO auth.users (
-        instance_id,
-        id,
-        aud,
-        role,
-        email,
-        encrypted_password,
-        email_confirmed_at,
-        raw_app_meta_data,
-        raw_user_meta_data,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        '00000000-0000-0000-0000-000000000000'::uuid,
-        gen_random_uuid(),
-        'authenticated',
-        'authenticated',
-        ${email},
-        crypt(${password}, gen_salt('bf')),
-        now(),
-        jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email')),
-        jsonb_build_object('name', ${name}),
-        now(),
-        now()
-      )
-      RETURNING id, email
-    ),
-    new_identity AS (
-      INSERT INTO auth.identities (
-        id,
-        user_id,
-        provider_id,
-        identity_data,
-        provider,
-        last_sign_in_at,
-        created_at,
-        updated_at
-      )
-      SELECT
-        gen_random_uuid(),
-        new_user.id,
-        new_user.id::text,
-        jsonb_build_object('sub', new_user.id::text, 'email', new_user.email),
-        'email',
-        now(),
-        now(),
-        now()
-      FROM new_user
-    )
-    SELECT id::text
-    FROM new_user
-  `;
-
-  if (!createdUsers[0]?.id) {
-    throw new Error(`Failed to create Supabase auth user for ${email}`);
-  }
-
-  return createdUsers[0].id;
+  return createSupabaseAuthUser(email, password, name);
 }
 
 async function main() {
@@ -104,6 +120,18 @@ async function main() {
     adminPassword,
     adminName,
   );
+
+  const existingAppUser = await prisma.user.findUnique({
+    where: { email: adminEmail },
+    select: { id: true },
+  });
+
+  if (existingAppUser && existingAppUser.id !== supabaseAuthUserId) {
+    await prisma.user.update({
+      where: { email: adminEmail },
+      data: { id: supabaseAuthUserId },
+    });
+  }
 
   await prisma.user.upsert({
     where: { email: adminEmail },
