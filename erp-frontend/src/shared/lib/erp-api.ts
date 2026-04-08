@@ -11,6 +11,7 @@ import type {
   Warehouse,
 } from "@/shared/types/erp";
 import { apiRequest } from "./api";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 type BackendAuthUser = {
@@ -222,6 +223,8 @@ type BackendInventorySummary = {
   status: string;
 };
 
+let currentUserRequest: Promise<User> | null = null;
+
 function formatDate(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -415,15 +418,27 @@ export function normalizeMovement(raw: BackendStockMovement): StockMovement {
 }
 
 export async function getCurrentUser() {
-  const data = await apiRequest<BackendAuthUser>("/auth/me");
+  if (!currentUserRequest) {
+    currentUserRequest = apiRequest<BackendAuthUser>("/auth/me")
+      .then((data) =>
+        ({
+          id: data.sub,
+          name: data.name || data.email,
+          email: data.email,
+          role: normalizeRole(data.roles?.[0]),
+          createdAt: data.createdAt || new Date().toISOString(),
+        }) satisfies User,
+      )
+      .finally(() => {
+        currentUserRequest = null;
+      });
+  }
 
-  return {
-    id: data.sub,
-    name: data.name || data.email,
-    email: data.email,
-    role: normalizeRole(data.roles?.[0]),
-    createdAt: data.createdAt || new Date().toISOString(),
-  } satisfies User;
+  return currentUserRequest;
+}
+
+export function clearCurrentUserRequest() {
+  currentUserRequest = null;
 }
 
 export async function listUsers() {
@@ -455,7 +470,7 @@ export async function loginWithSupabase(email: string, password: string) {
     throw new Error("Supabase did not return a user.");
   }
 
-  return getCurrentUser();
+  return data.session satisfies Session | null;
 }
 
 export async function logoutSupabase() {

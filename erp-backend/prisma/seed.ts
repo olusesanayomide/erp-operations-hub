@@ -73,15 +73,18 @@ async function createSupabaseAuthUser(
   password: string,
   name: string,
 ) {
-  const result = await supabaseAdminRequest<{ id: string }>('/auth/v1/admin/users', {
-    method: 'POST',
-    body: JSON.stringify({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { name },
-    }),
-  });
+  const result = await supabaseAdminRequest<{ id: string }>(
+    '/auth/v1/admin/users',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name },
+      }),
+    },
+  );
 
   return result.id;
 }

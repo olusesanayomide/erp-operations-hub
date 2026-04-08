@@ -1,11 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { User, UserRole } from '@/shared/types/erp';
+import { ApiError, getStoredUser, setStoredUser } from '@/shared/lib/api';
 import {
-  ApiError,
-  getStoredUser,
-  setStoredUser,
-} from '@/shared/lib/api';
-import {
+  clearCurrentUserRequest,
   getCurrentUser,
   loginWithSupabase,
   logoutSupabase,
@@ -16,7 +13,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   hasRole: (role: UserRole | UserRole[]) => boolean;
   canPerform: (action: string) => boolean;
@@ -51,10 +48,12 @@ const rolePermissions: Record<UserRole, string[]> = {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => getStoredUser<User>());
   const [isLoading, setIsLoading] = useState(true);
+  const authTransitionRef = useRef<((value: { success: boolean; error?: string }) => void) | null>(null);
 
   useEffect(() => {
     if (!isSupabaseAuthConfigured || !supabase) {
       console.warn('Supabase auth is enabled, but the client is not configured.');
+      clearCurrentUserRequest();
       setStoredUser(null);
       setUser(null);
       setIsLoading(false);
@@ -63,46 +62,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let mounted = true;
 
-    supabase.auth
-      .getSession()
-      .then(({ data, error }) => {
-        if (!mounted) return;
-
-        if (error || !data.session?.user) {
-          setStoredUser(null);
-          setUser(null);
-          setIsLoading(false);
-          return;
-        }
-
-        return getCurrentUser()
-          .then((nextUser) => {
-            if (!mounted) return;
-            setUser(nextUser);
-            setStoredUser(nextUser);
-          })
-          .catch(() => {
-            if (!mounted) return;
-            setStoredUser(null);
-            setUser(null);
-          })
-          .finally(() => {
-            if (mounted) setIsLoading(false);
-          });
-      })
-      .finally(() => {
-        if (mounted) setIsLoading(false);
-      });
+    const resolveTransition = (value: { success: boolean; error?: string }) => {
+      authTransitionRef.current?.(value);
+      authTransitionRef.current = null;
+    };
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
 
+      setIsLoading(true);
+
       if (!session?.user) {
+        clearCurrentUserRequest();
         setStoredUser(null);
         setUser(null);
         setIsLoading(false);
+        resolveTransition({ success: true });
         return;
       }
 
@@ -111,19 +88,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!mounted) return;
           setStoredUser(nextUser);
           setUser(nextUser);
+          resolveTransition({ success: true });
         })
-        .catch(() => {
+        .catch((error) => {
           if (!mounted) return;
           setStoredUser(null);
           setUser(null);
+          clearCurrentUserRequest();
+
+          const message =
+            error instanceof ApiError
+              ? error.message
+              : 'Signed in with Supabase, but failed to load your ERP user profile.';
+
+          resolveTransition({ success: false, error: message });
         })
         .finally(() => {
-          if (mounted) setIsLoading(false);
+          if (mounted) {
+            setIsLoading(false);
+          }
         });
     });
 
     return () => {
       mounted = false;
+      authTransitionRef.current = null;
       subscription.unsubscribe();
     };
   }, []);
@@ -132,23 +121,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!isSupabaseAuthConfigured) {
         console.warn('Supabase auth is enabled, but VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are missing.');
-        return false;
+        return {
+          success: false,
+          error: 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        };
       }
 
-      const nextUser = await loginWithSupabase(email, password);
-      setStoredUser(nextUser);
-      setUser(nextUser);
-      return true;
+      setIsLoading(true);
+
+      const transition = new Promise<{ success: boolean; error?: string }>((resolve) => {
+        authTransitionRef.current = resolve;
+      });
+
+      await loginWithSupabase(email, password);
+      return transition;
     } catch (error) {
+      authTransitionRef.current = null;
+      setIsLoading(false);
+
       if (!(error instanceof ApiError)) {
         console.error(error);
       }
-      return false;
+
+      return {
+        success: false,
+        error:
+          error instanceof ApiError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : 'Unable to sign in.',
+      };
     }
   }, []);
 
   const logout = useCallback(() => {
     void logoutSupabase();
+    clearCurrentUserRequest();
     setStoredUser(null);
     setUser(null);
   }, []);
@@ -177,4 +186,3 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
-

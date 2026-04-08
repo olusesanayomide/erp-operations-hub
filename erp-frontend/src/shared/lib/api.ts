@@ -79,14 +79,23 @@ export async function apiRequest<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    body:
-      init.body && typeof init.body === "object" && !(init.body instanceof FormData)
-        ? JSON.stringify(init.body)
-        : init.body ?? undefined,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      body:
+        init.body && typeof init.body === "object" && !(init.body instanceof FormData)
+          ? JSON.stringify(init.body)
+          : init.body ?? undefined,
+    });
+  } catch {
+    throw new ApiError(
+      `Unable to reach the ERP backend at ${API_BASE_URL}. Make sure the API server is running.`,
+      0,
+    );
+  }
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
