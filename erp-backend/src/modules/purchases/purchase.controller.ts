@@ -19,6 +19,7 @@ import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Role } from 'src/auth/enums/role.enum';
 import { Roles } from 'src/auth/decorator/role.decorator';
+import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -38,8 +39,8 @@ export class PurchaseContoller {
     status: 200,
     description: 'Purchase orders retrieved successfully.',
   })
-  async findAll() {
-    return await this.purchaseService.findAll();
+  async findAll(@GetUser() user: UserPayload) {
+    return await this.purchaseService.findAll(user.tenantId);
   }
 
   @Post()
@@ -51,8 +52,8 @@ export class PurchaseContoller {
   })
   @ApiResponse({ status: 201, description: 'Purchase Order created.' })
   @ApiResponse({ status: 404, description: 'Supplier or Product not found.' })
-  async create(@Body() dto: CreatePurchaseDto) {
-    return await this.purchaseService.createPurchase(dto);
+  async create(@Body() dto: CreatePurchaseDto, @GetUser() user: UserPayload) {
+    return await this.purchaseService.createPurchase(user.tenantId, dto);
   }
 
   @Patch(':id/receive')
@@ -70,8 +71,8 @@ export class PurchaseContoller {
     status: 400,
     description: 'Order already received or cancelled.',
   })
-  async receive(@Param('id') id: string) {
-    return await this.purchaseService.recievePurchase(id);
+  async receive(@Param('id') id: string, @GetUser() user: UserPayload) {
+    return await this.purchaseService.recievePurchase(user.tenantId, id);
   }
 
   @Get(':id')
@@ -83,7 +84,7 @@ export class PurchaseContoller {
   })
   @ApiResponse({ status: 200, description: 'PO details retrieved.' })
   @ApiResponse({ status: 404, description: 'Purchase Order not found.' })
-  async findOne(@Param('id') id: string) {
-    return await this.purchaseService.getPurchaseDetails(id);
+  async findOne(@Param('id') id: string, @GetUser() user: UserPayload) {
+    return await this.purchaseService.getPurchaseDetails(user.tenantId, id);
   }
 }

@@ -4,7 +4,6 @@ import {
   Post,
   Body,
   Param,
-  // Query,
   NotFoundException,
   UseGuards,
 } from '@nestjs/common';
@@ -21,6 +20,7 @@ import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/auth/decorator/role.decorator';
 import { Role } from 'src/auth/enums/role.enum';
+import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -40,8 +40,8 @@ export class InventoryController {
     status: 200,
     description: 'Return current stock levels for all products.',
   })
-  getAllInventory() {
-    return this.inventoryService.getInventory();
+  getAllInventory(@GetUser() user: UserPayload) {
+    return this.inventoryService.getInventory(user.tenantId);
   }
 
   @Get(':warehouseId')
@@ -55,9 +55,14 @@ export class InventoryController {
     description: 'Warehouse stock details retrieved successfully.',
   })
   @ApiResponse({ status: 404, description: 'Warehouse not found or empty.' })
-  async getWarehouseInventory(@Param('warehouseId') warehouseId: string) {
-    const items =
-      await this.inventoryService.getInventoryByWarehouse(warehouseId);
+  async getWarehouseInventory(
+    @Param('warehouseId') warehouseId: string,
+    @GetUser() user: UserPayload,
+  ) {
+    const items = await this.inventoryService.getInventoryByWarehouse(
+      user.tenantId,
+      warehouseId,
+    );
 
     if (!items || items.length === 0) {
       throw new NotFoundException(
@@ -67,16 +72,6 @@ export class InventoryController {
     return items;
   }
 
-  // @Get('movements')
-  // async getStockMovements(
-  //   @Query('page') page?: string,
-  //   @Query('limit') limit?: string,
-  // ) {
-  //   const _page = Number(page) || 1;
-  //   const _limit = Number(limit) || 10;
-  //   return this.inventoryService.getStockMovements(_page, _limit);
-  // }
-
   @Post('stock-in')
   @Roles(Role.MANAGER, Role.ADMIN)
   @ApiOperation({
@@ -85,9 +80,14 @@ export class InventoryController {
       'Creates a positive stock movement event in the ledger. Use this for adjustments or initial loading.',
   })
   @ApiResponse({ status: 201, description: 'Stock increased successfully.' })
-  async stockIn(@Body() dto: StockMovementDto) {
+  async stockIn(@Body() dto: StockMovementDto, @GetUser() user: UserPayload) {
     const { productId, warehouseId, quantity } = dto;
-    return this.inventoryService.stockIn(productId, warehouseId, quantity);
+    return this.inventoryService.stockIn(
+      user.tenantId,
+      productId,
+      warehouseId,
+      quantity,
+    );
   }
 
   @Post('stock-out')
@@ -99,9 +99,14 @@ export class InventoryController {
   })
   @ApiResponse({ status: 201, description: 'Stock decreased successfully.' })
   @ApiResponse({ status: 400, description: 'Insufficient stock levels.' })
-  async stockOut(@Body() dto: StockMovementDto) {
+  async stockOut(@Body() dto: StockMovementDto, @GetUser() user: UserPayload) {
     const { productId, warehouseId, quantity } = dto;
-    return this.inventoryService.stockOut(productId, warehouseId, quantity);
+    return this.inventoryService.stockOut(
+      user.tenantId,
+      productId,
+      warehouseId,
+      quantity,
+    );
   }
 
   @Post('transfer')
@@ -117,7 +122,7 @@ export class InventoryController {
     description:
       'Invalid transfer request, same warehouse selected, or insufficient stock.',
   })
-  async transfer(@Body() dto: TransferStockDto) {
+  async transfer(@Body() dto: TransferStockDto, @GetUser() user: UserPayload) {
     const {
       productId,
       sourceWarehouseId,
@@ -126,6 +131,7 @@ export class InventoryController {
       note,
     } = dto;
     return this.inventoryService.transferStock(
+      user.tenantId,
       productId,
       sourceWarehouseId,
       destinationWarehouseId,

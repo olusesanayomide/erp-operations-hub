@@ -33,6 +33,10 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User Authenticated or no roles found');
     }
 
+    if (user.isPlatformAdmin) {
+      return true;
+    }
+
     const requiredRolesStrings = requiredRoles.map((role) => String(role));
 
     const userRolesStrings = user.roles.map((role) => String(role));

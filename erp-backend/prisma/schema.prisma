@@ -15,6 +15,31 @@ enum UserRole {
   MANAGER
 }
 
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  users          User[]
+  warehouses     Warehouse[]
+  products       Product[]
+  inventoryItems InventoryItem[]
+  stockMovements StockMovement[]
+  orders         Order[]
+  customers      Customer[]
+  suppliers      Supplier[]
+  purchases      Purchase[]
+}
+
 model Role {
   id      String   @id @default(uuid())
   name    UserRole @unique
@@ -22,29 +47,39 @@ model Role {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String?
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  roles     Role[]   @relation("UserRoles")
+  id              String   @id @default(uuid())
+  tenantId        String
+  name            String?
+  email           String   @unique
+  password        String
+  isPlatformAdmin Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  roles           Role[]   @relation("UserRoles")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
 }
 
 // INVENTORY
 model Warehouse {
-  id   String @id @default(uuid())
-  name String
+  id       String @id @default(uuid())
+  tenantId String
+  name     String
   location String?
   inventoryItems InventoryItem[]
   stockMovements StockMovement[]
   purchases Purchase[]
   createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
 }
 
 model Product {
   id        String   @id @default(uuid())
+  tenantId  String
   name      String
-  sku       String   @unique
+  sku       String
   price     Float
   createdAt DateTime @default(now())
   updatedAt DateTime? @updatedAt
@@ -53,22 +88,32 @@ model Product {
   stockMovements StockMovement[]
   orderItems     OrderItem[]
   purchaseItems PurchaseItem[]
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
 }
 
 model InventoryItem {
   id          String @id @default(uuid())
+  tenantId    String
   productId   String
   warehouseId String
   quantity    Int @default(0)
 
   product   Product   @relation(fields: [productId], references: [id])
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
 
-  @@unique([productId, warehouseId])
+  @@unique([tenantId, productId, warehouseId])
+  @@index([tenantId])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, productId])
 }
 
 model StockMovement {
   id          String @id @default(uuid())
+  tenantId    String
   productId   String
   warehouseId String
   quantity    Int
@@ -78,6 +123,11 @@ model StockMovement {
 
   product   Product   @relation(fields: [productId], references: [id])
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, productId])
 }
 
 enum StockMovementType {
@@ -89,6 +139,7 @@ enum StockMovementType {
 // SALES / ORDERS
 model Order {
   id        String      @id @default(uuid())
+  tenantId  String
   status    OrderStatus @default(DRAFT)
   customerId String?
   customer Customer? @relation(fields: [customerId], references: [id])
@@ -96,6 +147,10 @@ model Order {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   items     OrderItem[]
+  tenant    Tenant      @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, customerId])
 }
 
 model OrderItem {
@@ -120,27 +175,37 @@ enum OrderStatus{
 
 model Customer{
   id String @id @default(uuid())
+  tenantId String
   name String
-  email  String @unique
+  email  String
   phone String?
   address String?
-  orders Order[] 
+  orders Order[]
+  tenant Tenant @relation(fields: [tenantId], references: [id])
   createdAt DateTime @default(now())
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
 }
 
 model Supplier {
   id        String     @id @default(uuid())
+  tenantId  String
   name      String
   email     String?
   phone     String?
   address   String?    // Added: Useful for generating PO documents
   purchases Purchase[]
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
   createdAt DateTime   @default(now())
+
+  @@index([tenantId])
 }
 
 model Purchase {
   id            String          @id @default(uuid())
-  purchaseOrder String          @unique  
+  tenantId      String
+  purchaseOrder String
   supplierId    String
   supplier      Supplier        @relation(fields: [supplierId], references: [id])
   warehouseId String
@@ -151,6 +216,12 @@ model Purchase {
   receivedAt    DateTime?       // Added: Track when inventory actually increased
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, purchaseOrder])
+  @@index([tenantId])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, warehouseId])
 }
 
 model PurchaseItem {

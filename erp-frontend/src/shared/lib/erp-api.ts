@@ -6,6 +6,7 @@ import type {
   Purchase,
   StockMovement,
   Supplier,
+  TenantSummary,
   User,
   UserRole,
   Warehouse,
@@ -16,17 +17,28 @@ import { supabase } from "./supabase";
 
 type BackendAuthUser = {
   sub: string;
+  tenantId: string;
   email: string;
   name?: string | null;
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+  };
   roles: string[];
+  isPlatformAdmin: boolean;
   createdAt?: string;
 };
 
 type BackendUserListItem = {
   id: string;
+  tenantId: string;
+  tenantName: string;
   email: string;
   name?: string | null;
   roles: string[];
+  isPlatformAdmin: boolean;
   createdAt: string;
 };
 
@@ -240,6 +252,25 @@ function normalizeRole(role?: string | null): UserRole {
   return "staff";
 }
 
+function normalizeTenant(raw: {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+}): TenantSummary {
+  const normalizedStatus = raw.status.toLowerCase();
+
+  return {
+    id: raw.id,
+    name: raw.name,
+    slug: raw.slug,
+    status:
+      normalizedStatus === "suspended" || normalizedStatus === "archived"
+        ? normalizedStatus
+        : "active",
+  };
+}
+
 function createOrderNumber(id: string) {
   return `ORD-${id.slice(0, 8).toUpperCase()}`;
 }
@@ -426,6 +457,8 @@ export async function getCurrentUser() {
           name: data.name || data.email,
           email: data.email,
           role: normalizeRole(data.roles?.[0]),
+          tenant: normalizeTenant(data.tenant),
+          isPlatformAdmin: data.isPlatformAdmin,
           createdAt: data.createdAt || new Date().toISOString(),
         }) satisfies User,
       )
@@ -448,6 +481,13 @@ export async function listUsers() {
     name: item.name || item.email,
     email: item.email,
     role: normalizeRole(item.roles?.[0]),
+    tenant: {
+      id: item.tenantId,
+      name: item.tenantName,
+      slug: "",
+      status: "active",
+    },
+    isPlatformAdmin: item.isPlatformAdmin,
     createdAt: formatDate(item.createdAt),
   })) satisfies User[];
 }
@@ -476,6 +516,19 @@ export async function loginWithSupabase(email: string, password: string) {
 export async function logoutSupabase() {
   if (!supabase) return;
   await supabase.auth.signOut();
+}
+
+export async function signupTenant(payload: {
+  companyName: string;
+  slug?: string;
+  adminName: string;
+  adminEmail: string;
+  adminPassword: string;
+}) {
+  return apiRequest("/auth/signup-tenant", {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export async function listProducts() {

@@ -8,10 +8,12 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { WarehousesModule } from './warehouses/warehouses.module';
 import { CustomersModule } from './customers/customers.module';
 import { AuthModule } from './auth/auth.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtGuard } from './auth/guard/jwt.guard';
 import { RolesGuard } from './auth/guard/role.guard';
 import { ConfigModule } from '@nestjs/config';
+import { TenantContextInterceptor } from './common/tenant-context.interceptor';
+import { PrismaModule } from './common/prisma.module';
 
 @Module({
   imports: [
@@ -19,6 +21,7 @@ import { ConfigModule } from '@nestjs/config';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    PrismaModule,
     InventoryModule,
     ProductsModule,
     OrdersModule,
@@ -30,9 +33,9 @@ import { ConfigModule } from '@nestjs/config';
   ],
   controllers: [],
   providers: [
-    PrismaService,
     { provide: APP_GUARD, useClass: JwtGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
   ],
 })
 export class AppModule {}

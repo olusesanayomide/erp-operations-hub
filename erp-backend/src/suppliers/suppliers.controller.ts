@@ -22,6 +22,7 @@ import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Role } from 'src/auth/enums/role.enum';
 import { Roles } from 'src/auth/decorator/role.decorator';
+import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -37,22 +38,22 @@ export class SuppliersController {
     status: 201,
     description: 'the supplier has successfully been created',
   })
-  create(@Body() createSupplierDto: CreateSupplierDto) {
-    return this.suppliersService.create(createSupplierDto);
+  create(@Body() createSupplierDto: CreateSupplierDto, @GetUser() user: UserPayload) {
+    return this.suppliersService.create(createSupplierDto, user);
   }
 
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   @ApiOperation({ summary: 'Fetch all suppliers' })
-  findAll() {
-    return this.suppliersService.findAll();
+  findAll(@GetUser() user: UserPayload) {
+    return this.suppliersService.findAll(user);
   }
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   @ApiOperation({ summary: 'Get a specific supplier by ID' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.suppliersService.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+    return this.suppliersService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -61,15 +62,16 @@ export class SuppliersController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateSupplierDto: UpdateSupplierDto,
+    @GetUser() user: UserPayload,
   ) {
-    return this.suppliersService.update(id, updateSupplierDto);
+    return this.suppliersService.update(id, updateSupplierDto, user);
   }
 
   @Delete(':id')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Delete a supplier' })
   @ApiResponse({ status: 200, description: 'Supplier deleted successfully' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.suppliersService.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+    return this.suppliersService.remove(id, user);
   }
 }

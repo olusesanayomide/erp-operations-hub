@@ -5,11 +5,15 @@ const prisma = new PrismaClient();
 
 const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '');
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const defaultTenantName = process.env.SEED_TENANT_NAME ?? 'Default Tenant';
+const defaultTenantSlug = process.env.SEED_TENANT_SLUG ?? 'default';
 const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@erp.com';
 const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'AdminPassword123!';
 const adminName = process.env.SEED_ADMIN_NAME ?? 'System Admin';
 const recreateSupabaseAuth =
   process.env.SEED_RECREATE_SUPABASE_AUTH?.toLowerCase() === 'true';
+const seedPlatformAdmin =
+  process.env.SEED_PLATFORM_ADMIN?.toLowerCase() !== 'false';
 
 function getSupabaseAdminHeaders() {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -72,6 +76,7 @@ async function createSupabaseAuthUser(
   email: string,
   password: string,
   name: string,
+  tenantId: string,
 ) {
   const result = await supabaseAdminRequest<{ id: string }>(
     '/auth/v1/admin/users',
@@ -81,7 +86,7 @@ async function createSupabaseAuthUser(
         email,
         password,
         email_confirm: true,
-        user_metadata: { name },
+        user_metadata: { name, tenantId },
       }),
     },
   );
@@ -93,6 +98,7 @@ async function ensureSupabaseAuthUser(
   email: string,
   password: string,
   name: string,
+  tenantId: string,
 ) {
   const existingUserId = await findSupabaseAuthUserByEmail(email);
 
@@ -102,13 +108,26 @@ async function ensureSupabaseAuthUser(
     return existingUserId;
   }
 
-  return createSupabaseAuthUser(email, password, name);
+  return createSupabaseAuthUser(email, password, name, tenantId);
 }
 
 async function main() {
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
   console.log('Seeding database...');
+
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: defaultTenantSlug },
+    update: {
+      name: defaultTenantName,
+      status: 'ACTIVE',
+    },
+    create: {
+      name: defaultTenantName,
+      slug: defaultTenantSlug,
+      status: 'ACTIVE',
+    },
+  });
 
   for (const role of Object.values(UserRole)) {
     await prisma.role.upsert({
@@ -122,6 +141,7 @@ async function main() {
     adminEmail,
     adminPassword,
     adminName,
+    tenant.id,
   );
 
   const existingAppUser = await prisma.user.findUnique({
@@ -130,17 +150,18 @@ async function main() {
   });
 
   if (existingAppUser && existingAppUser.id !== supabaseAuthUserId) {
-    await prisma.user.update({
+    await prisma.user.delete({
       where: { email: adminEmail },
-      data: { id: supabaseAuthUserId },
     });
   }
 
   await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
+      tenantId: tenant.id,
       name: adminName,
       password: hashedPassword,
+      isPlatformAdmin: seedPlatformAdmin,
       roles: {
         set: [],
         connect: [{ name: UserRole.ADMIN }],
@@ -148,15 +169,18 @@ async function main() {
     },
     create: {
       id: supabaseAuthUserId,
+      tenantId: tenant.id,
       email: adminEmail,
       password: hashedPassword,
       name: adminName,
+      isPlatformAdmin: seedPlatformAdmin,
       roles: {
         connect: [{ name: UserRole.ADMIN }],
       },
     },
   });
 
+  console.log(`Seeded tenant: ${tenant.name} (${tenant.slug})`);
   console.log(`Seeded Supabase auth user: ${adminEmail}`);
   console.log('Seeding finished successfully.');
 }

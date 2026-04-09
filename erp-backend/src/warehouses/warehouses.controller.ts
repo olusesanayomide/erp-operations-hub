@@ -22,10 +22,11 @@ import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/auth/decorator/role.decorator';
 import { Role } from 'src/auth/enums/role.enum';
+import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
-@ApiTags('Master Data: Warehouses') // Groups these endpoints in Swagger UI
+@ApiTags('Master Data: Warehouses')
 @Controller('warehouses')
 export class WarehousesController {
   constructor(private readonly warehousesService: WarehousesService) {}
@@ -38,8 +39,8 @@ export class WarehousesController {
   })
   @ApiResponse({ status: 201, description: 'Warehouse created successfully.' })
   @ApiResponse({ status: 400, description: 'Invalid data provided.' })
-  create(@Body() createWarehouseDto: CreateWarehouseDto) {
-    return this.warehousesService.create(createWarehouseDto);
+  create(@Body() createWarehouseDto: CreateWarehouseDto, @GetUser() user: UserPayload) {
+    return this.warehousesService.create(createWarehouseDto, user);
   }
 
   @Get()
@@ -50,8 +51,8 @@ export class WarehousesController {
       'Retrieves all locations including a count of their inventory items.',
   })
   @ApiResponse({ status: 200, description: 'Return all warehouses.' })
-  findAll() {
-    return this.warehousesService.findAll();
+  findAll(@GetUser() user: UserPayload) {
+    return this.warehousesService.findAll(user);
   }
 
   @Get(':id')
@@ -63,8 +64,8 @@ export class WarehousesController {
   })
   @ApiResponse({ status: 200, description: 'Warehouse found.' })
   @ApiResponse({ status: 404, description: 'Warehouse not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.warehousesService.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+    return this.warehousesService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -76,10 +77,11 @@ export class WarehousesController {
   @ApiResponse({ status: 200, description: 'Warehouse updated successfully.' })
   @ApiResponse({ status: 404, description: 'Warehouse not found.' })
   update(
-    @Param('id', ParseUUIDPipe) id: string, // Added Pipe
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateWarehouseDto: UpdateWarehouseDto,
+    @GetUser() user: UserPayload,
   ) {
-    return this.warehousesService.update(id, updateWarehouseDto);
+    return this.warehousesService.update(id, updateWarehouseDto, user);
   }
 
   @Delete(':id')
@@ -95,7 +97,7 @@ export class WarehousesController {
     description: 'Cannot delete warehouse with active inventory.',
   })
   @ApiResponse({ status: 404, description: 'Warehouse not found.' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.warehousesService.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+    return this.warehousesService.remove(id, user);
   }
 }

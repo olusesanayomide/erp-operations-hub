@@ -11,6 +11,8 @@ import { isSupabaseAuthConfigured, supabase } from '@/shared/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
+  tenant: User['tenant'] | null;
+  isPlatformAdmin: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -175,7 +177,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasRole, canPerform }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        tenant: user?.tenant ?? null,
+        isPlatformAdmin: user?.isPlatformAdmin ?? false,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        logout,
+        hasRole,
+        canPerform,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

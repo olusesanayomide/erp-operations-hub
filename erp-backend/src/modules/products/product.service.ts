@@ -1,21 +1,20 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Product } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
-import {
-  ProductImportMode,
-} from './dto/product.dto';
+import { ProductImportMode } from './dto/product.dto';
 import {
   buildProductImportPreview,
   ProductImportPreviewResult,
 } from './product-import';
+import { UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @Injectable()
 export class ProductService {
   constructor(private prisma: PrismaService) {}
 
-  //   Get all products
-  async getAll(): Promise<any[]> {
+  async getAll(user: UserPayload): Promise<any[]> {
     return this.prisma.product.findMany({
+      where: { tenantId: user.tenantId },
       include: {
         inventoryItems: true,
         orderItems: true,
@@ -24,10 +23,9 @@ export class ProductService {
     });
   }
 
-  //   Get product by ID
-  async getById(Id: string): Promise<Product> {
-    const product = await this.prisma.product.findUnique({
-      where: { id: Id },
+  async getById(id: string, user: UserPayload): Promise<Product> {
+    const product = await this.prisma.product.findFirst({
+      where: { id, tenantId: user.tenantId },
       include: {
         inventoryItems: true,
         orderItems: true,
@@ -40,25 +38,28 @@ export class ProductService {
     return product;
   }
 
-  //   create product
-  async createproduct(data: {
-    name: string;
-    sku: string;
-    price: number;
-  }): Promise<Product> {
+  async createproduct(
+    data: { name: string; sku: string; price: number },
+    user: UserPayload,
+  ): Promise<Product> {
     if (!data.name || !data.sku || data.price == null) {
       throw new NotFoundException('Missing required fields');
     }
     return this.prisma.product.create({
-      data,
+      data: {
+        ...data,
+        tenantId: user.tenantId,
+      },
     });
   }
 
   async previewImport(
     csv: string,
+    user: UserPayload,
     mode: ProductImportMode = 'upsert',
   ): Promise<ProductImportPreviewResult> {
     const existingProducts = await this.prisma.product.findMany({
+      where: { tenantId: user.tenantId },
       select: { sku: true },
     });
 
@@ -71,13 +72,14 @@ export class ProductService {
 
   async commitImport(
     csv: string,
+    user: UserPayload,
     mode: ProductImportMode = 'upsert',
   ): Promise<{
     mode: ProductImportMode;
     totals: ProductImportPreviewResult['totals'] & { imported: number };
     rows: ProductImportPreviewResult['rows'];
   }> {
-    const preview = await this.previewImport(csv, mode);
+    const preview = await this.previewImport(csv, user, mode);
     const validRows = preview.rows.filter((row) => row.issues.length === 0);
 
     if (preview.totals.rows === 0) {
@@ -95,6 +97,7 @@ export class ProductService {
         if (mode === 'create') {
           return this.prisma.product.create({
             data: {
+              tenantId: user.tenantId,
               name: row.name,
               sku: row.sku,
               price: row.price ?? 0,
@@ -103,8 +106,14 @@ export class ProductService {
         }
 
         return this.prisma.product.upsert({
-          where: { sku: row.sku },
+          where: {
+            tenantId_sku: {
+              tenantId: user.tenantId,
+              sku: row.sku,
+            },
+          },
           create: {
+            tenantId: user.tenantId,
             name: row.name,
             sku: row.sku,
             price: row.price ?? 0,
@@ -127,31 +136,22 @@ export class ProductService {
     };
   }
 
-  //   Update product
   async updateProduct(
     id: string,
     data: { name?: string; sku?: string; price?: number },
+    user: UserPayload,
   ): Promise<Product> {
-    const existingProduct = await this.prisma.product.findUnique({
-      where: { id },
-    });
-    if (!existingProduct) {
-      throw new NotFoundException('Product not found');
-    }
+    await this.getById(id, user);
+
     return this.prisma.product.update({
       where: { id },
       data,
     });
   }
 
-  //   Delete product
-  async deleteProduct(id: string): Promise<Product> {
-    const existingProduct = await this.prisma.product.findUnique({
-      where: { id },
-    });
-    if (!existingProduct) {
-      throw new NotFoundException('Product not found');
-    }
+  async deleteProduct(id: string, user: UserPayload): Promise<Product> {
+    await this.getById(id, user);
+
     return this.prisma.product.delete({ where: { id } });
   }
 }

@@ -2,10 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import * as bcrypt from 'bcrypt';
 import { createPublicKey } from 'crypto';
 import { PrismaService } from 'prisma/prisma.service';
-import { Role } from '../enums/role.enum';
 
 interface JwtHeader {
   alg?: string;
@@ -17,10 +15,6 @@ interface JwtPayLoad {
   email?: string;
   aud?: string | string[];
   iss?: string;
-  user_metadata?: {
-    name?: string;
-    full_name?: string;
-  };
 }
 
 type CachedSigningKey = {
@@ -73,7 +67,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     config: ConfigService,
     private prisma: PrismaService,
   ) {
-    const supabaseUrl = config.get<string>('SUPABASE_URL')?.trim().replace(/\/$/, '');
+    const supabaseUrl = config
+      .get<string>('SUPABASE_URL')
+      ?.trim()
+      .replace(/\/$/, '');
 
     if (!supabaseUrl) {
       throw new Error('SUPABASE_URL is required for Supabase token verification');
@@ -97,8 +94,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
 
     this.expectedIssuer = `${supabaseUrl}/auth/v1`;
-    this.expectedAudience = config.get<string>('SUPABASE_JWT_AUDIENCE') || 'authenticated';
-    this.supabaseJwtSecret = config.get<string>('SUPABASE_JWT_SECRET') || undefined;
+    this.expectedAudience =
+      config.get<string>('SUPABASE_JWT_AUDIENCE') || 'authenticated';
+    this.supabaseJwtSecret =
+      config.get<string>('SUPABASE_JWT_SECRET') || undefined;
   }
 
   private decodeHeader(token: string) {
@@ -111,7 +110,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   private assertExpectedIssuer(payload: JwtPayLoad | null) {
     if (!payload?.iss || payload.iss !== this.expectedIssuer) {
-      throw new UnauthorizedException('Token issuer is not the configured Supabase project');
+      throw new UnauthorizedException(
+        'Token issuer is not the configured Supabase project',
+      );
     }
   }
 
@@ -187,43 +188,31 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
   private async resolveAppUser(payload: JwtPayLoad) {
     if (!payload.sub || !payload.email) {
-      throw new UnauthorizedException('Token payload is missing subject or email');
+      throw new UnauthorizedException(
+        'Token payload is missing subject or email',
+      );
     }
 
     let user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { roles: true },
+      include: { roles: true, tenant: true },
     });
 
     if (!user) {
       user = await this.prisma.user.findUnique({
         where: { email: payload.email },
-        include: { roles: true },
+        include: { roles: true, tenant: true },
       });
     }
 
-    if (!user) {
-      const placeholderPassword = await bcrypt.hash(`supabase:${payload.sub}`, 10);
-      const derivedName =
-        payload.user_metadata?.full_name ||
-        payload.user_metadata?.name ||
-        payload.email;
+    if (!user || !user.tenantId) {
+      throw new UnauthorizedException(
+        'Authenticated user does not belong to a tenant. Complete tenant onboarding first.',
+      );
+    }
 
-      user = await this.prisma.user.create({
-        data: {
-          id: payload.sub,
-          email: payload.email,
-          name: derivedName,
-          password: placeholderPassword,
-          roles: {
-            connectOrCreate: {
-              where: { name: Role.STAFF },
-              create: { name: Role.STAFF },
-            },
-          },
-        },
-        include: { roles: true },
-      });
+    if (user.tenant.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Tenant access is not active.');
     }
 
     return user;
@@ -237,8 +226,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     return {
       userId: user.id,
+      tenantId: user.tenantId,
       email: user.email,
       roles: user.roles.map((role) => role.name),
+      isPlatformAdmin: user.isPlatformAdmin,
     };
   }
 }

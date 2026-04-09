@@ -1,10 +1,19 @@
 export type UserRole = 'admin' | 'manager' | 'staff';
 
+export interface TenantSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: 'active' | 'suspended' | 'archived';
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  tenant: TenantSummary;
+  isPlatformAdmin: boolean;
   avatar?: string;
   createdAt: string;
 }

@@ -11,22 +11,28 @@ import {
   buildCustomerImportPreview,
   CustomerImportPreviewResult,
 } from './customer-import';
+import { UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @Injectable()
 export class CustomersService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createCustomerDto: CreateCustomerDto) {
+  async create(createCustomerDto: CreateCustomerDto, user: UserPayload) {
     return this.prisma.customer.create({
-      data: createCustomerDto,
+      data: {
+        ...createCustomerDto,
+        tenantId: user.tenantId,
+      },
     });
   }
 
   async previewImport(
     csv: string,
+    user: UserPayload,
     mode: CustomerImportMode = 'upsert',
   ): Promise<CustomerImportPreviewResult> {
     const existingCustomers = await this.prisma.customer.findMany({
+      where: { tenantId: user.tenantId },
       select: { email: true },
     });
 
@@ -39,13 +45,14 @@ export class CustomersService {
 
   async commitImport(
     csv: string,
+    user: UserPayload,
     mode: CustomerImportMode = 'upsert',
   ): Promise<{
     mode: CustomerImportMode;
     totals: CustomerImportPreviewResult['totals'] & { imported: number };
     rows: CustomerImportPreviewResult['rows'];
   }> {
-    const preview = await this.previewImport(csv, mode);
+    const preview = await this.previewImport(csv, user, mode);
     const validRows = preview.rows.filter((row) => row.issues.length === 0);
 
     if (preview.totals.rows === 0) {
@@ -63,6 +70,7 @@ export class CustomersService {
         if (mode === 'create') {
           return this.prisma.customer.create({
             data: {
+              tenantId: user.tenantId,
               name: row.name,
               email: row.email,
               phone: row.phone || null,
@@ -72,8 +80,14 @@ export class CustomersService {
         }
 
         return this.prisma.customer.upsert({
-          where: { email: row.email },
+          where: {
+            tenantId_email: {
+              tenantId: user.tenantId,
+              email: row.email,
+            },
+          },
           create: {
+            tenantId: user.tenantId,
             name: row.name,
             email: row.email,
             phone: row.phone || null,
@@ -98,8 +112,9 @@ export class CustomersService {
     };
   }
 
-  async findAll() {
+  async findAll(user: UserPayload) {
     return this.prisma.customer.findMany({
+      where: { tenantId: user.tenantId },
       include: {
         _count: {
           select: { orders: true },
@@ -108,9 +123,9 @@ export class CustomersService {
     });
   }
 
-  async findOne(id: string) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id },
+  async findOne(id: string, user: UserPayload) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, tenantId: user.tenantId },
       include: { orders: true },
     });
     if (!customer) {
@@ -119,16 +134,18 @@ export class CustomersService {
     return customer;
   }
 
-  async update(id: string, updateCustomerDto: UpdateCustomerDto) {
+  async update(id: string, updateCustomerDto: UpdateCustomerDto, user: UserPayload) {
+    await this.findOne(id, user);
+
     return this.prisma.customer.update({
       where: { id },
       data: updateCustomerDto,
     });
   }
 
-  async remove(id: string) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id },
+  async remove(id: string, user: UserPayload) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, tenantId: user.tenantId },
       include: { _count: { select: { orders: true } } },
     });
     if (!customer) {

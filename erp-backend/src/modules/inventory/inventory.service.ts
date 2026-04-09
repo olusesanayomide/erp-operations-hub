@@ -7,18 +7,19 @@ export class InventoryService {
   constructor(private prisma: PrismaService) {}
 
   private async validateProductAndWarehouse(
+    tenantId: string,
     productId: string,
     warehouseId: string,
   ) {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
     });
     if (!product) {
       throw new BadRequestException('Product does not exist');
     }
 
-    const warehouse = await this.prisma.warehouse.findUnique({
-      where: { id: warehouseId },
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { id: warehouseId, tenantId },
     });
     if (!warehouse) {
       throw new BadRequestException('Warehouse does not exist');
@@ -27,9 +28,14 @@ export class InventoryService {
     return { product, warehouse };
   }
 
-  private async getAvailableStock(productId: string, warehouseId: string) {
+  private async getAvailableStock(
+    tenantId: string,
+    productId: string,
+    warehouseId: string,
+  ) {
     const summary = await this.prisma.stockMovement.aggregate({
       where: {
+        tenantId,
         productId,
         warehouseId,
       },
@@ -41,10 +47,10 @@ export class InventoryService {
     return summary._sum.quantity || 0;
   }
 
-  // Get all inventory items
-  async getInventory() {
+  async getInventory(tenantId: string) {
     const groups = await this.prisma.stockMovement.groupBy({
       by: ['productId', 'warehouseId'],
+      where: { tenantId },
       _sum: {
         quantity: true,
       },
@@ -58,11 +64,10 @@ export class InventoryService {
     }));
   }
 
-  // Get Inventory by Warehouse
-  async getInventoryByWarehouse(warehouseId: string) {
+  async getInventoryByWarehouse(tenantId: string, warehouseId: string) {
     const stock = await this.prisma.stockMovement.groupBy({
       by: ['productId'],
-      where: { warehouseId },
+      where: { tenantId, warehouseId },
       _sum: {
         quantity: true,
       },
@@ -75,17 +80,21 @@ export class InventoryService {
     }));
   }
 
-  // Add stock to a warehouse
-  async stockIn(productId: string, warehouseId: string, quantity: number) {
+  async stockIn(
+    tenantId: string,
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+  ) {
     if (quantity <= 0) {
       throw new BadRequestException('Quantity must be greater than 0');
     }
-    await this.validateProductAndWarehouse(productId, warehouseId);
+    await this.validateProductAndWarehouse(tenantId, productId, warehouseId);
 
     return this.prisma.$transaction([
-      // Record the stock movement
       this.prisma.stockMovement.create({
         data: {
+          tenantId,
           productId,
           warehouseId,
           quantity,
@@ -93,16 +102,15 @@ export class InventoryService {
           reference: 'API_STOCK_IN',
         },
       }),
-
-      // Update or create the inventory item
       this.prisma.inventoryItem.upsert({
         where: {
-          productId_warehouseId: { productId, warehouseId },
+          tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
         },
         update: {
           quantity: { increment: quantity },
         },
         create: {
+          tenantId,
           productId,
           warehouseId,
           quantity,
@@ -111,16 +119,21 @@ export class InventoryService {
     ]);
   }
 
-  // Remove stock from a warehouse
-  async stockOut(productId: string, warehouseId: string, quantity: number) {
+  async stockOut(
+    tenantId: string,
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+  ) {
     if (quantity <= 0)
       throw new BadRequestException('Quantity must be greater than 0');
 
-    await this.validateProductAndWarehouse(productId, warehouseId);
+    await this.validateProductAndWarehouse(tenantId, productId, warehouseId);
 
-    // Check if inventory exists and has enough stock
     const inventory = await this.prisma.inventoryItem.findUnique({
-      where: { productId_warehouseId: { productId, warehouseId } },
+      where: {
+        tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
+      },
     });
 
     if (!inventory)
@@ -131,6 +144,7 @@ export class InventoryService {
     return this.prisma.$transaction([
       this.prisma.stockMovement.create({
         data: {
+          tenantId,
           productId,
           warehouseId,
           quantity: -quantity,
@@ -139,13 +153,16 @@ export class InventoryService {
         },
       }),
       this.prisma.inventoryItem.update({
-        where: { productId_warehouseId: { productId, warehouseId } },
+        where: {
+          tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
+        },
         data: { quantity: { decrement: quantity } },
       }),
     ]);
   }
 
   async transferStock(
+    tenantId: string,
     productId: string,
     sourceWarehouseId: string,
     destinationWarehouseId: string,
@@ -167,19 +184,19 @@ export class InventoryService {
       );
     }
 
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
     });
     if (!product) {
       throw new BadRequestException('Product does not exist');
     }
 
     const [sourceWarehouse, destinationWarehouse] = await Promise.all([
-      this.prisma.warehouse.findUnique({
-        where: { id: sourceWarehouseId },
+      this.prisma.warehouse.findFirst({
+        where: { id: sourceWarehouseId, tenantId },
       }),
-      this.prisma.warehouse.findUnique({
-        where: { id: destinationWarehouseId },
+      this.prisma.warehouse.findFirst({
+        where: { id: destinationWarehouseId, tenantId },
       }),
     ]);
 
@@ -193,8 +210,8 @@ export class InventoryService {
 
     const [sourceAvailableStock, destinationAvailableStock] = await Promise.all(
       [
-        this.getAvailableStock(productId, sourceWarehouseId),
-        this.getAvailableStock(productId, destinationWarehouseId),
+        this.getAvailableStock(tenantId, productId, sourceWarehouseId),
+        this.getAvailableStock(tenantId, productId, destinationWarehouseId),
       ],
     );
 
@@ -212,6 +229,7 @@ export class InventoryService {
     const operations = [
       this.prisma.stockMovement.create({
         data: {
+          tenantId,
           productId,
           warehouseId: sourceWarehouseId,
           quantity: -quantity,
@@ -221,6 +239,7 @@ export class InventoryService {
       }),
       this.prisma.stockMovement.create({
         data: {
+          tenantId,
           productId,
           warehouseId: destinationWarehouseId,
           quantity,
@@ -230,7 +249,8 @@ export class InventoryService {
       }),
       this.prisma.inventoryItem.upsert({
         where: {
-          productId_warehouseId: {
+          tenantId_productId_warehouseId: {
+            tenantId,
             productId,
             warehouseId: sourceWarehouseId,
           },
@@ -239,6 +259,7 @@ export class InventoryService {
           quantity: sourceAvailableStock - quantity,
         },
         create: {
+          tenantId,
           productId,
           warehouseId: sourceWarehouseId,
           quantity: sourceAvailableStock - quantity,
@@ -246,7 +267,8 @@ export class InventoryService {
       }),
       this.prisma.inventoryItem.upsert({
         where: {
-          productId_warehouseId: {
+          tenantId_productId_warehouseId: {
+            tenantId,
             productId,
             warehouseId: destinationWarehouseId,
           },
@@ -255,6 +277,7 @@ export class InventoryService {
           quantity: destinationAvailableStock + quantity,
         },
         create: {
+          tenantId,
           productId,
           warehouseId: destinationWarehouseId,
           quantity: destinationAvailableStock + quantity,
@@ -262,8 +285,7 @@ export class InventoryService {
       }),
     ];
 
-    const [outMovement, inMovement] =
-      await this.prisma.$transaction(operations);
+    const [outMovement, inMovement] = await this.prisma.$transaction(operations);
 
     return {
       success: true,
@@ -272,20 +294,4 @@ export class InventoryService {
       movements: [outMovement, inMovement],
     };
   }
-
-  // // Get all stock movements
-  // async getStockMovements(_page: number, _limit: number) {
-  //   const skip = (_page - 1) * _limit;
-  //   const movement = await this.prisma.stockMovement.findMany({
-  //     skip,
-  //     take: _limit,
-  //     orderBy: { createdAt: 'desc' },
-  //     include: {
-  //       product: true,
-  //       warehouse: true,
-  //     },
-  //   });
-  //   console.log('movements fetched:', movement.length);
-  //   return movement;
-  // }
 }

@@ -6,32 +6,35 @@ import {
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
 import { PrismaService } from 'prisma/prisma.service';
+import { UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @Injectable()
 export class WarehousesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createWarehouseDto: CreateWarehouseDto) {
+  async create(createWarehouseDto: CreateWarehouseDto, user: UserPayload) {
     return this.prisma.warehouse.create({
-      data: createWarehouseDto,
+      data: {
+        ...createWarehouseDto,
+        tenantId: user.tenantId,
+      },
     });
   }
 
-  async findAll() {
-    const data = await this.prisma.warehouse.findMany({
+  async findAll(user: UserPayload) {
+    return this.prisma.warehouse.findMany({
+      where: { tenantId: user.tenantId },
       include: {
         _count: {
           select: { purchases: true },
         },
       },
     });
-    console.log('Warehouse in DB ', data);
-    return data;
   }
 
-  async findOne(id: string) {
-    const warehouse = await this.prisma.warehouse.findUnique({
-      where: { id },
+  async findOne(id: string, user: UserPayload) {
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { id, tenantId: user.tenantId },
       include: {
         inventoryItems: {
           include: {
@@ -46,16 +49,18 @@ export class WarehousesService {
     return warehouse;
   }
 
-  async update(id: string, updateWarehouseDto: UpdateWarehouseDto) {
+  async update(id: string, updateWarehouseDto: UpdateWarehouseDto, user: UserPayload) {
+    await this.findOne(id, user);
+
     return this.prisma.warehouse.update({
       where: { id },
       data: updateWarehouseDto,
     });
   }
 
-  async remove(id: string) {
-    const warehouse = await this.prisma.warehouse.findUnique({
-      where: { id },
+  async remove(id: string, user: UserPayload) {
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { id, tenantId: user.tenantId },
       include: {
         _count: {
           select: {

@@ -3,8 +3,10 @@ import { Request } from 'express';
 
 export class UserPayload {
   userId: string;
+  tenantId: string;
   email: string;
   roles: string[];
+  isPlatformAdmin: boolean;
 }
 
 interface RequestWithUser extends Request {

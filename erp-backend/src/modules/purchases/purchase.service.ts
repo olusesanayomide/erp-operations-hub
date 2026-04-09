@@ -10,8 +10,9 @@ import { CreatePurchaseDto } from './dto/create-purchase.dto';
 export class PurchaseService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(tenantId: string) {
     return this.prisma.purchase.findMany({
+      where: { tenantId },
       include: {
         supplier: true,
         warehouse: true,
@@ -25,21 +26,43 @@ export class PurchaseService {
     });
   }
 
-  // Get purchase Order
-  async getPurchaseDetails(id: string) {
-    return this.prisma.purchase.findUnique({
-      where: { id },
+  async getPurchaseDetails(tenantId: string, id: string) {
+    const purchase = await this.prisma.purchase.findFirst({
+      where: { id, tenantId },
       include: { items: true, supplier: true, warehouse: true },
     });
+
+    if (!purchase) {
+      throw new NotFoundException('Purchase order not found');
+    }
+
+    return purchase;
   }
 
-  // Create Purchase
-  async createPurchase(dto: CreatePurchaseDto) {
+  async createPurchase(tenantId: string, dto: CreatePurchaseDto) {
+    const [supplier, warehouse] = await Promise.all([
+      this.prisma.supplier.findFirst({
+        where: { id: dto.supplierId, tenantId },
+      }),
+      this.prisma.warehouse.findFirst({
+        where: { id: dto.warehouseId, tenantId },
+      }),
+    ]);
+
+    if (!supplier) {
+      throw new BadRequestException('Supplier not found');
+    }
+
+    if (!warehouse) {
+      throw new BadRequestException('Warehouse not found');
+    }
+
     const totalAmount = dto.items.reduce((sum, item) => {
       return sum + item.quantity * item.price;
     }, 0);
     return this.prisma.purchase.create({
       data: {
+        tenantId,
         purchaseOrder: dto.purchaseOrder,
         supplierId: dto.supplierId,
         warehouseId: dto.warehouseId,
@@ -65,11 +88,10 @@ export class PurchaseService {
     });
   }
 
-  async recievePurchase(purchaseId: string) {
+  async recievePurchase(tenantId: string, purchaseId: string) {
     return await this.prisma.$transaction(async (tx) => {
-      // fetchc purchase order
-      const purchase = await tx.purchase.findUnique({
-        where: { id: purchaseId },
+      const purchase = await tx.purchase.findFirst({
+        where: { id: purchaseId, tenantId },
         include: { items: true },
       });
       if (!purchase) {
@@ -81,7 +103,6 @@ export class PurchaseService {
       if (purchase.status === 'CANCELLED') {
         throw new BadRequestException('Purchase order already cancelled');
       }
-      //    Update Purchase Items
       await tx.purchase.update({
         where: { id: purchaseId },
         data: {
@@ -89,10 +110,10 @@ export class PurchaseService {
           receivedAt: new Date(),
         },
       });
-      //   Generate Stock Movement
       const movementPromises = purchase.items.map((item) => {
         return tx.stockMovement.create({
           data: {
+            tenantId,
             productId: item.productId,
             warehouseId: purchase.warehouseId,
             quantity: item.quantity,
@@ -104,7 +125,8 @@ export class PurchaseService {
       const inventoryUpserts = purchase.items.map((item) => {
         return tx.inventoryItem.upsert({
           where: {
-            productId_warehouseId: {
+            tenantId_productId_warehouseId: {
+              tenantId,
               productId: item.productId,
               warehouseId: purchase.warehouseId,
             },
@@ -113,6 +135,7 @@ export class PurchaseService {
             quantity: { increment: item.quantity },
           },
           create: {
+            tenantId,
             productId: item.productId,
             warehouseId: purchase.warehouseId,
             quantity: item.quantity,

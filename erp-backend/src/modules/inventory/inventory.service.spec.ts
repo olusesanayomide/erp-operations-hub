@@ -4,9 +4,10 @@ import { InventoryService } from './inventory.service';
 
 describe('InventoryService transferStock', () => {
   let service: InventoryService;
+  const tenantId = 'tenant-1';
   let prisma: {
-    product: { findUnique: jest.Mock };
-    warehouse: { findUnique: jest.Mock };
+    product: { findFirst: jest.Mock };
+    warehouse: { findFirst: jest.Mock };
     inventoryItem: { upsert: jest.Mock };
     stockMovement: { create: jest.Mock; aggregate: jest.Mock };
     $transaction: jest.Mock;
@@ -14,8 +15,8 @@ describe('InventoryService transferStock', () => {
 
   beforeEach(() => {
     prisma = {
-      product: { findUnique: jest.fn() },
-      warehouse: { findUnique: jest.fn() },
+      product: { findFirst: jest.fn() },
+      warehouse: { findFirst: jest.fn() },
       inventoryItem: { upsert: jest.fn() },
       stockMovement: {
         create: jest.fn(),
@@ -32,8 +33,8 @@ describe('InventoryService transferStock', () => {
   });
 
   it('transfers stock when destination inventory already exists', async () => {
-    prisma.product.findUnique.mockResolvedValue({ id: 'p1' });
-    prisma.warehouse.findUnique
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
+    prisma.warehouse.findFirst
       .mockResolvedValueOnce({ id: 'w1', name: 'Main' })
       .mockResolvedValueOnce({ id: 'w2', name: 'Overflow' });
     prisma.stockMovement.aggregate
@@ -54,7 +55,14 @@ describe('InventoryService transferStock', () => {
       });
     prisma.inventoryItem.upsert.mockResolvedValue({});
 
-    const result = await service.transferStock('p1', 'w1', 'w2', 5, 'Rebalance');
+    const result = await service.transferStock(
+      tenantId,
+      'p1',
+      'w1',
+      'w2',
+      5,
+      'Rebalance',
+    );
 
     expect(result.success).toBe(true);
     expect(result.movements).toHaveLength(2);
@@ -78,7 +86,8 @@ describe('InventoryService transferStock', () => {
     });
     expect(prisma.inventoryItem.upsert).toHaveBeenNthCalledWith(1, {
       where: {
-        productId_warehouseId: {
+        tenantId_productId_warehouseId: {
+          tenantId,
           productId: 'p1',
           warehouseId: 'w1',
         },
@@ -87,6 +96,7 @@ describe('InventoryService transferStock', () => {
         quantity: 15,
       },
       create: {
+        tenantId,
         productId: 'p1',
         warehouseId: 'w1',
         quantity: 15,
@@ -94,7 +104,8 @@ describe('InventoryService transferStock', () => {
     });
     expect(prisma.inventoryItem.upsert).toHaveBeenNthCalledWith(2, {
       where: {
-        productId_warehouseId: {
+        tenantId_productId_warehouseId: {
+          tenantId,
           productId: 'p1',
           warehouseId: 'w2',
         },
@@ -103,6 +114,7 @@ describe('InventoryService transferStock', () => {
         quantity: 9,
       },
       create: {
+        tenantId,
         productId: 'p1',
         warehouseId: 'w2',
         quantity: 9,
@@ -111,8 +123,8 @@ describe('InventoryService transferStock', () => {
   });
 
   it('creates destination inventory when it does not exist', async () => {
-    prisma.product.findUnique.mockResolvedValue({ id: 'p1' });
-    prisma.warehouse.findUnique
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
+    prisma.warehouse.findFirst
       .mockResolvedValueOnce({ id: 'w1', name: 'Main' })
       .mockResolvedValueOnce({ id: 'w3', name: 'Remote' });
     prisma.stockMovement.aggregate
@@ -121,12 +133,20 @@ describe('InventoryService transferStock', () => {
     prisma.stockMovement.create.mockResolvedValue({});
     prisma.inventoryItem.upsert.mockResolvedValue({});
 
-    await service.transferStock('p1', 'w1', 'w3', 3, 'Stock balancing');
+    await service.transferStock(
+      tenantId,
+      'p1',
+      'w1',
+      'w3',
+      3,
+      'Stock balancing',
+    );
 
     expect(prisma.inventoryItem.upsert).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         create: {
+          tenantId,
           productId: 'p1',
           warehouseId: 'w3',
           quantity: 3,
@@ -136,8 +156,8 @@ describe('InventoryService transferStock', () => {
   });
 
   it('creates a source inventory row when the ledger shows stock but the row is missing', async () => {
-    prisma.product.findUnique.mockResolvedValue({ id: 'p1' });
-    prisma.warehouse.findUnique
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
+    prisma.warehouse.findFirst
       .mockResolvedValueOnce({ id: 'w1', name: 'Main' })
       .mockResolvedValueOnce({ id: 'w2', name: 'Overflow' });
     prisma.stockMovement.aggregate
@@ -147,6 +167,7 @@ describe('InventoryService transferStock', () => {
     prisma.inventoryItem.upsert.mockResolvedValue({});
 
     await service.transferStock(
+      tenantId,
       'p1',
       'w1',
       'w2',
@@ -158,6 +179,7 @@ describe('InventoryService transferStock', () => {
       1,
       expect.objectContaining({
         create: {
+          tenantId,
           productId: 'p1',
           warehouseId: 'w1',
           quantity: 3,
@@ -167,8 +189,8 @@ describe('InventoryService transferStock', () => {
   });
 
   it('rejects transfers with insufficient stock', async () => {
-    prisma.product.findUnique.mockResolvedValue({ id: 'p1' });
-    prisma.warehouse.findUnique
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
+    prisma.warehouse.findFirst
       .mockResolvedValueOnce({ id: 'w1', name: 'Main' })
       .mockResolvedValueOnce({ id: 'w2', name: 'Overflow' });
     prisma.stockMovement.aggregate
@@ -176,7 +198,7 @@ describe('InventoryService transferStock', () => {
       .mockResolvedValueOnce({ _sum: { quantity: 0 } });
 
     await expect(
-      service.transferStock('p1', 'w1', 'w2', 5, 'Rebalance'),
+      service.transferStock(tenantId, 'p1', 'w1', 'w2', 5, 'Rebalance'),
     ).rejects.toThrow(
       new BadRequestException('Insufficient stock in source warehouse'),
     );
@@ -184,7 +206,7 @@ describe('InventoryService transferStock', () => {
 
   it('rejects same-warehouse transfers', async () => {
     await expect(
-      service.transferStock('p1', 'w1', 'w1', 1, 'Rebalance'),
+      service.transferStock(tenantId, 'p1', 'w1', 'w1', 1, 'Rebalance'),
     ).rejects.toThrow(
       new BadRequestException(
         'Source and destination warehouses must be different',
@@ -194,7 +216,7 @@ describe('InventoryService transferStock', () => {
 
   it('rejects blank notes', async () => {
     await expect(
-      service.transferStock('p1', 'w1', 'w2', 1, '   '),
+      service.transferStock(tenantId, 'p1', 'w1', 'w2', 1, '   '),
     ).rejects.toThrow(new BadRequestException('Transfer note is required'));
   });
 });

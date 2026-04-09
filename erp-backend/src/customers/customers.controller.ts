@@ -23,6 +23,7 @@ import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/auth/decorator/role.decorator';
 import { Role } from 'src/auth/enums/role.enum';
+import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -43,8 +44,11 @@ export class CustomersController {
     status: 400,
     description: 'Validation failed or Email already exists.',
   })
-  create(@Body() createCustomerDto: CreateCustomerDto) {
-    return this.customersService.create(createCustomerDto);
+  create(
+    @Body() createCustomerDto: CreateCustomerDto,
+    @GetUser() user: UserPayload,
+  ) {
+    return this.customersService.create(createCustomerDto, user);
   }
 
   @Post('import/preview')
@@ -58,8 +62,12 @@ export class CustomersController {
     status: 200,
     description: 'Customer import preview generated successfully.',
   })
-  previewImport(@Body() dto: CustomerImportDto) {
-    return this.customersService.previewImport(dto.csv, dto.mode ?? 'upsert');
+  previewImport(@Body() dto: CustomerImportDto, @GetUser() user: UserPayload) {
+    return this.customersService.previewImport(
+      dto.csv,
+      user,
+      dto.mode ?? 'upsert',
+    );
   }
 
   @Post('import/commit')
@@ -73,8 +81,12 @@ export class CustomersController {
     status: 201,
     description: 'Customers imported successfully.',
   })
-  commitImport(@Body() dto: CustomerImportDto) {
-    return this.customersService.commitImport(dto.csv, dto.mode ?? 'upsert');
+  commitImport(@Body() dto: CustomerImportDto, @GetUser() user: UserPayload) {
+    return this.customersService.commitImport(
+      dto.csv,
+      user,
+      dto.mode ?? 'upsert',
+    );
   }
 
   @Get()
@@ -85,8 +97,8 @@ export class CustomersController {
       'Returns a list of all registered customers with their total order counts.',
   })
   @ApiResponse({ status: 200, description: 'List retrieved successfully.' })
-  findAll() {
-    return this.customersService.findAll();
+  findAll(@GetUser() user: UserPayload) {
+    return this.customersService.findAll(user);
   }
 
   @Get(':id')
@@ -98,8 +110,8 @@ export class CustomersController {
   })
   @ApiResponse({ status: 200, description: 'Customer found.' })
   @ApiResponse({ status: 404, description: 'Customer not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.customersService.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+    return this.customersService.findOne(id, user);
   }
 
   @Patch(':id')
@@ -113,8 +125,9 @@ export class CustomersController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCustomerDto: UpdateCustomerDto,
+    @GetUser() user: UserPayload,
   ) {
-    return this.customersService.update(id, updateCustomerDto);
+    return this.customersService.update(id, updateCustomerDto, user);
   }
 
   @Delete(':id')
@@ -130,7 +143,7 @@ export class CustomersController {
     description: 'Cannot delete customer with order history.',
   })
   @ApiResponse({ status: 404, description: 'Customer not found.' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.customersService.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+    return this.customersService.remove(id, user);
   }
 }

@@ -32,13 +32,23 @@ const ORDER_STATUS_TRANSITIONS: Record<
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
-    private inventoryService: InventoryService, // inject inventory service
+    private inventoryService: InventoryService,
   ) {}
 
-  //   Create a new order
-  async createOrder(customerId?: string) {
+  async createOrder(tenantId: string, customerId?: string) {
+    if (customerId) {
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: customerId, tenantId },
+      });
+
+      if (!customer) {
+        throw new BadRequestException('Customer not found');
+      }
+    }
+
     return this.prisma.order.create({
       data: {
+        tenantId,
         customerId,
         status: OrderLifecycleStatus.DRAFT as any,
         totalAmount: 0,
@@ -46,16 +56,15 @@ export class OrdersService {
     });
   }
 
-  //   Add an item to an order
   async addItem(
+    tenantId: string,
     orderId: string,
     productId: string,
     quantity: number,
-    warehouseId: string, // warehouse to reduce stock from
+    warehouseId: string,
   ) {
-    // Fetch the order
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
       include: { items: true },
     });
 
@@ -63,23 +72,22 @@ export class OrdersService {
     if ((order.status as OrderLifecycleStatus) !== OrderLifecycleStatus.DRAFT)
       throw new BadRequestException('Cannot add items to a non-draft order');
 
-    // Fetch product price
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
     });
     if (!product) throw new BadRequestException('product not found');
     const price = product.price;
 
-    // Check stock
     const inventory = await this.prisma.inventoryItem.findUnique({
-      where: { productId_warehouseId: { productId, warehouseId } },
+      where: {
+        tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
+      },
     });
 
     if (!inventory || inventory.quantity < quantity) {
       throw new BadRequestException('Insufficient stock');
     }
 
-    // Add item
     const orderItem = await this.prisma.orderItem.create({
       data: {
         orderId,
@@ -90,7 +98,6 @@ export class OrdersService {
       },
     });
 
-    // Update totalAmount
     const newTotal =
       order.items.reduce((sum, item) => sum + item.price * item.quantity, 0) +
       price * quantity;
@@ -103,18 +110,17 @@ export class OrdersService {
     return orderItem;
   }
 
-  //   Get all orders
-  async getOrders() {
+  async getOrders(tenantId: string) {
     return this.prisma.order.findMany({
+      where: { tenantId },
       include: { items: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  //  Get Order by Id
-  async getOrderById(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
+  async getOrderById(tenantId: string, id: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, tenantId },
       include: {
         items: {
           include: {
@@ -130,10 +136,13 @@ export class OrdersService {
     return order;
   }
 
-  //   Update order status
-  async updateStatus(orderId: string, status: OrderLifecycleStatus) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+  async updateStatus(
+    tenantId: string,
+    orderId: string,
+    status: OrderLifecycleStatus,
+  ) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
       include: { items: true },
     });
     if (!order) throw new BadRequestException('Order not found');
@@ -162,6 +171,7 @@ export class OrdersService {
       }
       for (const item of order.items) {
         await this.inventoryService.stockOut(
+          tenantId,
           item.productId,
           item.warehouseId,
           item.quantity,
@@ -177,6 +187,7 @@ export class OrdersService {
     if (isCancellingReservedOrder) {
       for (const item of order.items) {
         await this.inventoryService.stockIn(
+          tenantId,
           item.productId,
           item.warehouseId,
           item.quantity,

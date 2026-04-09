@@ -26,6 +26,7 @@ import { Roles } from 'src/auth/decorator/role.decorator';
 import { Role } from 'src/auth/enums/role.enum';
 import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
+import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -34,7 +35,6 @@ import { RolesGuard } from 'src/auth/guard/role.guard';
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
-  //   get all products
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   @ApiOperation({
@@ -43,8 +43,8 @@ export class ProductController {
       'Retrieves the full catalog of products available in the system.',
   })
   @ApiResponse({ status: 200, description: 'Products retrieved successfully.' })
-  async getAllProducts() {
-    return this.productService.getAll();
+  async getAllProducts(@GetUser() user: UserPayload) {
+    return this.productService.getAll(user);
   }
 
   @Post('import/preview')
@@ -58,8 +58,8 @@ export class ProductController {
     status: 200,
     description: 'Import preview generated successfully.',
   })
-  async previewImport(@Body() dto: ProductImportDto) {
-    return this.productService.previewImport(dto.csv, dto.mode ?? 'upsert');
+  async previewImport(@Body() dto: ProductImportDto, @GetUser() user: UserPayload) {
+    return this.productService.previewImport(dto.csv, user, dto.mode ?? 'upsert');
   }
 
   @Post('import/commit')
@@ -73,11 +73,10 @@ export class ProductController {
     status: 201,
     description: 'Products imported successfully.',
   })
-  async commitImport(@Body() dto: ProductImportDto) {
-    return this.productService.commitImport(dto.csv, dto.mode ?? 'upsert');
+  async commitImport(@Body() dto: ProductImportDto, @GetUser() user: UserPayload) {
+    return this.productService.commitImport(dto.csv, user, dto.mode ?? 'upsert');
   }
 
-  //   get product by id
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   @ApiOperation({
@@ -87,11 +86,10 @@ export class ProductController {
   })
   @ApiResponse({ status: 200, description: 'Product found.' })
   @ApiResponse({ status: 404, description: 'Product not found.' })
-  async getProductById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.productService.getById(id);
+  async getProductById(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+    return this.productService.getById(id, user);
   }
 
-  //   create product
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({
@@ -100,11 +98,10 @@ export class ProductController {
       'Adds a new item to the master catalog. This does not set stock levels (use Inventory Stock-In for that).',
   })
   @ApiResponse({ status: 201, description: 'Product created successfully.' })
-  async create(@Body() dto: ProductDto): Promise<Product> {
-    return this.productService.createproduct(dto);
+  async create(@Body() dto: ProductDto, @GetUser() user: UserPayload): Promise<Product> {
+    return this.productService.createproduct(dto, user);
   }
 
-  // Update a product
   @Put(':id')
   @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({
@@ -117,11 +114,11 @@ export class ProductController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProductDto,
+    @GetUser() user: UserPayload,
   ): Promise<Product> {
-    return this.productService.updateProduct(id, dto);
+    return this.productService.updateProduct(id, dto, user);
   }
 
-  //  Delete a product
   @Delete(':id')
   @Roles(Role.ADMIN)
   @ApiOperation({
@@ -134,7 +131,7 @@ export class ProductController {
     status: 409,
     description: 'Conflict: Product is linked to existing orders.',
   })
-  async delete(@Param('id', ParseUUIDPipe) id: string): Promise<Product> {
-    return this.productService.deleteProduct(id);
+  async delete(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload): Promise<Product> {
+    return this.productService.deleteProduct(id, user);
   }
 }

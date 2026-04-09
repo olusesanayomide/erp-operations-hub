@@ -24,6 +24,7 @@ import { Roles } from 'src/auth/decorator/role.decorator';
 import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Role } from 'src/auth/enums/role.enum';
+import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -40,8 +41,8 @@ export class OrdersController {
       'Returns a history of all customer orders, including their current statuses (PENDING, SHIPPED, etc.).',
   })
   @ApiResponse({ status: 200, description: 'List of orders retrieved.' })
-  findAll() {
-    return this.ordersService.getOrders();
+  findAll(@GetUser() user: UserPayload) {
+    return this.ordersService.getOrders(user.tenantId);
   }
 
   @Get(':id')
@@ -52,8 +53,8 @@ export class OrdersController {
       'Retrieves a single order by id, including alll associated line items and product  details',
   })
   @ApiResponse({ status: 200, description: 'Order details found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.ordersService.getOrderById(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+    return this.ordersService.getOrderById(user.tenantId, id);
   }
 
   @Post()
@@ -68,8 +69,8 @@ export class OrdersController {
     description: 'Order header created successfully.',
   })
   @ApiResponse({ status: 404, description: 'Customer ID not found.' })
-  create(@Body() dto: CreateOrderDto) {
-    return this.ordersService.createOrder(dto.customerId);
+  create(@Body() dto: CreateOrderDto, @GetUser() user: UserPayload) {
+    return this.ordersService.createOrder(user.tenantId, dto.customerId);
   }
 
   @Post(':id/items')
@@ -81,9 +82,14 @@ export class OrdersController {
   })
   @ApiResponse({ status: 201, description: 'Item added to order.' })
   @ApiResponse({ status: 404, description: 'Order or Product not found.' })
-  addItem(@Param('id') orderId: string, @Body() dto: AddOrderItemDto) {
+  addItem(
+    @Param('id') orderId: string,
+    @Body() dto: AddOrderItemDto,
+    @GetUser() user: UserPayload,
+  ) {
     const { productId, quantity, warehouseId } = dto;
     return this.ordersService.addItem(
+      user.tenantId,
       orderId,
       productId,
       quantity,
@@ -103,7 +109,8 @@ export class OrdersController {
   updateStatus(
     @Param('id', ParseUUIDPipe) orderId: string,
     @Body() dto: UpdateOrderStatusDto,
+    @GetUser() user: UserPayload,
   ) {
-    return this.ordersService.updateStatus(orderId, dto.status);
+    return this.ordersService.updateStatus(user.tenantId, orderId, dto.status);
   }
 }
