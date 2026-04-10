@@ -211,8 +211,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       );
     }
 
-    if (user.tenant.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Tenant access is not active.');
+    if (user.tenant.status === 'SUSPENDED') {
+      throw new UnauthorizedException(
+        'This tenant has been suspended. Contact the platform administrator.',
+      );
+    }
+
+    if (user.tenant.status === 'ARCHIVED') {
+      throw new UnauthorizedException(
+        'This tenant has been archived and can no longer sign in.',
+      );
     }
 
     return user;

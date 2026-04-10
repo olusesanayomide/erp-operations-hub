@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
@@ -35,8 +35,9 @@ const itemVariants = {
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const prefersReducedMotion = useReducedMotion();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => (location.state as { email?: string } | null)?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -183,6 +184,13 @@ export default function LoginPage() {
                     </Button>
                   </motion.div>
                 </form>
+
+                <div className="mt-6 text-center text-sm text-slate-600">
+                  New organization?{' '}
+                  <Link to="/signup" className="font-semibold text-primary transition-colors hover:text-[#2f57da]">
+                    Create a workspace
+                  </Link>
+                </div>
 
               </div>
             </div>

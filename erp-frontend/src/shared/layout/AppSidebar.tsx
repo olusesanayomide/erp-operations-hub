@@ -4,7 +4,7 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { cn } from '@/shared/lib/utils';
 import {
   LayoutDashboard, Package, Boxes, ShoppingCart, Truck,
-  Users, Factory, Warehouse, Settings, ChevronLeft, LogOut, UserCircle
+  Users, Factory, Warehouse, Settings, ChevronLeft, LogOut, UserCircle, Building2
 } from 'lucide-react';
 import { RoleBadge } from '@/shared/components/StatusBadge';
 
@@ -25,6 +25,9 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout } = useAuth();
   const location = useLocation();
+  const items = user?.isPlatformAdmin
+    ? [...navItems, { label: 'Tenants', path: '/admin/tenants', icon: Building2 }]
+    : navItems;
 
   return (
     <aside className={cn(
@@ -51,7 +54,7 @@ export function AppSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto scrollbar-thin">
-        {navItems.map(item => {
+        {items.map(item => {
           const isActive = location.pathname.startsWith(item.path);
           return (
             <NavLink

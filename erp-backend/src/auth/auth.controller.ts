@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
+import { UpdateTenantStatusDto } from './dto/update-tenant-status.dto';
 import { JwtGuard } from './guard/jwt.guard';
 import { GetUser, UserPayload } from './decorator/get-user.decorator';
 import { Public } from './decorator/public.decorator';
@@ -80,5 +81,21 @@ export class AuthController {
   })
   listTenants(@GetUser() user: UserPayload) {
     return this.authService.listTenants(user);
+  }
+
+  @Patch('tenants/:tenantId/status')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Update tenant status (platform admin only)' })
+  @ApiResponse({ status: 200, description: 'Tenant status updated.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Platform admin access required.',
+  })
+  updateTenantStatus(
+    @GetUser() user: UserPayload,
+    @Param('tenantId') tenantId: string,
+    @Body() dto: UpdateTenantStatusDto,
+  ) {
+    return this.authService.updateTenantStatus(user, tenantId, dto);
   }
 }

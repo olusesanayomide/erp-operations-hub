@@ -97,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setStoredUser(null);
           setUser(null);
           clearCurrentUserRequest();
+          void logoutSupabase();
 
           const message =
             error instanceof ApiError

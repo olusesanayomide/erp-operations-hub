@@ -1,10 +1,21 @@
 export type UserRole = 'admin' | 'manager' | 'staff';
+export type TenantStatus = 'active' | 'suspended' | 'archived';
 
 export interface TenantSummary {
   id: string;
   name: string;
   slug: string;
-  status: 'active' | 'suspended' | 'archived';
+  status: TenantStatus;
+}
+
+export interface PlatformTenant {
+  id: string;
+  name: string;
+  slug: string;
+  status: TenantStatus;
+  createdAt: string;
+  updatedAt: string;
+  userCount: number;
 }
 
 export interface User {

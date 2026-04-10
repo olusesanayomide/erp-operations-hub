@@ -283,10 +283,10 @@ export default function LandingPage() {
               </p>
 
               <div className="mt-8 flex justify-center">
-                <Link to="/login">
+                <Link to="/signup">
                   <motion.div whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.02 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}>
                     <Button className="rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] px-6 shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105">
-                      Get Started
+                      Create Workspace
                       <ArrowUpRight className="h-4 w-4" />
                     </Button>
                   </motion.div>
@@ -623,10 +623,10 @@ export default function LandingPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Company & Contact</p>
                 <div className="mt-4 space-y-3 text-sm">
-                  <Link to="/login" className="block text-foreground/90 transition-colors hover:text-foreground">Contact Sales</Link>
+                  <Link to="/signup" className="block text-foreground/90 transition-colors hover:text-foreground">Contact Sales</Link>
                   <a href="#blog" className="block text-foreground/90 transition-colors hover:text-foreground">Updates</a>
                   <a href="#changes" className="block text-foreground/90 transition-colors hover:text-foreground">Release Notes</a>
-                  <Link to="/login" className="block text-foreground/90 transition-colors hover:text-foreground">Get Access</Link>
+                  <Link to="/signup" className="block text-foreground/90 transition-colors hover:text-foreground">Get Access</Link>
                 </div>
               </div>
             </div>

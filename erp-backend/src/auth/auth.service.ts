@@ -9,6 +9,10 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
+import {
+  TenantStatusValue,
+  UpdateTenantStatusDto,
+} from './dto/update-tenant-status.dto';
 import { Role } from './enums/role.enum';
 import { UserPayload } from './decorator/get-user.decorator';
 
@@ -239,7 +243,7 @@ export class AuthService {
       throw new ForbiddenException('Platform admin access is required.');
     }
 
-    return this.prisma.tenant.findMany({
+    const tenants = await this.prisma.tenant.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
         _count: {
@@ -247,5 +251,85 @@ export class AuthService {
         },
       },
     });
+
+    return tenants.map((tenant) => ({
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      status: tenant.status,
+      createdAt: tenant.createdAt,
+      updatedAt: tenant.updatedAt,
+      userCount: tenant._count.users,
+    }));
+  }
+
+  async updateTenantStatus(
+    currentUser: UserPayload,
+    tenantId: string,
+    dto: UpdateTenantStatusDto,
+  ) {
+    if (!currentUser.isPlatformAdmin) {
+      throw new ForbiddenException('Platform admin access is required.');
+    }
+
+    const existingTenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: { users: true },
+        },
+      },
+    });
+
+    if (!existingTenant) {
+      throw new BadRequestException('Tenant was not found.');
+    }
+
+    if (existingTenant.status === dto.status) {
+      return {
+        id: existingTenant.id,
+        name: existingTenant.name,
+        slug: existingTenant.slug,
+        status: existingTenant.status,
+        createdAt: existingTenant.createdAt,
+        updatedAt: existingTenant.updatedAt,
+        userCount: existingTenant._count.users,
+      };
+    }
+
+    if (
+      existingTenant.status === TenantStatusValue.ARCHIVED &&
+      dto.status === TenantStatusValue.SUSPENDED
+    ) {
+      throw new BadRequestException(
+        'Archived tenants can only be reactivated or remain archived.',
+      );
+    }
+
+    const tenant = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { status: dto.status },
+      include: {
+        _count: {
+          select: { users: true },
+        },
+      },
+    });
+
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      status: tenant.status,
+      createdAt: tenant.createdAt,
+      updatedAt: tenant.updatedAt,
+      userCount: tenant._count.users,
+    };
   }
 }

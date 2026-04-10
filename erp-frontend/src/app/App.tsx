@@ -8,6 +8,7 @@ import { AppLayout } from "@/shared/layout/AppLayout";
 import LandingPage from "@/app/pages/LandingPage";
 import NotFound from "@/app/pages/NotFound";
 import LoginPage from "@/features/auth/pages/LoginPage";
+import SignupPage from "@/features/auth/pages/SignupPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
 import ProductsPage from "@/features/products/pages/ProductsPage";
 import ProductDetailPage from "@/features/products/pages/ProductDetailPage";
@@ -26,6 +27,7 @@ import WarehousesPage from "@/features/warehouses/pages/WarehousesPage";
 import WarehouseDetailPage from "@/features/warehouses/pages/WarehouseDetailPage";
 import UsersPage from "@/features/users/pages/UsersPage";
 import SettingsPage from "@/features/settings/pages/SettingsPage";
+import TenantsPage from "@/features/platform-admin/pages/TenantsPage";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, isPlatformAdmin } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        Restoring your session...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isPlatformAdmin) return <Navigate to="/dashboard" replace />;
+
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -52,6 +71,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/products" element={<ProductsPage />} />
@@ -71,6 +91,14 @@ const App = () => (
                 <Route path="/warehouses/:id" element={<WarehouseDetailPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route
+                  path="/admin/tenants"
+                  element={
+                    <PlatformAdminRoute>
+                      <TenantsPage />
+                    </PlatformAdminRoute>
+                  }
+                />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

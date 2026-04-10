@@ -6,6 +6,7 @@ import type {
   Purchase,
   StockMovement,
   Supplier,
+  PlatformTenant,
   TenantSummary,
   User,
   UserRole,
@@ -40,6 +41,16 @@ type BackendUserListItem = {
   roles: string[];
   isPlatformAdmin: boolean;
   createdAt: string;
+};
+
+type BackendTenantListItem = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  userCount: number;
 };
 
 type BackendProduct = {
@@ -529,6 +540,52 @@ export async function signupTenant(payload: {
     method: "POST",
     body: payload,
   });
+}
+
+export async function listTenants() {
+  const items = await apiRequest<BackendTenantListItem[]>("/auth/tenants");
+  return items.map(
+    (item) =>
+      ({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        status: normalizeTenant({
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          status: item.status,
+        }).status,
+        createdAt: formatDate(item.createdAt),
+        updatedAt: formatDate(item.updatedAt),
+        userCount: item.userCount,
+      }) satisfies PlatformTenant,
+  );
+}
+
+export async function updateTenantStatus(
+  tenantId: string,
+  status: "ACTIVE" | "SUSPENDED" | "ARCHIVED",
+) {
+  const item = await apiRequest<BackendTenantListItem>(`/auth/tenants/${tenantId}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+
+  return {
+    id: item.id,
+    name: item.name,
+    slug: item.slug,
+    status: normalizeTenant({
+      id: item.id,
+      name: item.name,
+      slug: item.slug,
+      status: item.status,
+    }).status,
+    createdAt: formatDate(item.createdAt),
+    updatedAt: formatDate(item.updatedAt),
+    userCount: item.userCount,
+  } satisfies PlatformTenant;
 }
 
 export async function listProducts() {

@@ -1,7 +1,7 @@
 import { cn } from '@/shared/lib/utils';
-import type { OrderStatus, PurchaseStatus, StockStatus } from '@/shared/types/erp';
+import type { OrderStatus, PurchaseStatus, StockStatus, TenantStatus } from '@/shared/types/erp';
 
-type BadgeStatus = OrderStatus | PurchaseStatus | StockStatus | 'active' | 'inactive';
+type BadgeStatus = OrderStatus | PurchaseStatus | StockStatus | TenantStatus | 'inactive';
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   'draft': { label: 'Draft', className: 'status-draft' },
@@ -16,6 +16,8 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   'low-stock': { label: 'Low Stock', className: 'status-low-stock' },
   'out-of-stock': { label: 'Out of Stock', className: 'status-out-of-stock' },
   'active': { label: 'Active', className: 'status-in-stock' },
+  'suspended': { label: 'Suspended', className: 'status-cancelled' },
+  'archived': { label: 'Archived', className: 'status-draft' },
   'inactive': { label: 'Inactive', className: 'status-draft' },
 };
 
