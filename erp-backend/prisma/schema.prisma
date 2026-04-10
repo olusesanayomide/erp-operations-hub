@@ -80,7 +80,7 @@ model Product {
   tenantId  String
   name      String
   sku       String
-  price     Float
+  price     Decimal  @db.Decimal(12, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime? @updatedAt
 
@@ -143,7 +143,7 @@ model Order {
   status    OrderStatus @default(DRAFT)
   customerId String?
   customer Customer? @relation(fields: [customerId], references: [id])
-  totalAmount Float  @default(0)
+  totalAmount Decimal  @default(0) @db.Decimal(14, 2)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   items     OrderItem[]
@@ -161,7 +161,7 @@ model OrderItem {
   productId String
   warehouseId String @default("main")
   quantity  Int
-  price     Float
+  price     Decimal  @db.Decimal(12, 2)
 }
 
 enum OrderStatus{
@@ -211,7 +211,7 @@ model Purchase {
   warehouseId String
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
   status        PurchaseStatus  @default(DRAFT)
-  totalAmount   Float           @default(0)
+  totalAmount   Decimal         @default(0) @db.Decimal(14, 2)
   items         PurchaseItem[]
   receivedAt    DateTime?       // Added: Track when inventory actually increased
   createdAt     DateTime        @default(now())
@@ -231,7 +231,7 @@ model PurchaseItem {
   productId  String
   product    Product  @relation(fields: [productId], references: [id])
   quantity   Int
-  price      Float    // This is the unit price at the time of purchase
+  price      Decimal  @db.Decimal(12, 2) // This is the unit price at the time of purchase
 }
 enum PurchaseStatus {
   DRAFT

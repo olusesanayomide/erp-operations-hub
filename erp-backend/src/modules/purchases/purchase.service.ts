@@ -3,7 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from 'prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 
 @Injectable()
@@ -40,12 +41,21 @@ export class PurchaseService {
   }
 
   async createPurchase(tenantId: string, dto: CreatePurchaseDto) {
-    const [supplier, warehouse] = await Promise.all([
+    const productIds = Array.from(new Set(dto.items.map((item) => item.productId)));
+
+    const [supplier, warehouse, products] = await Promise.all([
       this.prisma.supplier.findFirst({
         where: { id: dto.supplierId, tenantId },
       }),
       this.prisma.warehouse.findFirst({
         where: { id: dto.warehouseId, tenantId },
+      }),
+      this.prisma.product.findMany({
+        where: {
+          tenantId,
+          id: { in: productIds },
+        },
+        select: { id: true },
       }),
     ]);
 
@@ -57,9 +67,16 @@ export class PurchaseService {
       throw new BadRequestException('Warehouse not found');
     }
 
-    const totalAmount = dto.items.reduce((sum, item) => {
-      return sum + item.quantity * item.price;
-    }, 0);
+    if (productIds.length !== products.length) {
+      throw new BadRequestException(
+        'One or more products do not exist in the current tenant.',
+      );
+    }
+
+    const totalAmount = dto.items.reduce(
+      (sum, item) => sum.plus(new Prisma.Decimal(item.price).mul(item.quantity)),
+      new Prisma.Decimal(0),
+    );
     return this.prisma.purchase.create({
       data: {
         tenantId,

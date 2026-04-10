@@ -1,25 +1,30 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  ArrayMinSize,
+  IsInt,
   IsNumber,
-  IsString,
-  IsNotEmpty,
   IsArray,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PurchaseItemDto {
   @ApiProperty({ example: 'uuid-of-product' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   productId: string;
 
   @ApiProperty({ example: 10 })
-  @IsNumber()
+  @IsInt()
+  @Min(1)
   quantity: number;
 
   @ApiProperty({ example: 150.0, description: 'Price per single unit' })
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
   price: number;
 }
 
@@ -30,11 +35,11 @@ export class CreatePurchaseDto {
   purchaseOrder: string;
 
   @ApiProperty({ example: 'uuid-of-warehouse' })
-  @IsString()
+  @IsUUID()
   warehouseId: string;
 
   @ApiProperty({ example: 'uuid-of-supplier' })
-  @IsString() // Changed to string to match common UUID practices
+  @IsUUID()
   supplierId: string;
 
   // Note: TotalAmount and PurchaseDate are usually handled by the server (Date.now)
@@ -42,6 +47,7 @@ export class CreatePurchaseDto {
 
   @ApiProperty({ type: [PurchaseItemDto] })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => PurchaseItemDto) // Crucial for nested validation and Swagger UI
   items: PurchaseItemDto[];

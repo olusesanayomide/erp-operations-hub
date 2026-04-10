@@ -208,17 +208,6 @@ export class InventoryService {
       throw new BadRequestException('Destination warehouse does not exist');
     }
 
-    const [sourceAvailableStock, destinationAvailableStock] = await Promise.all(
-      [
-        this.getAvailableStock(tenantId, productId, sourceWarehouseId),
-        this.getAvailableStock(tenantId, productId, destinationWarehouseId),
-      ],
-    );
-
-    if (sourceAvailableStock < quantity) {
-      throw new BadRequestException('Insufficient stock in source warehouse');
-    }
-
     const transferReferenceId = `TRANSFER-${Date.now()}-${Math.random()
       .toString(36)
       .slice(2, 8)
@@ -226,66 +215,67 @@ export class InventoryService {
     const sourceReference = `${transferReferenceId} | TO:${destinationWarehouse.name} (${destinationWarehouse.id}) | NOTE:${trimmedNote}`;
     const destinationReference = `${transferReferenceId} | FROM:${sourceWarehouse.name} (${sourceWarehouse.id}) | NOTE:${trimmedNote}`;
 
-    const operations = [
-      this.prisma.stockMovement.create({
-        data: {
-          tenantId,
-          productId,
-          warehouseId: sourceWarehouseId,
-          quantity: -quantity,
-          type: StockMovementType.OUT,
-          reference: sourceReference,
-        },
-      }),
-      this.prisma.stockMovement.create({
-        data: {
-          tenantId,
-          productId,
-          warehouseId: destinationWarehouseId,
-          quantity,
-          type: StockMovementType.IN,
-          reference: destinationReference,
-        },
-      }),
-      this.prisma.inventoryItem.upsert({
-        where: {
-          tenantId_productId_warehouseId: {
+    const { outMovement, inMovement } = await this.prisma.$transaction(
+      async (tx) => {
+        const sourceUpdate = await tx.inventoryItem.updateMany({
+          where: {
             tenantId,
             productId,
             warehouseId: sourceWarehouseId,
+            quantity: { gte: quantity },
           },
-        },
-        update: {
-          quantity: sourceAvailableStock - quantity,
-        },
-        create: {
-          tenantId,
-          productId,
-          warehouseId: sourceWarehouseId,
-          quantity: sourceAvailableStock - quantity,
-        },
-      }),
-      this.prisma.inventoryItem.upsert({
-        where: {
-          tenantId_productId_warehouseId: {
+          data: {
+            quantity: { decrement: quantity },
+          },
+        });
+
+        if (sourceUpdate.count === 0) {
+          throw new BadRequestException('Insufficient stock in source warehouse');
+        }
+
+        await tx.inventoryItem.upsert({
+          where: {
+            tenantId_productId_warehouseId: {
+              tenantId,
+              productId,
+              warehouseId: destinationWarehouseId,
+            },
+          },
+          update: {
+            quantity: { increment: quantity },
+          },
+          create: {
             tenantId,
             productId,
             warehouseId: destinationWarehouseId,
+            quantity,
           },
-        },
-        update: {
-          quantity: destinationAvailableStock + quantity,
-        },
-        create: {
-          tenantId,
-          productId,
-          warehouseId: destinationWarehouseId,
-          quantity: destinationAvailableStock + quantity,
-        },
-      }),
-    ];
+        });
 
-    const [outMovement, inMovement] = await this.prisma.$transaction(operations);
+        const outMovement = await tx.stockMovement.create({
+          data: {
+            tenantId,
+            productId,
+            warehouseId: sourceWarehouseId,
+            quantity: -quantity,
+            type: StockMovementType.OUT,
+            reference: sourceReference,
+          },
+        });
+        const inMovement = await tx.stockMovement.create({
+          data: {
+            tenantId,
+            productId,
+            warehouseId: destinationWarehouseId,
+            quantity,
+            type: StockMovementType.IN,
+            reference: destinationReference,
+          },
+        });
+
+        return { outMovement, inMovement };
+      },
+    );
 
     return {
       success: true,
