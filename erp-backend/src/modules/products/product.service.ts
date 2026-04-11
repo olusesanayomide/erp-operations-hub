@@ -39,16 +39,33 @@ export class ProductService {
   }
 
   async createproduct(
-    data: { name: string; sku: string; price: number },
+    data: {
+      name: string;
+      sku: string;
+      price: number;
+      description?: string;
+      category?: string;
+      unit?: string;
+    },
     user: UserPayload,
   ): Promise<Product> {
     if (!data.name || !data.sku || data.price == null) {
       throw new NotFoundException('Missing required fields');
     }
+
+    const description = data.description?.trim() || null;
+    const category = data.category?.trim() || 'General';
+    const unit = data.unit?.trim() || 'unit';
+
     return this.prisma.product.create({
       data: {
-        ...data,
         tenantId: user.tenantId,
+        name: data.name,
+        sku: data.sku,
+        price: data.price,
+        description,
+        category,
+        unit,
       },
     });
   }
@@ -138,14 +155,29 @@ export class ProductService {
 
   async updateProduct(
     id: string,
-    data: { name?: string; sku?: string; price?: number },
+    data: {
+      name?: string;
+      sku?: string;
+      price?: number;
+      description?: string;
+      category?: string;
+      unit?: string;
+    },
     user: UserPayload,
   ): Promise<Product> {
     await this.getById(id, user);
 
+    const normalizedData = {
+      ...data,
+      description:
+        data.description === undefined ? undefined : data.description.trim() || null,
+      category: data.category === undefined ? undefined : data.category.trim() || 'General',
+      unit: data.unit === undefined ? undefined : data.unit.trim() || 'unit',
+    };
+
     return this.prisma.product.update({
       where: { id },
-      data,
+      data: normalizedData,
     });
   }
 

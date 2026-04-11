@@ -14,6 +14,7 @@ import { RolesGuard } from './auth/guard/role.guard';
 import { ConfigModule } from '@nestjs/config';
 import { TenantContextInterceptor } from './common/tenant-context.interceptor';
 import { PrismaModule } from './common/prisma.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { PrismaModule } from './common/prisma.module';
     WarehousesModule,
     CustomersModule,
     AuthModule,
+    SettingsModule,
   ],
   controllers: [],
   providers: [

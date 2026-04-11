@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageHeader } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -9,7 +9,7 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
-  const { currency, updateCurrency, formatMoney } = useSettings();
+  const { currency, updateCurrency, formatMoney, isLoading, isSaving } = useSettings();
   const { hasRole } = useAuth();
   const canManageCurrency = hasRole(['admin', 'manager']);
 
@@ -19,7 +19,15 @@ export default function SettingsPage() {
     exchangeRate: String(currency.exchangeRate),
   });
 
-  const handleSave = () => {
+  useEffect(() => {
+    setForm({
+      currencyCode: currency.currencyCode,
+      locale: currency.locale,
+      exchangeRate: String(currency.exchangeRate),
+    });
+  }, [currency.currencyCode, currency.locale, currency.exchangeRate]);
+
+  const handleSave = async () => {
     const exchangeRate = Number(form.exchangeRate);
 
     if (!form.currencyCode.trim() || !form.locale.trim() || !(exchangeRate > 0)) {
@@ -27,13 +35,16 @@ export default function SettingsPage() {
       return;
     }
 
-    updateCurrency({
-      currencyCode: form.currencyCode.trim().toUpperCase(),
-      locale: form.locale.trim(),
-      exchangeRate,
-    });
-
-    toast.success('Currency settings updated');
+    try {
+      await updateCurrency({
+        currencyCode: form.currencyCode.trim().toUpperCase(),
+        locale: form.locale.trim(),
+        exchangeRate,
+      });
+      toast.success('Currency settings updated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to save currency settings');
+    }
   };
 
   return (
@@ -53,6 +64,12 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
+
+          {isLoading && (
+            <p className="text-sm text-muted-foreground">
+              Loading tenant currency settings...
+            </p>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -96,7 +113,9 @@ export default function SettingsPage() {
 
           {canManageCurrency ? (
             <div className="flex justify-end">
-              <Button onClick={handleSave}>Save Currency Settings</Button>
+              <Button onClick={handleSave} disabled={isLoading || isSaving}>
+                {isSaving ? 'Saving...' : 'Save Currency Settings'}
+              </Button>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">

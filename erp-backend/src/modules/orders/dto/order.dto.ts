@@ -1,6 +1,8 @@
 // orders.dto.ts
 import {
+  IsArray,
   IsInt,
+  ValidateNested,
   IsOptional,
   IsString,
   IsUUID,
@@ -9,20 +11,14 @@ import {
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { OrderLifecycleStatus } from '../order-status.enum';
+import { Type } from 'class-transformer';
 
-export class CreateOrderDto {
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  customerId?: string;
-}
-
-export class AddOrderItemDto {
+export class CreateOrderItemDto {
   @ApiProperty({ description: 'ID of the product' })
   @IsUUID()
   productId: string;
 
-  @ApiProperty({ description: 'ID of the product' })
+  @ApiProperty({ description: 'ID of the warehouse' })
   @IsUUID()
   warehouseId: string;
 
@@ -31,6 +27,24 @@ export class AddOrderItemDto {
   @IsPositive()
   quantity: number;
 }
+
+export class CreateOrderDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  customerId?: string;
+
+  @ApiProperty({
+    description: 'Initial draft line items to create atomically with the order',
+    type: [CreateOrderItemDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDto)
+  items: CreateOrderItemDto[];
+}
+
+export class AddOrderItemDto extends CreateOrderItemDto {}
 
 export class UpdateOrderStatusDto {
   @ApiProperty({

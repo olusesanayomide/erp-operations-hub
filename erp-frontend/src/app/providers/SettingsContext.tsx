@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getCurrencySettings, updateCurrencySettings } from '@/shared/lib/erp-api';
 
 type CurrencySettings = {
   currencyCode: string;
@@ -8,12 +10,12 @@ type CurrencySettings = {
 
 type SettingsContextType = {
   currency: CurrencySettings;
-  updateCurrency: (next: CurrencySettings) => void;
+  updateCurrency: (next: CurrencySettings) => Promise<void>;
   convertAmount: (amount: number) => number;
   formatMoney: (amount: number) => string;
+  isLoading: boolean;
+  isSaving: boolean;
 };
-
-const STORAGE_KEY = 'erp.settings.currency';
 
 const defaultCurrency: CurrencySettings = {
   currencyCode: 'USD',
@@ -23,27 +25,19 @@ const defaultCurrency: CurrencySettings = {
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
-function loadInitialSettings(): CurrencySettings {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return defaultCurrency;
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<CurrencySettings>;
-    return {
-      currencyCode: parsed.currencyCode || defaultCurrency.currencyCode,
-      locale: parsed.locale || defaultCurrency.locale,
-      exchangeRate:
-        typeof parsed.exchangeRate === 'number' && parsed.exchangeRate > 0
-          ? parsed.exchangeRate
-          : defaultCurrency.exchangeRate,
-    };
-  } catch {
-    return defaultCurrency;
-  }
-}
-
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [currency, setCurrency] = useState<CurrencySettings>(loadInitialSettings);
+  const queryClient = useQueryClient();
+  const { data: currency = defaultCurrency, isLoading } = useQuery({
+    queryKey: ['settings', 'currency'],
+    queryFn: getCurrencySettings,
+  });
+
+  const mutation = useMutation({
+    mutationFn: updateCurrencySettings,
+    onSuccess: (nextCurrency) => {
+      queryClient.setQueryData(['settings', 'currency'], nextCurrency);
+    },
+  });
 
   const value = useMemo<SettingsContextType>(() => {
     const convertAmount = (amount: number) => amount * currency.exchangeRate;
@@ -55,9 +49,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         maximumFractionDigits: 2,
       }).format(convertAmount(amount));
 
-    const updateCurrency = (next: CurrencySettings) => {
-      setCurrency(next);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    const updateCurrency = async (next: CurrencySettings) => {
+      await mutation.mutateAsync(next);
     };
 
     return {
@@ -65,8 +58,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       updateCurrency,
       convertAmount,
       formatMoney,
+      isLoading,
+      isSaving: mutation.isPending,
     };
-  }, [currency]);
+  }, [currency, isLoading, mutation]);
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }

@@ -169,9 +169,9 @@ export default function LoginPage() {
                       <Checkbox id="remember" />
                       <Label htmlFor="remember" className="text-sm font-medium leading-none text-slate-600">Remember me</Label>
                     </div>
-                    <button type="button" className="flex min-h-11 items-center text-sm font-medium text-primary transition-colors hover:text-[#2f57da]">
+                    <Link to="/forgot-password" className="flex min-h-11 items-center text-sm font-medium text-primary transition-colors hover:text-[#2f57da]">
                       Forgot password?
-                    </button>
+                    </Link>
                   </motion.div>
 
                   <motion.div variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.01 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}>

@@ -33,50 +33,46 @@ export class InventoryService {
     productId: string,
     warehouseId: string,
   ) {
-    const summary = await this.prisma.stockMovement.aggregate({
+    const inventory = await this.prisma.inventoryItem.findUnique({
       where: {
-        tenantId,
-        productId,
-        warehouseId,
-      },
-      _sum: {
-        quantity: true,
+        tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
       },
     });
 
-    return summary._sum.quantity || 0;
+    return inventory?.quantity || 0;
   }
 
   async getInventory(tenantId: string) {
-    const groups = await this.prisma.stockMovement.groupBy({
-      by: ['productId', 'warehouseId'],
+    const groups = await this.prisma.inventoryItem.findMany({
       where: { tenantId },
-      _sum: {
-        quantity: true,
-      },
     });
 
     return groups.map((item) => ({
       product: item.productId,
       location: item.warehouseId,
-      availableStock: item._sum.quantity || 0,
-      status: (item._sum.quantity || 0) > 10 ? 'IN_STOCK' : 'LOW_STOCK',
+      availableStock: item.quantity || 0,
+      reservedStock: item.reservedQuantity || 0,
+      onHandStock: (item.quantity || 0) + (item.reservedQuantity || 0),
+      status:
+        (item.quantity || 0) > 10
+          ? 'IN_STOCK'
+          : (item.quantity || 0) > 0
+            ? 'LOW_STOCK'
+            : 'OUT_OF_STOCK',
     }));
   }
 
   async getInventoryByWarehouse(tenantId: string, warehouseId: string) {
-    const stock = await this.prisma.stockMovement.groupBy({
-      by: ['productId'],
+    const stock = await this.prisma.inventoryItem.findMany({
       where: { tenantId, warehouseId },
-      _sum: {
-        quantity: true,
-      },
     });
 
     return stock.map((item) => ({
       productId: item.productId,
       warehouseId,
-      totalQuantity: item._sum.quantity || 0,
+      availableQuantity: item.quantity || 0,
+      reservedQuantity: item.reservedQuantity || 0,
+      totalQuantity: (item.quantity || 0) + (item.reservedQuantity || 0),
     }));
   }
 
@@ -114,6 +110,7 @@ export class InventoryService {
           productId,
           warehouseId,
           quantity,
+          reservedQuantity: 0,
         },
       }),
     ]);
@@ -249,6 +246,7 @@ export class InventoryService {
             productId,
             warehouseId: destinationWarehouseId,
             quantity,
+            reservedQuantity: 0,
           },
         });
 

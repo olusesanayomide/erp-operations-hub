@@ -27,7 +27,14 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', sku: '', price: '', category: '' });
+  const [form, setForm] = useState({
+    name: '',
+    sku: '',
+    price: '',
+    category: '',
+    unit: '',
+    description: '',
+  });
   const [importMode, setImportMode] = useState<ProductImportMode>('upsert');
   const [importFileName, setImportFileName] = useState('');
   const [importCsv, setImportCsv] = useState('');
@@ -44,7 +51,7 @@ export default function ProductsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setDialogOpen(false);
-      setForm({ name: '', sku: '', price: '', category: '' });
+      setForm({ name: '', sku: '', price: '', category: '', unit: '', description: '' });
       toast.success('Product created');
     },
     onError: (error: Error) => toast.error(error.message),
@@ -327,7 +334,11 @@ export default function ProductsPage() {
                     <div className="space-y-2"><Label>SKU</Label><Input placeholder="SKU-000" value={form.sku} onChange={(e) => setForm((current) => ({ ...current, sku: e.target.value }))} /></div>
                     <div className="space-y-2"><Label>Price</Label><Input type="number" placeholder="0.00" value={form.price} onChange={(e) => setForm((current) => ({ ...current, price: e.target.value }))} /></div>
                   </div>
-                  <div className="space-y-2"><Label>Category</Label><Input placeholder="Category" value={form.category} onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))} /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Category</Label><Input placeholder="Category" value={form.category} onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))} /></div>
+                    <div className="space-y-2"><Label>Unit</Label><Input placeholder="pc" value={form.unit} onChange={(e) => setForm((current) => ({ ...current, unit: e.target.value }))} /></div>
+                  </div>
+                  <div className="space-y-2"><Label>Description</Label><Input placeholder="Short product description" value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} /></div>
                   <Button
                     className="w-full"
                     disabled={createMutation.isPending}
@@ -340,6 +351,9 @@ export default function ProductsPage() {
                         name: form.name,
                         sku: form.sku,
                         price: Number(form.price),
+                        category: form.category,
+                        unit: form.unit,
+                        description: form.description,
                       });
                     }}
                   >

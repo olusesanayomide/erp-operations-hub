@@ -4,13 +4,19 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { useAuth } from '@/app/providers/AuthContext';
-import { ArrowLeft, Truck, PackageCheck } from 'lucide-react';
+import { ArrowLeft, Truck, PackageCheck, CheckCircle, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/shared/ui/alert-dialog';
-import { getPurchaseById, listSuppliers, listWarehouses, receivePurchase } from '@/shared/lib/erp-api';
+import {
+  getPurchaseById,
+  listSuppliers,
+  listWarehouses,
+  receivePurchase,
+  updatePurchaseStatus,
+} from '@/shared/lib/erp-api';
 import { useSettings } from '@/app/providers/SettingsContext';
 
 export default function PurchaseDetailPage() {
@@ -46,6 +52,17 @@ export default function PurchaseDetailPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: (status: 'CONFIRMED' | 'SHIPPED' | 'CANCELLED') =>
+      updatePurchaseStatus(id || '', status),
+    onSuccess: (_, status) => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['purchases', id] });
+      toast.success(`Purchase order marked ${status.toLowerCase()}`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading purchase...</div>;
   if (!purchase) return <EmptyState icon={Truck} title="Purchase not found" description="This PO does not exist" action={<Link to="/purchases"><Button variant="outline">Back</Button></Link>} />;
 
@@ -58,10 +75,28 @@ export default function PurchaseDetailPage() {
 
       <PageHeader title={purchase.purchaseNumber}>
         <StatusBadge status={purchase.status} className="text-sm px-3 py-1" />
+        {purchase.status === 'draft' && canPerform('purchases.confirm') && (
+          <Button onClick={() => updateStatusMutation.mutate('CONFIRMED')}>
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Confirm PO
+          </Button>
+        )}
+        {purchase.status === 'confirmed' && canPerform('purchases.confirm') && (
+          <Button variant="outline" onClick={() => updateStatusMutation.mutate('SHIPPED')}>
+            <Send className="h-4 w-4 mr-2" />
+            Mark Shipped
+          </Button>
+        )}
         {purchase.status !== 'received' && purchase.status !== 'cancelled' && canPerform('purchases.receive') && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button className="bg-success hover:bg-success/90"><PackageCheck className="h-4 w-4 mr-2" />Receive Goods</Button>
+              <Button
+                className="bg-success hover:bg-success/90"
+                disabled={purchase.status === 'draft'}
+              >
+                <PackageCheck className="h-4 w-4 mr-2" />
+                Receive Goods
+              </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>

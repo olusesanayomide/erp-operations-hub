@@ -6,6 +6,25 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
+import { PurchaseLifecycleStatus } from './purchase-status.enum';
+
+const PURCHASE_STATUS_TRANSITIONS: Record<
+  PurchaseLifecycleStatus,
+  PurchaseLifecycleStatus[]
+> = {
+  [PurchaseLifecycleStatus.DRAFT]: [
+    PurchaseLifecycleStatus.CONFIRMED,
+    PurchaseLifecycleStatus.CANCELLED,
+  ],
+  [PurchaseLifecycleStatus.CONFIRMED]: [
+    PurchaseLifecycleStatus.SHIPPED,
+    PurchaseLifecycleStatus.RECEIVED,
+    PurchaseLifecycleStatus.CANCELLED,
+  ],
+  [PurchaseLifecycleStatus.SHIPPED]: [PurchaseLifecycleStatus.RECEIVED],
+  [PurchaseLifecycleStatus.RECEIVED]: [],
+  [PurchaseLifecycleStatus.CANCELLED]: [],
+};
 
 @Injectable()
 export class PurchaseService {
@@ -84,7 +103,7 @@ export class PurchaseService {
         supplierId: dto.supplierId,
         warehouseId: dto.warehouseId,
         totalAmount: totalAmount,
-        status: 'DRAFT',
+        status: PurchaseLifecycleStatus.DRAFT,
         items: {
           create: dto.items.map((items) => ({
             productId: items.productId,
@@ -114,16 +133,20 @@ export class PurchaseService {
       if (!purchase) {
         throw new NotFoundException('Purchase order not found');
       }
-      if (purchase.status === 'RECEIVED') {
-        throw new BadRequestException('Purchase order already received');
-      }
-      if (purchase.status === 'CANCELLED') {
-        throw new BadRequestException('Purchase order already cancelled');
+      const currentStatus = purchase.status as PurchaseLifecycleStatus;
+      if (
+        !PURCHASE_STATUS_TRANSITIONS[currentStatus].includes(
+          PurchaseLifecycleStatus.RECEIVED,
+        )
+      ) {
+        throw new BadRequestException(
+          `Invalid status transition from ${currentStatus} to ${PurchaseLifecycleStatus.RECEIVED}`,
+        );
       }
       await tx.purchase.update({
         where: { id: purchaseId },
         data: {
-          status: 'RECEIVED',
+          status: PurchaseLifecycleStatus.RECEIVED,
           receivedAt: new Date(),
         },
       });
@@ -164,6 +187,53 @@ export class PurchaseService {
         success: true,
         message: 'Purchase order received and stock updated',
       };
+    });
+  }
+
+  async updateStatus(
+    tenantId: string,
+    purchaseId: string,
+    status: PurchaseLifecycleStatus,
+  ) {
+    if (status === PurchaseLifecycleStatus.RECEIVED) {
+      return this.recievePurchase(tenantId, purchaseId);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.findFirst({
+        where: { id: purchaseId, tenantId },
+      });
+
+      if (!purchase) {
+        throw new NotFoundException('Purchase order not found');
+      }
+
+      const currentStatus = purchase.status as PurchaseLifecycleStatus;
+
+      if (currentStatus === status) {
+        throw new BadRequestException('Purchase order is already in that status');
+      }
+
+      const allowedTransitions = PURCHASE_STATUS_TRANSITIONS[currentStatus];
+      if (!allowedTransitions.includes(status)) {
+        throw new BadRequestException(
+          `Invalid status transition from ${currentStatus} to ${status}`,
+        );
+      }
+
+      return tx.purchase.update({
+        where: { id: purchaseId },
+        data: { status },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          supplier: true,
+          warehouse: true,
+        },
+      });
     });
   }
 }

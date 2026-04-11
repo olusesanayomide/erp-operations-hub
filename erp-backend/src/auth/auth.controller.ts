@@ -1,9 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { LoginDto } from './dto/login.dto';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
 import { UpdateTenantStatusDto } from './dto/update-tenant-status.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtGuard } from './guard/jwt.guard';
 import { GetUser, UserPayload } from './decorator/get-user.decorator';
 import { Public } from './decorator/public.decorator';
@@ -22,30 +21,6 @@ import { Role } from './enums/role.enum';
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
-
-  @Public()
-  @Post('register')
-  @ApiOperation({
-    summary: 'Deprecated: user creation is handled by Supabase auth',
-  })
-  @ApiResponse({
-    status: 410,
-    description: 'Authentication is managed by Supabase.',
-  })
-  register(@Body() _dto: CreateUserDto) {
-    return this.authService.assertSupabaseManagedAuth();
-  }
-
-  @Public()
-  @Post('login')
-  @ApiOperation({ summary: 'Deprecated: login is handled by Supabase auth' })
-  @ApiResponse({
-    status: 410,
-    description: 'Authentication is managed by Supabase.',
-  })
-  login(@Body() _dto: LoginDto) {
-    return this.authService.assertSupabaseManagedAuth();
-  }
 
   @Public()
   @Post('signup-tenant')
@@ -69,6 +44,19 @@ export class AuthController {
   @ApiResponse({ status: 403, description: 'Admin access required.' })
   listUsers(@GetUser() user: UserPayload) {
     return this.authService.listUsers(user);
+  }
+
+  @Patch('users/:userId')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Update a user name or role' })
+  @ApiResponse({ status: 200, description: 'User updated successfully.' })
+  @ApiResponse({ status: 403, description: 'Admin access required.' })
+  updateUser(
+    @GetUser() user: UserPayload,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.authService.updateUser(user, userId, dto);
   }
 
   @Get('tenants')

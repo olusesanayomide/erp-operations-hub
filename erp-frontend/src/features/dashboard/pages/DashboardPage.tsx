@@ -40,7 +40,14 @@ export default function DashboardPage() {
     return status === 'low-stock' || status === 'out-of-stock';
   });
 
-  const totalInventoryQty = inventory.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAvailableInventoryQty = inventory.reduce(
+    (sum, item) => sum + item.quantity,
+    0,
+  );
+  const totalReservedInventoryQty = inventory.reduce(
+    (sum, item) => sum + item.reservedQuantity,
+    0,
+  );
   const activeOrders = orders.filter((order) =>
     ['draft', 'confirmed', 'picked', 'shipped'].includes(order.status),
   ).length;
@@ -90,7 +97,8 @@ export default function DashboardPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard title="Total Products" value={products.length} icon={Package} />
-        <KPICard title="Inventory Qty" value={totalInventoryQty.toLocaleString()} icon={Boxes} />
+        <KPICard title="Available Inventory" value={totalAvailableInventoryQty.toLocaleString()} icon={Boxes} />
+        <KPICard title="Reserved Inventory" value={totalReservedInventoryQty.toLocaleString()} icon={Boxes} />
         <KPICard title="Low Stock Items" value={lowStockItems.length} icon={AlertTriangle} variant={lowStockItems.length > 0 ? 'warning' : 'default'} />
         <KPICard title="Active Orders" value={activeOrders} icon={ShoppingCart} />
         <KPICard title="Draft Purchases" value={draftPurchases} icon={Truck} variant={draftPurchases > 0 ? 'warning' : 'default'} />

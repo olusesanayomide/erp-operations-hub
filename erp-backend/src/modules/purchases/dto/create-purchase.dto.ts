@@ -9,8 +9,10 @@ import {
   IsUUID,
   Min,
   ValidateNested,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PurchaseLifecycleStatus } from '../purchase-status.enum';
 
 export class PurchaseItemDto {
   @ApiProperty({ example: 'uuid-of-product' })
@@ -51,4 +53,14 @@ export class CreatePurchaseDto {
   @ValidateNested({ each: true })
   @Type(() => PurchaseItemDto) // Crucial for nested validation and Swagger UI
   items: PurchaseItemDto[];
+}
+
+export class UpdatePurchaseStatusDto {
+  @ApiProperty({
+    example: PurchaseLifecycleStatus.CONFIRMED,
+    enum: PurchaseLifecycleStatus,
+    description: 'New status of the purchase order',
+  })
+  @IsEnum(PurchaseLifecycleStatus)
+  status: PurchaseLifecycleStatus;
 }

@@ -20,7 +20,9 @@ export default function WarehouseDetailPage() {
   if (!warehouse) return <EmptyState icon={Warehouse} title="Warehouse not found" description="" action={<Link to="/warehouses"><Button variant="outline">Back</Button></Link>} />;
 
   const inventory = data?.inventory || [];
-  const totalQty = inventory.reduce((s, i) => s + i.quantity, 0);
+  const totalAvailableQty = inventory.reduce((sum, item) => sum + item.quantity, 0);
+  const totalReservedQty = inventory.reduce((sum, item) => sum + item.reservedQuantity, 0);
+  const totalOnHandQty = inventory.reduce((sum, item) => sum + item.onHandQuantity, 0);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -30,7 +32,12 @@ export default function WarehouseDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="erp-card p-5 flex items-center gap-3"><MapPin className="h-4 w-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">Location</p><p className="text-sm font-medium">{warehouse.location}</p></div></div>
         <div className="erp-card p-5"><p className="text-xs text-muted-foreground">Stocked Products</p><p className="text-2xl font-bold">{inventory.length}</p></div>
-        <div className="erp-card p-5"><p className="text-xs text-muted-foreground">Total Units</p><p className="text-2xl font-bold">{totalQty.toLocaleString()}</p></div>
+        <div className="erp-card p-5">
+          <p className="text-xs text-muted-foreground">Available / Reserved / On Hand</p>
+          <p className="text-2xl font-bold">
+            {totalAvailableQty.toLocaleString()} / {totalReservedQty.toLocaleString()} / {totalOnHandQty.toLocaleString()}
+          </p>
+        </div>
       </div>
 
       <div className="erp-card p-5">
@@ -39,7 +46,9 @@ export default function WarehouseDetailPage() {
           <thead><tr className="erp-table-header">
             <th className="text-left p-3">Product</th>
             <th className="text-left p-3">SKU</th>
-            <th className="text-right p-3">Quantity</th>
+            <th className="text-right p-3">Available</th>
+            <th className="text-right p-3">Reserved</th>
+            <th className="text-right p-3">On Hand</th>
             <th className="text-right p-3">Min Stock</th>
             <th className="text-left p-3">Status</th>
           </tr></thead>
@@ -49,6 +58,8 @@ export default function WarehouseDetailPage() {
                 <td className="p-3"><Link to={`/products/${inv.productId}`} className="text-sm font-medium text-primary hover:underline">{inv.product?.name}</Link></td>
                 <td className="p-3 text-sm text-muted-foreground font-mono">{inv.product?.sku}</td>
                 <td className="p-3 text-sm text-right font-semibold">{inv.quantity}</td>
+                <td className="p-3 text-sm text-right">{inv.reservedQuantity}</td>
+                <td className="p-3 text-sm text-right font-medium">{inv.onHandQuantity}</td>
                 <td className="p-3 text-sm text-right text-muted-foreground">{inv.minStock}</td>
                 <td className="p-3"><StatusBadge status={getStockStatus(inv.quantity, inv.minStock)} /></td>
               </tr>

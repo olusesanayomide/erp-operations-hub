@@ -72,11 +72,28 @@ remove(@Param('id') id: string) { ... }
 
 ##  Getting Started
 
-1. **Environment Setup:** Create a `.env` file with `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, and `SUPABASE_SERVICE_ROLE_KEY` for admin-user seeding. Add `SUPABASE_JWT_SECRET` only if your Supabase project still signs tokens with HS256.
+1. **Environment Setup:** Create a `.env` file with `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, and `SUPABASE_SERVICE_ROLE_KEY` for admin-user seeding. Add `SUPABASE_JWT_SECRET` only if your Supabase project still signs tokens with HS256.
 2. **Install:** `npm install`
-3. **Database:** `npx prisma migrate dev`
+3. **Database:** `npm run prisma:migrate:dev`
 4. **Run:** `npm run start:dev`
 5. **Docs:** Visit `http://localhost:3000/api`
+
+## Migration-Safe Workflow
+
+- Keep `DATABASE_URL` pointed at the Supabase pooler for normal app traffic.
+- Keep `DIRECT_URL` pointed at the direct Supabase Postgres connection for schema changes.
+- Run Prisma schema-changing commands through the provided wrapper so migrations always use `DIRECT_URL`.
+
+Use these commands:
+
+```bash
+npm run prisma:migrate:dev
+npm run prisma:migrate:deploy
+npm run prisma:migrate:status
+npm run prisma:db:push
+```
+
+This avoids the common Supabase pooler/shadow-database issues that can happen with `prisma migrate dev`.
 
 ---
 

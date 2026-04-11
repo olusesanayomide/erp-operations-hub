@@ -22,6 +22,21 @@ export class ProductDto {
   @IsNumber()
   @Min(0)
   price: number;
+
+  @ApiProperty({ description: 'Short description of the product', required: false })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiProperty({ description: 'Category used for grouping products', required: false })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @ApiProperty({ description: 'Base stocking or sales unit', required: false })
+  @IsOptional()
+  @IsString()
+  unit?: string;
 }
 
 export class UpdateProductDto {
@@ -40,6 +55,21 @@ export class UpdateProductDto {
   @IsNumber()
   @Min(0)
   price?: number;
+
+  @ApiProperty({ description: 'Short description of the product', required: false })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiProperty({ description: 'Category used for grouping products', required: false })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @ApiProperty({ description: 'Base stocking or sales unit', required: false })
+  @IsOptional()
+  @IsString()
+  unit?: string;
 }
 
 export const PRODUCT_IMPORT_MODES = ['create', 'upsert'] as const;

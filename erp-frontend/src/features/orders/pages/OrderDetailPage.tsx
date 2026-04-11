@@ -81,7 +81,7 @@ export default function OrderDetailPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Confirm this order?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  <span className="flex items-start gap-2 text-warning"><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />This will reserve stock from {warehouse?.name}. This action cannot be easily undone.</span>
+                  <span className="flex items-start gap-2 text-warning"><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />This will reserve stock from {warehouse?.name}. Stock leaves inventory history only when the order is marked shipped.</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

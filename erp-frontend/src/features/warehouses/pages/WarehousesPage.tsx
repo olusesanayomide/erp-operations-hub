@@ -69,7 +69,11 @@ export default function WarehousesPage() {
                     toast.error('Warehouse name is required');
                     return;
                   }
-                  createMutation.mutate({ name: form.name, location: form.location });
+                  createMutation.mutate({
+                    name: form.name,
+                    location: form.location,
+                    description: form.description,
+                  });
                 }}>{createMutation.isPending ? 'Creating...' : 'Create Warehouse'}</Button>
               </div>
             </DialogContent>

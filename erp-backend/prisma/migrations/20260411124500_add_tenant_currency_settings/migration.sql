@@ -1,0 +1,4 @@
+ALTER TABLE "Tenant"
+ADD COLUMN "currencyCode" TEXT NOT NULL DEFAULT 'USD',
+ADD COLUMN "currencyLocale" TEXT NOT NULL DEFAULT 'en-US',
+ADD COLUMN "currencyExchangeRate" DECIMAL(12, 4) NOT NULL DEFAULT 1;

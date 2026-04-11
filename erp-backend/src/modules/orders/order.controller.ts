@@ -60,17 +60,17 @@ export class OrdersController {
   @Post()
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   @ApiOperation({
-    summary: 'Initialize a new order',
+    summary: 'Create a new draft order',
     description:
-      'Creates a base order header linked to a Customer. Items must be added in a separate step.',
+      'Creates an order header and its draft line items in a single atomic request.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Order header created successfully.',
+    description: 'Draft order created successfully.',
   })
   @ApiResponse({ status: 404, description: 'Customer ID not found.' })
   create(@Body() dto: CreateOrderDto, @GetUser() user: UserPayload) {
-    return this.ordersService.createOrder(user.tenantId, dto.customerId);
+    return this.ordersService.createOrder(user.tenantId, dto);
   }
 
   @Post(':id/items')

@@ -46,6 +46,8 @@ export interface InventoryItem {
   productId: string;
   warehouseId: string;
   quantity: number;
+  reservedQuantity: number;
+  onHandQuantity: number;
   minStock: number;
   product?: Product;
   warehouse?: Warehouse;

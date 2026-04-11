@@ -1,18 +1,17 @@
 import {
   BadRequestException,
   ForbiddenException,
-  GoneException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
 import {
   TenantStatusValue,
   UpdateTenantStatusDto,
 } from './dto/update-tenant-status.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { Role } from './enums/role.enum';
 import { UserPayload } from './decorator/get-user.decorator';
 
@@ -22,12 +21,6 @@ export class AuthService {
     private prisma: PrismaService,
     private config: ConfigService,
   ) {}
-
-  assertSupabaseManagedAuth() {
-    throw new GoneException(
-      'Authentication is managed by Supabase. Sign in from the frontend with your Supabase credentials.',
-    );
-  }
 
   private getSupabaseAdminConfig() {
     const supabaseUrl = this.config
@@ -141,13 +134,11 @@ export class AuthService {
         tenant.id,
       );
 
-      const hashedPassword = await bcrypt.hash(dto.adminPassword, 10);
       const user = await this.prisma.user.create({
         data: {
           id: supabaseUserId,
           tenantId: tenant.id,
           email: dto.adminEmail,
-          password: hashedPassword,
           name: dto.adminName,
           roles: {
             connectOrCreate: {
@@ -236,6 +227,80 @@ export class AuthService {
       isPlatformAdmin: user.isPlatformAdmin,
       createdAt: user.createdAt,
     }));
+  }
+
+  async updateUser(
+    currentUser: UserPayload,
+    userId: string,
+    dto: UpdateUserDto,
+  ) {
+    const targetUser = await this.prisma.user.findFirst({
+      where: currentUser.isPlatformAdmin
+        ? { id: userId }
+        : { id: userId, tenantId: currentUser.tenantId },
+      include: { roles: true, tenant: true },
+    });
+
+    if (!targetUser) {
+      throw new BadRequestException('User not found.');
+    }
+
+    if (!dto.name && !dto.role) {
+      throw new BadRequestException('Provide at least one field to update.');
+    }
+
+    if (
+      dto.role &&
+      currentUser.userId === userId &&
+      dto.role !== targetUser.roles[0]?.name
+    ) {
+      throw new BadRequestException(
+        'You cannot change your own role from the current session.',
+      );
+    }
+
+    const currentRole = targetUser.roles[0]?.name;
+    if (dto.role && dto.role !== currentRole && currentRole === Role.ADMIN) {
+      const tenantAdminCount = await this.prisma.user.count({
+        where: {
+          tenantId: targetUser.tenantId,
+          roles: {
+            some: { name: Role.ADMIN },
+          },
+        },
+      });
+
+      if (tenantAdminCount <= 1) {
+        throw new BadRequestException(
+          'Each tenant must keep at least one admin user.',
+        );
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: targetUser.id },
+      data: {
+        name: dto.name === undefined ? undefined : dto.name.trim() || null,
+        roles: dto.role
+          ? {
+              set: [],
+              connect: [{ name: dto.role }],
+            }
+          : undefined,
+      },
+      include: { roles: true, tenant: true },
+    });
+
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      name: updatedUser.name,
+      tenantId: updatedUser.tenantId,
+      tenantName: updatedUser.tenant.name,
+      roles: updatedUser.roles.map((role) => role.name),
+      isPlatformAdmin: updatedUser.isPlatformAdmin,
+      createdAt: updatedUser.createdAt,
+    };
   }
 
   async listTenants(currentUser: UserPayload) {

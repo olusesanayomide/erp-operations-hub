@@ -101,6 +101,7 @@ describe('InventoryService transferStock', () => {
         productId: 'p1',
         warehouseId: 'w2',
         quantity: 5,
+        reservedQuantity: 0,
       },
     });
     expect(prisma.inventoryItem.updateMany).toHaveBeenCalledWith({
@@ -141,6 +142,7 @@ describe('InventoryService transferStock', () => {
           productId: 'p1',
           warehouseId: 'w3',
           quantity: 3,
+          reservedQuantity: 0,
         },
       }),
     );

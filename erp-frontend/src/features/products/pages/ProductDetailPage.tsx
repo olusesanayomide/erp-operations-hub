@@ -83,7 +83,9 @@ export default function ProductDetailPage() {
         <table className="w-full">
           <thead><tr className="erp-table-header">
             <th className="text-left p-3">Warehouse</th>
-            <th className="text-right p-3">Quantity</th>
+            <th className="text-right p-3">Available</th>
+            <th className="text-right p-3">Reserved</th>
+            <th className="text-right p-3">On Hand</th>
             <th className="text-right p-3">Min Stock</th>
             <th className="text-left p-3">Status</th>
           </tr></thead>
@@ -92,6 +94,8 @@ export default function ProductDetailPage() {
               <tr key={inv.id} className="erp-table-row">
                 <td className="p-3 text-sm font-medium">{inv.warehouse?.name}</td>
                 <td className="p-3 text-sm text-right font-semibold">{inv.quantity}</td>
+                <td className="p-3 text-sm text-right">{inv.reservedQuantity}</td>
+                <td className="p-3 text-sm text-right font-medium">{inv.onHandQuantity}</td>
                 <td className="p-3 text-sm text-right text-muted-foreground">{inv.minStock}</td>
                 <td className="p-3"><StatusBadge status={getStockStatus(inv.quantity, inv.minStock)} /></td>
               </tr>

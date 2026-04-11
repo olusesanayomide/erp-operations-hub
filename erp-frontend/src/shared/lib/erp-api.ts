@@ -53,10 +53,19 @@ type BackendTenantListItem = {
   userCount: number;
 };
 
+type BackendCurrencySettings = {
+  currencyCode: string;
+  locale: string;
+  exchangeRate: number;
+};
+
 type BackendProduct = {
   id: string;
   name: string;
   sku: string;
+  description?: string | null;
+  category?: string | null;
+  unit?: string | null;
   price: number;
   createdAt: string;
   updatedAt?: string | null;
@@ -65,6 +74,7 @@ type BackendProduct = {
     productId: string;
     warehouseId: string;
     quantity: number;
+    reservedQuantity?: number;
     product?: BackendProduct;
     warehouse?: BackendWarehouse;
   }>;
@@ -145,12 +155,14 @@ type BackendWarehouse = {
   id: string;
   name: string;
   location?: string | null;
+  description?: string | null;
   createdAt: string;
   inventoryItems?: Array<{
     id: string;
     productId: string;
     warehouseId: string;
     quantity: number;
+    reservedQuantity?: number;
     product?: BackendProduct;
   }>;
   _count?: {
@@ -243,6 +255,8 @@ type BackendInventorySummary = {
   product: string;
   location: string;
   availableStock: number;
+  reservedStock?: number;
+  onHandStock?: number;
   status: string;
 };
 
@@ -308,10 +322,10 @@ export function normalizeProduct(raw: BackendProduct): Product {
     id: raw.id,
     name: raw.name,
     sku: raw.sku,
-    description: "",
+    description: raw.description || "",
     basePrice: raw.price,
-    category: "General",
-    unit: "unit",
+    category: raw.category || "General",
+    unit: raw.unit || "unit",
     createdAt: formatDate(raw.createdAt),
     updatedAt: formatDate(raw.updatedAt || raw.createdAt),
   };
@@ -322,7 +336,7 @@ export function normalizeWarehouse(raw: BackendWarehouse): Warehouse {
     id: raw.id,
     name: raw.name,
     location: raw.location || "Unspecified location",
-    description: "",
+    description: raw.description || "",
     itemCount: raw.inventoryItems?.length ?? raw._count?.inventoryItems ?? 0,
     createdAt: formatDate(raw.createdAt),
   };
@@ -360,6 +374,7 @@ export function normalizeInventoryItem(
         productId: string;
         warehouseId: string;
         quantity: number;
+        reservedQuantity?: number;
         product?: BackendProduct;
         warehouse?: BackendWarehouse;
       },
@@ -369,12 +384,18 @@ export function normalizeInventoryItem(
   const productId = "product" in raw ? raw.product : raw.productId;
   const warehouseId = "location" in raw ? raw.location : raw.warehouseId;
   const quantity = "availableStock" in raw ? raw.availableStock : raw.quantity;
+  const reservedQuantity =
+    "reservedStock" in raw ? raw.reservedStock || 0 : raw.reservedQuantity || 0;
+  const onHandQuantity =
+    "onHandStock" in raw ? raw.onHandStock || quantity + reservedQuantity : quantity + reservedQuantity;
 
   return {
     id: "id" in raw ? raw.id : `${productId}-${warehouseId}`,
     productId,
     warehouseId,
     quantity,
+    reservedQuantity,
+    onHandQuantity,
     minStock: 10,
     product: "product" in raw ? productsById.get(productId) : raw.product ? normalizeProduct(raw.product) : productsById.get(productId),
     warehouse:
@@ -503,6 +524,31 @@ export async function listUsers() {
   })) satisfies User[];
 }
 
+export async function updateUser(
+  userId: string,
+  payload: { name?: string; role?: "ADMIN" | "MANAGER" | "STAFF" },
+) {
+  const item = await apiRequest<BackendUserListItem>(`/auth/users/${userId}`, {
+    method: "PATCH",
+    body: payload,
+  });
+
+  return {
+    id: item.id,
+    name: item.name || item.email,
+    email: item.email,
+    role: normalizeRole(item.roles?.[0]),
+    tenant: {
+      id: item.tenantId,
+      name: item.tenantName,
+      slug: "",
+      status: "active",
+    },
+    isPlatformAdmin: item.isPlatformAdmin,
+    createdAt: formatDate(item.createdAt),
+  } satisfies User;
+}
+
 export async function loginWithSupabase(email: string, password: string) {
   if (!supabase) {
     throw new Error("Supabase auth is not configured.");
@@ -522,6 +568,46 @@ export async function loginWithSupabase(email: string, password: string) {
   }
 
   return data.session satisfies Session | null;
+}
+
+function getAuthRedirectBaseUrl() {
+  const configuredUrl = import.meta.env.VITE_SITE_URL?.trim();
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/$/, "");
+  }
+
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+
+  return "http://localhost:8080";
+}
+
+export async function sendPasswordResetEmail(email: string) {
+  if (!supabase) {
+    throw new Error("Supabase auth is not configured.");
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${getAuthRedirectBaseUrl()}/auth/reset-password`,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateSupabasePassword(password: string) {
+  if (!supabase) {
+    throw new Error("Supabase auth is not configured.");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function logoutSupabase() {
@@ -588,6 +674,17 @@ export async function updateTenantStatus(
   } satisfies PlatformTenant;
 }
 
+export async function getCurrencySettings() {
+  return apiRequest<BackendCurrencySettings>("/settings/currency");
+}
+
+export async function updateCurrencySettings(payload: BackendCurrencySettings) {
+  return apiRequest<BackendCurrencySettings>("/settings/currency", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
 export async function listProducts() {
   const items = await apiRequest<BackendProduct[]>("/products");
   return items.map(normalizeProduct);
@@ -606,6 +703,8 @@ export async function getProductById(id: string) {
       productId: inventoryItem.productId,
       warehouseId: inventoryItem.warehouseId,
       quantity: inventoryItem.quantity,
+      reservedQuantity: inventoryItem.reservedQuantity || 0,
+      onHandQuantity: inventoryItem.quantity + (inventoryItem.reservedQuantity || 0),
       minStock: 10,
     })),
     movements: (item.stockMovements || []).map(normalizeMovement),
@@ -613,7 +712,14 @@ export async function getProductById(id: string) {
   };
 }
 
-export async function createProduct(payload: { name: string; sku: string; price: number }) {
+export async function createProduct(payload: {
+  name: string;
+  sku: string;
+  price: number;
+  description?: string;
+  category?: string;
+  unit?: string;
+}) {
   const item = await apiRequest<BackendProduct>("/products", {
     method: "POST",
     body: payload,
@@ -727,13 +833,19 @@ export async function getWarehouseById(id: string) {
       productId: inventoryItem.productId,
       warehouseId: inventoryItem.warehouseId,
       quantity: inventoryItem.quantity,
+      reservedQuantity: inventoryItem.reservedQuantity || 0,
+      onHandQuantity: inventoryItem.quantity + (inventoryItem.reservedQuantity || 0),
       minStock: 10,
       product: inventoryItem.product ? normalizeProduct(inventoryItem.product) : undefined,
     })),
   };
 }
 
-export async function createWarehouse(payload: { name: string; location?: string }) {
+export async function createWarehouse(payload: {
+  name: string;
+  location?: string;
+  description?: string;
+}) {
   const item = await apiRequest<BackendWarehouse>("/warehouses", {
     method: "POST",
     body: payload,
@@ -758,22 +870,17 @@ export async function createOrder(payload: {
 }) {
   const order = await apiRequest<BackendOrder>("/orders", {
     method: "POST",
-    body: { customerId: payload.customerId },
-  });
-
-  for (const item of payload.items) {
-    await apiRequest(`/orders/${order.id}/items`, {
-      method: "POST",
-      body: {
+    body: {
+      customerId: payload.customerId,
+      items: payload.items.map((item) => ({
         productId: item.productId,
         warehouseId: payload.warehouseId,
         quantity: item.quantity,
-      },
-    });
-  }
+      })),
+    },
+  });
 
-  const completed = await apiRequest<BackendOrder>(`/orders/${order.id}`);
-  return normalizeOrder(completed);
+  return normalizeOrder(order);
 }
 
 export async function updateOrderStatus(
@@ -828,6 +935,18 @@ export async function receivePurchase(id: string) {
   await apiRequest(`/purchases/${id}/receive`, {
     method: "PATCH",
   });
+}
+
+export async function updatePurchaseStatus(
+  id: string,
+  status: "CONFIRMED" | "SHIPPED" | "RECEIVED" | "CANCELLED",
+) {
+  const item = await apiRequest<BackendPurchase>(`/purchases/${id}/status`, {
+    method: "PATCH",
+    body: { status },
+  });
+
+  return normalizePurchase(item);
 }
 
 export async function listInventory() {

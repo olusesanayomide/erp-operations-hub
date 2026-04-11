@@ -8,7 +8,6 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "password" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
@@ -293,4 +292,8 @@ INSERT INTO "Role" ("id", "name")
 SELECT gen_random_uuid()::text, role_name
 FROM unnest(ARRAY['ADMIN'::"UserRole', 'MANAGER'::"UserRole', 'STAFF'::"UserRole']) AS role_name
 WHERE NOT EXISTS (SELECT 1 FROM "Role" r WHERE r."name" = role_name);
+
+-- Migration: 20260411153000_remove_user_password_column
+ALTER TABLE "User"
+DROP COLUMN IF EXISTS "password";
 

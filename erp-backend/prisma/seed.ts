@@ -1,5 +1,4 @@
 import { PrismaClient, UserRole } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -112,8 +111,6 @@ async function ensureSupabaseAuthUser(
 }
 
 async function main() {
-  const hashedPassword = await bcrypt.hash(adminPassword, 10);
-
   console.log('Seeding database...');
 
   const tenant = await prisma.tenant.upsert({
@@ -160,7 +157,6 @@ async function main() {
     update: {
       tenantId: tenant.id,
       name: adminName,
-      password: hashedPassword,
       isPlatformAdmin: seedPlatformAdmin,
       roles: {
         set: [],
@@ -171,7 +167,6 @@ async function main() {
       id: supabaseAuthUserId,
       tenantId: tenant.id,
       email: adminEmail,
-      password: hashedPassword,
       name: adminName,
       isPlatformAdmin: seedPlatformAdmin,
       roles: {

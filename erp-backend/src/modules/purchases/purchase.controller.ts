@@ -8,7 +8,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
-import { CreatePurchaseDto } from './dto/create-purchase.dto';
+import {
+  CreatePurchaseDto,
+  UpdatePurchaseStatusDto,
+} from './dto/create-purchase.dto';
 import {
   ApiTags,
   ApiOperation,
@@ -73,6 +76,33 @@ export class PurchaseContoller {
   })
   async receive(@Param('id') id: string, @GetUser() user: UserPayload) {
     return await this.purchaseService.recievePurchase(user.tenantId, id);
+  }
+
+  @Patch(':id/status')
+  @Roles(Role.ADMIN, Role.MANAGER)
+  @ApiOperation({
+    summary: 'Update purchase order status',
+    description:
+      'Changes purchase order state through the procurement lifecycle.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Purchase status updated successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid purchase status transition.',
+  })
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdatePurchaseStatusDto,
+    @GetUser() user: UserPayload,
+  ) {
+    return await this.purchaseService.updateStatus(
+      user.tenantId,
+      id,
+      dto.status,
+    );
   }
 
   @Get(':id')

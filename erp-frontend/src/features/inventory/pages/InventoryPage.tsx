@@ -465,6 +465,10 @@ export default function InventoryPage() {
         </Select>
       </div>
 
+      <p className="mb-4 text-sm text-muted-foreground">
+        Available stock can be sold immediately. Reserved stock is committed to confirmed or picked orders.
+      </p>
+
       <div className="erp-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -473,6 +477,8 @@ export default function InventoryPage() {
               <th className="text-left p-3">SKU</th>
               <th className="text-left p-3">Warehouse</th>
               <th className="text-right p-3">Available</th>
+              <th className="text-right p-3">Reserved</th>
+              <th className="text-right p-3">On Hand</th>
               <th className="text-right p-3">Min Stock</th>
               <th className="text-left p-3">Status</th>
             </tr></thead>
@@ -485,6 +491,8 @@ export default function InventoryPage() {
                   <td className={`p-3 text-sm text-right font-semibold ${item.stockStatus === 'low-stock' ? 'text-warning' : item.stockStatus === 'out-of-stock' ? 'text-destructive' : ''}`}>
                     {item.quantity}
                   </td>
+                  <td className="p-3 text-sm text-right">{item.reservedQuantity}</td>
+                  <td className="p-3 text-sm text-right font-medium">{item.onHandQuantity}</td>
                   <td className="p-3 text-sm text-right text-muted-foreground">{item.minStock}</td>
                   <td className="p-3"><StatusBadge status={item.stockStatus} /></td>
                 </tr>

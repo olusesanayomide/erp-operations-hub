@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
+import { PurchaseLifecycleStatus } from './purchase-status.enum';
 
 describe('PurchaseService.createPurchase', () => {
   const tenantId = 'tenant-1';
@@ -75,5 +76,85 @@ describe('PurchaseService.createPurchase', () => {
         }),
       }),
     );
+  });
+});
+
+describe('PurchaseService.updateStatus', () => {
+  const tenantId = 'tenant-1';
+  const purchaseId = 'purchase-1';
+
+  let service: PurchaseService;
+  let prisma: {
+    $transaction: jest.Mock;
+    purchase: { findFirst: jest.Mock; update: jest.Mock };
+    stockMovement: { create: jest.Mock };
+    inventoryItem: { upsert: jest.Mock };
+  };
+
+  beforeEach(() => {
+    prisma = {
+      $transaction: jest.fn(),
+      purchase: { findFirst: jest.fn(), update: jest.fn() },
+      stockMovement: { create: jest.fn() },
+      inventoryItem: { upsert: jest.fn() },
+    };
+
+    prisma.$transaction.mockImplementation(async (operation: any) => {
+      if (typeof operation === 'function') {
+        return operation(prisma as any);
+      }
+
+      return Promise.all(operation);
+    });
+
+    service = new PurchaseService(prisma as any);
+  });
+
+  it('blocks draft purchases from jumping straight to received', async () => {
+    prisma.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseLifecycleStatus.DRAFT,
+      items: [],
+    });
+
+    await expect(
+      service.recievePurchase(tenantId, purchaseId),
+    ).rejects.toThrow(
+      new BadRequestException(
+        `Invalid status transition from ${PurchaseLifecycleStatus.DRAFT} to ${PurchaseLifecycleStatus.RECEIVED}`,
+      ),
+    );
+  });
+
+  it('allows confirmed purchases to move to shipped', async () => {
+    prisma.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseLifecycleStatus.CONFIRMED,
+    });
+    prisma.purchase.update.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseLifecycleStatus.SHIPPED,
+    });
+
+    const result = await service.updateStatus(
+      tenantId,
+      purchaseId,
+      PurchaseLifecycleStatus.SHIPPED,
+    );
+
+    expect(result.status).toBe(PurchaseLifecycleStatus.SHIPPED);
+    expect(prisma.purchase.update).toHaveBeenCalledWith({
+      where: { id: purchaseId },
+      data: { status: PurchaseLifecycleStatus.SHIPPED },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        supplier: true,
+        warehouse: true,
+      },
+    });
   });
 });

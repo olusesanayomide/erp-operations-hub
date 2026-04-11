@@ -38,19 +38,19 @@ export const mockWarehouses: Warehouse[] = [
 ];
 
 export const mockInventory: InventoryItem[] = [
-  { id: 'inv1', productId: 'p1', warehouseId: 'w1', quantity: 250, minStock: 50 },
-  { id: 'inv2', productId: 'p2', warehouseId: 'w1', quantity: 80, minStock: 20 },
-  { id: 'inv3', productId: 'p3', warehouseId: 'w1', quantity: 12, minStock: 5 },
-  { id: 'inv4', productId: 'p4', warehouseId: 'w1', quantity: 8, minStock: 30 },
-  { id: 'inv5', productId: 'p5', warehouseId: 'w1', quantity: 45, minStock: 15 },
-  { id: 'inv6', productId: 'p6', warehouseId: 'w1', quantity: 0, minStock: 20 },
-  { id: 'inv7', productId: 'p1', warehouseId: 'w2', quantity: 120, minStock: 30 },
-  { id: 'inv8', productId: 'p3', warehouseId: 'w2', quantity: 6, minStock: 5 },
-  { id: 'inv9', productId: 'p7', warehouseId: 'w2', quantity: 200, minStock: 50 },
-  { id: 'inv10', productId: 'p8', warehouseId: 'w2', quantity: 35, minStock: 10 },
-  { id: 'inv11', productId: 'p2', warehouseId: 'w3', quantity: 40, minStock: 15 },
-  { id: 'inv12', productId: 'p4', warehouseId: 'w3', quantity: 150, minStock: 30 },
-  { id: 'inv13', productId: 'p5', warehouseId: 'w3', quantity: 22, minStock: 10 },
+  { id: 'inv1', productId: 'p1', warehouseId: 'w1', quantity: 250, reservedQuantity: 0, onHandQuantity: 250, minStock: 50 },
+  { id: 'inv2', productId: 'p2', warehouseId: 'w1', quantity: 80, reservedQuantity: 0, onHandQuantity: 80, minStock: 20 },
+  { id: 'inv3', productId: 'p3', warehouseId: 'w1', quantity: 12, reservedQuantity: 0, onHandQuantity: 12, minStock: 5 },
+  { id: 'inv4', productId: 'p4', warehouseId: 'w1', quantity: 8, reservedQuantity: 0, onHandQuantity: 8, minStock: 30 },
+  { id: 'inv5', productId: 'p5', warehouseId: 'w1', quantity: 45, reservedQuantity: 0, onHandQuantity: 45, minStock: 15 },
+  { id: 'inv6', productId: 'p6', warehouseId: 'w1', quantity: 0, reservedQuantity: 0, onHandQuantity: 0, minStock: 20 },
+  { id: 'inv7', productId: 'p1', warehouseId: 'w2', quantity: 120, reservedQuantity: 0, onHandQuantity: 120, minStock: 30 },
+  { id: 'inv8', productId: 'p3', warehouseId: 'w2', quantity: 6, reservedQuantity: 0, onHandQuantity: 6, minStock: 5 },
+  { id: 'inv9', productId: 'p7', warehouseId: 'w2', quantity: 200, reservedQuantity: 0, onHandQuantity: 200, minStock: 50 },
+  { id: 'inv10', productId: 'p8', warehouseId: 'w2', quantity: 35, reservedQuantity: 0, onHandQuantity: 35, minStock: 10 },
+  { id: 'inv11', productId: 'p2', warehouseId: 'w3', quantity: 40, reservedQuantity: 0, onHandQuantity: 40, minStock: 15 },
+  { id: 'inv12', productId: 'p4', warehouseId: 'w3', quantity: 150, reservedQuantity: 0, onHandQuantity: 150, minStock: 30 },
+  { id: 'inv13', productId: 'p5', warehouseId: 'w3', quantity: 22, reservedQuantity: 0, onHandQuantity: 22, minStock: 10 },
 ];
 
 export const mockOrders: Order[] = [
