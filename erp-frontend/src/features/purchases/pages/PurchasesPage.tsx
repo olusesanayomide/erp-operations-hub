@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -17,20 +17,23 @@ export default function PurchasesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const { data: purchases = [], isLoading } = useQuery({
+  const { data: purchases = [], isLoading: isPurchasesLoading, isError: isPurchasesError, error: purchasesError, refetch: refetchPurchases } = useQuery({
     queryKey: ['purchases'],
     queryFn: listPurchases,
   });
 
-  const { data: suppliers = [] } = useQuery({
+  const { data: suppliers = [], isLoading: isSuppliersLoading, isError: isSuppliersError, error: suppliersError, refetch: refetchSuppliers } = useQuery({
     queryKey: ['suppliers'],
     queryFn: listSuppliers,
   });
 
-  const { data: warehouses = [] } = useQuery({
+  const { data: warehouses = [], isLoading: isWarehousesLoading, isError: isWarehousesError, error: warehousesError, refetch: refetchWarehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   });
+  const isLoading = isPurchasesLoading || isSuppliersLoading || isWarehousesLoading;
+  const isError = isPurchasesError || isSuppliersError || isWarehousesError;
+  const loadError = (purchasesError || suppliersError || warehousesError) as Error | null;
 
   const filtered = purchases.filter((purchase) => {
     const supplier = purchase.supplier || suppliers.find((item) => item.id === purchase.supplierId);
@@ -99,8 +102,15 @@ export default function PurchasesPage() {
             </tbody>
           </table>
         </div>
-        {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading purchases...</p>}
-        {filtered.length === 0 && <EmptyState icon={Truck} title="No purchases found" description="Create a purchase order" />}
+        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={7} /></div>}
+        {isError && (
+          <ErrorState
+            title="Unable to load purchases"
+            description={loadError?.message || 'Purchase records and related reference data could not be loaded right now.'}
+            action={<RetryButton onClick={() => { void refetchPurchases(); void refetchSuppliers(); void refetchWarehouses(); }} />}
+          />
+        )}
+        {!isLoading && !isError && filtered.length === 0 && <EmptyState icon={Truck} title="No purchases found" description="Create a purchase order" />}
       </div>
     </div>
   );

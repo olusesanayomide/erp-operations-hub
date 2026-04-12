@@ -1,4 +1,4 @@
-import { PageHeader } from '@/shared/components/PageComponents';
+import { EmptyState, ErrorState, PageHeader, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { RoleBadge } from '@/shared/components/StatusBadge';
 import { useAuth } from '@/app/providers/AuthContext';
 import { Shield, Users } from 'lucide-react';
@@ -153,22 +153,20 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
-            {isLoading && (
-              <p className="p-4 text-sm text-muted-foreground">Loading users...</p>
-            )}
+            {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={5} /></div>}
             {isError && (
-              <p className="p-4 text-sm text-destructive">
-                {(error as Error).message || 'Unable to load users.'}
-              </p>
+              <ErrorState
+                title="Unable to load users"
+                description={(error as Error).message || 'The user directory could not be loaded right now.'}
+                action={<RetryButton onClick={() => void queryClient.invalidateQueries({ queryKey: ['users'] })} />}
+              />
             )}
             {!isLoading && !isError && users.length === 0 && (
-              <div className="p-8 text-center">
-                <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                <h3 className="font-semibold mb-1">No users found</h3>
-                <p className="text-sm text-muted-foreground">
-                  Registered users will appear here once they exist in the system.
-                </p>
-              </div>
+              <EmptyState
+                icon={Users}
+                title="No users found"
+                description="Registered users will appear here once they exist in the system."
+              />
             )}
           </div>
 

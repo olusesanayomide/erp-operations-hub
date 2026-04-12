@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -204,20 +204,23 @@ export default function InventoryPage() {
     note: '',
   });
 
-  const { data: inventory = [], isLoading } = useQuery({
+  const { data: inventory = [], isLoading: isInventoryLoading, isError: isInventoryError, error: inventoryError, refetch: refetchInventory } = useQuery({
     queryKey: ['inventory'],
     queryFn: listInventory,
   });
 
-  const { data: products = [] } = useQuery({
+  const { data: products = [], isLoading: isProductsLoading, isError: isProductsError, error: productsError, refetch: refetchProducts } = useQuery({
     queryKey: ['products', 'normalized'],
     queryFn: listProducts,
   });
 
-  const { data: warehouses = [] } = useQuery({
+  const { data: warehouses = [], isLoading: isWarehousesLoading, isError: isWarehousesError, error: warehousesError, refetch: refetchWarehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   });
+  const isLoading = isInventoryLoading || isProductsLoading || isWarehousesLoading;
+  const isError = isInventoryError || isProductsError || isWarehousesError;
+  const loadError = (inventoryError || productsError || warehousesError) as Error | null;
 
   const stockInMutation = useMutation({
     mutationFn: stockIn,
@@ -500,8 +503,15 @@ export default function InventoryPage() {
             </tbody>
           </table>
         </div>
-        {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading inventory...</p>}
-        {filtered.length === 0 && <EmptyState icon={Boxes} title="No inventory found" description="Adjust your filters" />}
+        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>}
+        {isError && (
+          <ErrorState
+            title="Unable to load inventory"
+            description={loadError?.message || 'Inventory and related reference data could not be loaded right now.'}
+            action={<RetryButton onClick={() => { void refetchInventory(); void refetchProducts(); void refetchWarehouses(); }} />}
+          />
+        )}
+        {!isLoading && !isError && filtered.length === 0 && <EmptyState icon={Boxes} title="No inventory found" description="Adjust your filters" />}
       </div>
     </div>
   );

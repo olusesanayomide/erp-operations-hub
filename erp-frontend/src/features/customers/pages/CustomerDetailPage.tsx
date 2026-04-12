@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { ArrowLeft, Users, Mail, Phone, MapPin } from 'lucide-react';
 import { getCustomerById } from '@/shared/lib/erp-api';
@@ -10,14 +10,15 @@ import { useSettings } from '@/app/providers/SettingsContext';
 export default function CustomerDetailPage() {
   const { id } = useParams();
   const { formatMoney } = useSettings();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['customers', id],
     queryFn: () => getCustomerById(id || ''),
     enabled: !!id,
   });
   const customer = data?.customer;
 
-  if (isLoading) return <div className="text-sm text-muted-foreground">Loading customer...</div>;
+  if (isLoading) return <DetailPageSkeleton />;
+  if (isError) return <ErrorState title="Unable to load customer" description={(error as Error).message || 'The requested customer could not be loaded right now.'} action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/customers"><Button variant="outline">Back</Button></Link></div>} />;
   if (!customer) return <EmptyState icon={Users} title="Customer not found" description="" action={<Link to="/customers"><Button variant="outline">Back</Button></Link>} />;
 
   const orders = data?.orders || [];

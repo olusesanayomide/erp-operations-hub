@@ -72,11 +72,17 @@ remove(@Param('id') id: string) { ... }
 
 ##  Getting Started
 
-1. **Environment Setup:** Create a `.env` file with `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, and `SUPABASE_SERVICE_ROLE_KEY` for admin-user seeding. Add `SUPABASE_JWT_SECRET` only if your Supabase project still signs tokens with HS256.
+1. **Environment Setup:** Create a `.env` file with `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, `SUPABASE_SERVICE_ROLE_KEY`, and `SEED_ADMIN_PASSWORD` for admin-user seeding. Add `SUPABASE_JWT_SECRET` only if your Supabase project still signs tokens with HS256.
 2. **Install:** `npm install`
 3. **Database:** `npm run prisma:migrate:dev`
 4. **Run:** `npm run start:dev`
 5. **Docs:** Visit `http://localhost:3000/api`
+
+### Seeding Note
+
+- `SEED_ADMIN_PASSWORD` is required by default when creating the seeded admin account.
+- For local-only bootstrap, you can set `SEED_ALLOW_INSECURE_DEFAULTS=true` to opt into the built-in development password.
+- Avoid enabling insecure seed defaults in shared or production environments.
 
 ## Migration-Safe Workflow
 

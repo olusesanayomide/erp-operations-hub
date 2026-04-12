@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { ArrowLeft, Factory, Mail, Phone, MapPin } from 'lucide-react';
 import { getSupplierById } from '@/shared/lib/erp-api';
@@ -10,14 +10,15 @@ import { useSettings } from '@/app/providers/SettingsContext';
 export default function SupplierDetailPage() {
   const { id } = useParams();
   const { formatMoney } = useSettings();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['suppliers', id],
     queryFn: () => getSupplierById(id || ''),
     enabled: !!id,
   });
   const supplier = data?.supplier;
 
-  if (isLoading) return <div className="text-sm text-muted-foreground">Loading supplier...</div>;
+  if (isLoading) return <DetailPageSkeleton />;
+  if (isError) return <ErrorState title="Unable to load supplier" description={(error as Error).message || 'The requested supplier could not be loaded right now.'} action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/suppliers"><Button variant="outline">Back</Button></Link></div>} />;
   if (!supplier) return <EmptyState icon={Factory} title="Supplier not found" description="" action={<Link to="/suppliers"><Button variant="outline">Back</Button></Link>} />;
 
   const purchases = data?.purchases || [];

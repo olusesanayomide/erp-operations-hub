@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { useAuth } from '@/app/providers/AuthContext';
@@ -41,7 +41,7 @@ export default function ProductsPage() {
   const [preview, setPreview] = useState<ProductImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { data: rawProducts = [], isLoading } = useQuery({
+  const { data: rawProducts = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['products'],
     queryFn: listRawProducts,
   });
@@ -402,8 +402,15 @@ export default function ProductsPage() {
             </tbody>
           </table>
         </div>
-        {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading products...</p>}
-        {filtered.length === 0 && <EmptyState icon={Package} title="No products found" description="Try adjusting your search" />}
+        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={6} /></div>}
+        {isError && (
+          <ErrorState
+            title="Unable to load products"
+            description={(error as Error).message || 'The product catalog could not be loaded right now.'}
+            action={<RetryButton onClick={() => void refetch()} />}
+          />
+        )}
+        {!isLoading && !isError && filtered.length === 0 && <EmptyState icon={Package} title="No products found" description="Try adjusting your search" />}
       </div>
     </div>
   );

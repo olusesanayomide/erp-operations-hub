@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => getStoredUser<User>());
   const [isLoading, setIsLoading] = useState(true);
   const authTransitionRef = useRef<((value: { success: boolean; error?: string }) => void) | null>(null);
+  const hasResolvedInitialSessionRef = useRef(false);
 
   useEffect(() => {
     if (!isSupabaseAuthConfigured || !supabase) {
@@ -74,13 +75,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
 
-      setIsLoading(true);
+      const isInitialSessionRestore = !hasResolvedInitialSessionRef.current;
+
+      if (isInitialSessionRestore) {
+        setIsLoading(true);
+      }
 
       if (!session?.user) {
         clearCurrentUserRequest();
         setStoredUser(null);
         setUser(null);
-        setIsLoading(false);
+        hasResolvedInitialSessionRef.current = true;
+        if (isInitialSessionRestore) {
+          setIsLoading(false);
+        }
         resolveTransition({ success: true });
         return;
       }
@@ -108,7 +116,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         .finally(() => {
           if (mounted) {
-            setIsLoading(false);
+            hasResolvedInitialSessionRef.current = true;
+            if (isInitialSessionRestore) {
+              setIsLoading(false);
+            }
           }
         });
     });
@@ -129,8 +140,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
         };
       }
-
-      setIsLoading(true);
 
       const transition = new Promise<{ success: boolean; error?: string }>((resolve) => {
         authTransitionRef.current = resolve;

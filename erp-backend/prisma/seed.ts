@@ -7,12 +7,35 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const defaultTenantName = process.env.SEED_TENANT_NAME ?? 'Default Tenant';
 const defaultTenantSlug = process.env.SEED_TENANT_SLUG ?? 'default';
 const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@erp.com';
-const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'AdminPassword123!';
 const adminName = process.env.SEED_ADMIN_NAME ?? 'System Admin';
 const recreateSupabaseAuth =
   process.env.SEED_RECREATE_SUPABASE_AUTH?.toLowerCase() === 'true';
 const seedPlatformAdmin =
   process.env.SEED_PLATFORM_ADMIN?.toLowerCase() !== 'false';
+const allowInsecureSeedDefaults =
+  process.env.SEED_ALLOW_INSECURE_DEFAULTS?.toLowerCase() === 'true';
+const isLocalEnvironment =
+  (process.env.NODE_ENV ?? 'development').toLowerCase() !== 'production';
+const fallbackAdminPassword = 'AdminPassword123!';
+
+function resolveAdminPassword() {
+  if (process.env.SEED_ADMIN_PASSWORD) {
+    return process.env.SEED_ADMIN_PASSWORD;
+  }
+
+  if (isLocalEnvironment && allowInsecureSeedDefaults) {
+    console.warn(
+      `[seed] Using the local fallback admin password for ${adminEmail}. Set SEED_ADMIN_PASSWORD to override it.`,
+    );
+    return fallbackAdminPassword;
+  }
+
+  throw new Error(
+    'SEED_ADMIN_PASSWORD is required to seed the admin user. For local-only bootstrap, set SEED_ALLOW_INSECURE_DEFAULTS=true to opt into the built-in development password.',
+  );
+}
+
+const adminPassword = resolveAdminPassword();
 
 function getSupabaseAdminHeaders() {
   if (!supabaseUrl || !supabaseServiceRoleKey) {

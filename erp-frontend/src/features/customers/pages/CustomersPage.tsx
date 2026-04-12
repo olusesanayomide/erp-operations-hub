@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import {
@@ -49,7 +49,7 @@ export default function CustomersPage() {
   const [preview, setPreview] = useState<CustomerImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { data: customers = [], isLoading } = useQuery({
+  const { data: customers = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['customers'],
     queryFn: listCustomers,
   });
@@ -577,10 +577,15 @@ export default function CustomersPage() {
             </tbody>
           </table>
         </div>
-        {isLoading && (
-          <p className="p-4 text-sm text-muted-foreground">Loading customers...</p>
+        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={5} /></div>}
+        {isError && (
+          <ErrorState
+            title="Unable to load customers"
+            description={(error as Error).message || 'The customer registry could not be loaded right now.'}
+            action={<RetryButton onClick={() => void refetch()} />}
+          />
         )}
-        {filtered.length === 0 && (
+        {!isLoading && !isError && filtered.length === 0 && (
           <EmptyState
             icon={Users}
             title="No customers found"

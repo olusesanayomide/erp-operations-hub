@@ -2,21 +2,22 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getStockStatus } from '@/shared/types/erp';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { ArrowLeft, Warehouse, MapPin } from 'lucide-react';
 import { getWarehouseById } from '@/shared/lib/erp-api';
 
 export default function WarehouseDetailPage() {
   const { id } = useParams();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['warehouses', id],
     queryFn: () => getWarehouseById(id || ''),
     enabled: !!id,
   });
   const warehouse = data?.warehouse;
 
-  if (isLoading) return <div className="text-sm text-muted-foreground">Loading warehouse...</div>;
+  if (isLoading) return <DetailPageSkeleton />;
+  if (isError) return <ErrorState title="Unable to load warehouse" description={(error as Error).message || 'The requested warehouse could not be loaded right now.'} action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/warehouses"><Button variant="outline">Back</Button></Link></div>} />;
   if (!warehouse) return <EmptyState icon={Warehouse} title="Warehouse not found" description="" action={<Link to="/warehouses"><Button variant="outline">Back</Button></Link>} />;
 
   const inventory = data?.inventory || [];

@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { useAuth } from '@/app/providers/AuthContext';
 import { ArrowLeft, ShoppingCart, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
@@ -19,7 +19,7 @@ export default function OrderDetailPage() {
   const { formatMoney } = useSettings();
   const queryClient = useQueryClient();
 
-  const { data: order, isLoading } = useQuery({
+  const { data: order, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['orders', id],
     queryFn: () => getOrderById(id || ''),
     enabled: !!id,
@@ -46,7 +46,8 @@ export default function OrderDetailPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  if (isLoading) return <div className="text-sm text-muted-foreground">Loading order...</div>;
+  if (isLoading) return <DetailPageSkeleton />;
+  if (isError) return <ErrorState title="Unable to load order" description={(error as Error).message || 'The requested order could not be loaded right now.'} action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/orders"><Button variant="outline">Back to Orders</Button></Link></div>} />;
   if (!order) return <EmptyState icon={ShoppingCart} title="Order not found" description="This order does not exist" action={<Link to="/orders"><Button variant="outline">Back to Orders</Button></Link>} />;
 
   const customer = order.customer || customers.find((item) => item.id === order.customerId);

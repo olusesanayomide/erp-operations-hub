@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/ui/dialog';
@@ -18,12 +18,24 @@ export default function WarehousesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: '', location: '', description: '' });
 
-  const { data: warehouses = [], isLoading } = useQuery({
+  const {
+    data: warehouses = [],
+    isLoading: isWarehousesLoading,
+    isError: isWarehousesError,
+    error: warehousesError,
+    refetch: refetchWarehouses,
+  } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   });
 
-  const { data: warehouseInventory = {} } = useQuery({
+  const {
+    data: warehouseInventory = {},
+    isLoading: isInventorySummaryLoading,
+    isError: isInventorySummaryError,
+    error: inventorySummaryError,
+    refetch: refetchInventorySummary,
+  } = useQuery({
     queryKey: ['warehouses', 'inventory-summary', warehouses.map((warehouse) => warehouse.id).join(',')],
     queryFn: async () => {
       const entries = await Promise.all(
@@ -51,6 +63,9 @@ export default function WarehousesPage() {
   const filtered = warehouses.filter(w =>
     w.name.toLowerCase().includes(search.toLowerCase()) || w.location.toLowerCase().includes(search.toLowerCase())
   );
+  const isLoading = isWarehousesLoading || isInventorySummaryLoading;
+  const isError = isWarehousesError || isInventorySummaryError;
+  const loadError = (warehousesError || inventorySummaryError) as Error | null;
 
   return (
     <div className="animate-fade-in">
@@ -87,7 +102,15 @@ export default function WarehousesPage() {
       </div>
 
       {/* Warehouse Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {isLoading && <div className="rounded-xl border p-6"><TableSkeleton rows={6} cols={3} /></div>}
+      {isError && (
+        <ErrorState
+          title="Unable to load warehouses"
+          description={loadError?.message || 'Warehouse records could not be loaded right now.'}
+          action={<RetryButton onClick={() => { void refetchWarehouses(); void refetchInventorySummary(); }} />}
+        />
+      )}
+      {!isLoading && !isError && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(w => {
           const inv = warehouseInventory[w.id] || [];
           const totalQty = inv.reduce((s, i) => s + i.quantity, 0);
@@ -116,9 +139,8 @@ export default function WarehousesPage() {
             </Link>
           );
         })}
-      </div>
-      {isLoading && <p className="text-sm text-muted-foreground">Loading warehouses...</p>}
-      {filtered.length === 0 && <EmptyState icon={Warehouse} title="No warehouses found" description="Add your first warehouse" />}
+      </div>}
+      {!isLoading && !isError && filtered.length === 0 && <EmptyState icon={Warehouse} title="No warehouses found" description="Add your first warehouse" />}
     </div>
   );
 }

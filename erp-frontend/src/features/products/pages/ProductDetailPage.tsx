@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { getStockStatus } from '@/shared/types/erp';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { ArrowLeft, Package } from 'lucide-react';
 import { getProductById, getWarehouseById, listOrders, listPurchases } from '@/shared/lib/erp-api';
@@ -12,7 +12,7 @@ import { useSettings } from '@/app/providers/SettingsContext';
 export default function ProductDetailPage() {
   const { id } = useParams();
   const { formatMoney } = useSettings();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['products', id],
     queryFn: () => getProductById(id || ''),
     enabled: !!id,
@@ -46,7 +46,16 @@ export default function ProductDetailPage() {
 
   const product = data?.product;
 
-  if (isLoading) return <div className="text-sm text-muted-foreground">Loading product...</div>;
+  if (isLoading) return <DetailPageSkeleton />;
+  if (isError) {
+    return (
+      <ErrorState
+        title="Unable to load product"
+        description={(error as Error).message || 'The requested product could not be loaded right now.'}
+        action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/products"><Button variant="outline">Back to Products</Button></Link></div>}
+      />
+    );
+  }
   if (!product) return <EmptyState icon={Package} title="Product not found" description="This product does not exist" action={<Link to="/products"><Button variant="outline">Back to Products</Button></Link>} />;
 
   const movements = data?.movements || [];

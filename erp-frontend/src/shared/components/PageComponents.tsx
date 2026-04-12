@@ -1,5 +1,6 @@
 import { Skeleton } from '@/shared/ui/skeleton';
-import { Package } from 'lucide-react';
+import { Button } from '@/shared/ui/button';
+import { AlertTriangle, Package } from 'lucide-react';
 
 export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
   return (
@@ -34,6 +35,63 @@ export function EmptyState({ title, description, icon: Icon = Package, action }:
       <h3 className="text-lg font-semibold mb-1">{title}</h3>
       <p className="text-muted-foreground text-sm max-w-sm mb-4">{description}</p>
       {action}
+    </div>
+  );
+}
+
+export function ErrorState({
+  title,
+  description,
+  icon: Icon = AlertTriangle,
+  action,
+}: {
+  title: string;
+  description: string;
+  icon?: React.ElementType;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+      <div className="mb-4 rounded-full bg-destructive/10 p-4">
+        <Icon className="h-8 w-8 text-destructive" />
+      </div>
+      <h3 className="mb-1 text-lg font-semibold">{title}</h3>
+      <p className="mb-4 max-w-sm text-sm text-muted-foreground">{description}</p>
+      {action}
+    </div>
+  );
+}
+
+export function RetryButton({
+  onClick,
+  label = 'Try Again',
+}: {
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <Button variant="outline" onClick={onClick}>
+      {label}
+    </Button>
+  );
+}
+
+export function DetailPageSkeleton() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <Skeleton className="h-9 w-24" />
+      <div className="space-y-2">
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Skeleton className="h-28 rounded-xl" />
+        <Skeleton className="h-28 rounded-xl" />
+        <Skeleton className="h-28 rounded-xl" />
+      </div>
+      <div className="rounded-xl border p-5">
+        <TableSkeleton rows={5} cols={4} />
+      </div>
     </div>
   );
 }

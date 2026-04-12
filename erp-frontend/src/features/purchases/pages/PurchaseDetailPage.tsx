@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { useAuth } from '@/app/providers/AuthContext';
 import { ArrowLeft, Truck, PackageCheck, CheckCircle, Send } from 'lucide-react';
@@ -25,7 +25,7 @@ export default function PurchaseDetailPage() {
   const { formatMoney } = useSettings();
   const queryClient = useQueryClient();
 
-  const { data: purchase, isLoading } = useQuery({
+  const { data: purchase, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['purchases', id],
     queryFn: () => getPurchaseById(id || ''),
     enabled: !!id,
@@ -63,7 +63,8 @@ export default function PurchaseDetailPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  if (isLoading) return <div className="text-sm text-muted-foreground">Loading purchase...</div>;
+  if (isLoading) return <DetailPageSkeleton />;
+  if (isError) return <ErrorState title="Unable to load purchase" description={(error as Error).message || 'The requested purchase order could not be loaded right now.'} action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/purchases"><Button variant="outline">Back</Button></Link></div>} />;
   if (!purchase) return <EmptyState icon={Truck} title="Purchase not found" description="This PO does not exist" action={<Link to="/purchases"><Button variant="outline">Back</Button></Link>} />;
 
   const supplier = purchase.supplier || suppliers.find((item) => item.id === purchase.supplierId);

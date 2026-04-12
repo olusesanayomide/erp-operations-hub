@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PageHeader, EmptyState } from '@/shared/components/PageComponents';
+import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/ui/dialog';
@@ -18,7 +18,7 @@ export default function SuppliersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', address: '' });
 
-  const { data: suppliers = [], isLoading } = useQuery({
+  const { data: suppliers = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['suppliers'],
     queryFn: listSuppliers,
   });
@@ -92,8 +92,15 @@ export default function SuppliersPage() {
             </tbody>
           </table>
         </div>
-        {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading suppliers...</p>}
-        {filtered.length === 0 && <EmptyState icon={Factory} title="No suppliers found" description="Add your first supplier" />}
+        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={5} /></div>}
+        {isError && (
+          <ErrorState
+            title="Unable to load suppliers"
+            description={(error as Error).message || 'The supplier directory could not be loaded right now.'}
+            action={<RetryButton onClick={() => void refetch()} />}
+          />
+        )}
+        {!isLoading && !isError && filtered.length === 0 && <EmptyState icon={Factory} title="No suppliers found" description="Add your first supplier" />}
       </div>
     </div>
   );
