@@ -275,6 +275,18 @@ type BackendInventorySummary = {
 
 let currentUserRequest: Promise<User> | null = null;
 
+function normalizeAuthUser(data: BackendAuthUser): User {
+  return {
+    id: data.sub,
+    name: data.name || data.email,
+    email: data.email,
+    role: normalizeRole(data.roles?.[0]),
+    tenant: normalizeTenant(data.tenant),
+    isPlatformAdmin: data.isPlatformAdmin,
+    createdAt: data.createdAt || new Date().toISOString(),
+  } satisfies User;
+}
+
 function formatDate(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -534,20 +546,12 @@ export function normalizeMovement(raw: BackendStockMovement): StockMovement {
   };
 }
 
-export async function getCurrentUser() {
+export async function getCurrentUser(accessToken?: string | null) {
   if (!currentUserRequest) {
-    currentUserRequest = apiRequest<BackendAuthUser>("/auth/me")
-      .then((data) =>
-        ({
-          id: data.sub,
-          name: data.name || data.email,
-          email: data.email,
-          role: normalizeRole(data.roles?.[0]),
-          tenant: normalizeTenant(data.tenant),
-          isPlatformAdmin: data.isPlatformAdmin,
-          createdAt: data.createdAt || new Date().toISOString(),
-        }) satisfies User,
-      )
+    currentUserRequest = apiRequest<BackendAuthUser>("/auth/me", {
+      accessToken,
+    })
+      .then(normalizeAuthUser)
       .finally(() => {
         currentUserRequest = null;
       });

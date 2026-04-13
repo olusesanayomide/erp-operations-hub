@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/shared/ui/sonner";
@@ -6,41 +6,43 @@ import { TooltipProvider } from "@/shared/ui/tooltip";
 import { AuthProvider, useAuth } from "@/app/providers/AuthContext";
 import { SettingsProvider } from "@/app/providers/SettingsContext";
 import { AppLayout } from "@/shared/layout/AppLayout";
-
-const LandingPage = lazy(() => import("@/app/pages/LandingPage"));
-const NotFound = lazy(() => import("@/app/pages/NotFound"));
-const LoginPage = lazy(() => import("@/features/auth/pages/LoginPage"));
-const SignupPage = lazy(() => import("@/features/auth/pages/SignupPage"));
-const ForgotPasswordPage = lazy(() => import("@/features/auth/pages/ForgotPasswordPage"));
-const ResetPasswordPage = lazy(() => import("@/features/auth/pages/ResetPasswordPage"));
-const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
-const ProductsPage = lazy(() => import("@/features/products/pages/ProductsPage"));
-const ProductDetailPage = lazy(() => import("@/features/products/pages/ProductDetailPage"));
-const InventoryPage = lazy(() => import("@/features/inventory/pages/InventoryPage"));
-const OrdersPage = lazy(() => import("@/features/orders/pages/OrdersPage"));
-const OrderDetailPage = lazy(() => import("@/features/orders/pages/OrderDetailPage"));
-const OrderCreatePage = lazy(() => import("@/features/orders/pages/OrderCreatePage"));
-const PurchasesPage = lazy(() => import("@/features/purchases/pages/PurchasesPage"));
-const PurchaseDetailPage = lazy(() => import("@/features/purchases/pages/PurchaseDetailPage"));
-const PurchaseCreatePage = lazy(() => import("@/features/purchases/pages/PurchaseCreatePage"));
-const CustomersPage = lazy(() => import("@/features/customers/pages/CustomersPage"));
-const CustomerDetailPage = lazy(() => import("@/features/customers/pages/CustomerDetailPage"));
-const SuppliersPage = lazy(() => import("@/features/suppliers/pages/SuppliersPage"));
-const SupplierDetailPage = lazy(() => import("@/features/suppliers/pages/SupplierDetailPage"));
-const WarehousesPage = lazy(() => import("@/features/warehouses/pages/WarehousesPage"));
-const WarehouseDetailPage = lazy(() => import("@/features/warehouses/pages/WarehouseDetailPage"));
-const UsersPage = lazy(() => import("@/features/users/pages/UsersPage"));
-const SettingsPage = lazy(() => import("@/features/settings/pages/SettingsPage"));
-const TenantsPage = lazy(() => import("@/features/platform-admin/pages/TenantsPage"));
+import { Skeleton } from "@/shared/ui/skeleton";
+import {
+  CustomersPage,
+  CustomerDetailPage,
+  DashboardPage,
+  ForgotPasswordPage,
+  InventoryPage,
+  LandingPage,
+  LoginPage,
+  NotFound,
+  OrderCreatePage,
+  OrderDetailPage,
+  OrdersPage,
+  ProductDetailPage,
+  ProductsPage,
+  PurchaseCreatePage,
+  PurchaseDetailPage,
+  PurchasesPage,
+  ResetPasswordPage,
+  SettingsPage,
+  SignupPage,
+  SupplierDetailPage,
+  SuppliersPage,
+  TenantsPage,
+  UsersPage,
+  WarehouseDetailPage,
+  WarehousesPage,
+} from "@/app/routeModules";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, authStatusMessage } = useAuth();
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
-        Restoring your session...
+        {authStatusMessage || 'Restoring your session...'}
       </div>
     );
   }
@@ -49,12 +51,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, isPlatformAdmin } = useAuth();
+  const { isAuthenticated, isLoading, isPlatformAdmin, authStatusMessage } = useAuth();
 
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
-        Restoring your session...
+        {authStatusMessage || 'Restoring your session...'}
       </div>
     );
   }
@@ -67,8 +69,11 @@ function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
 
 function RouteFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
-      Loading workspace...
+    <div className="flex min-h-screen items-center justify-center bg-background px-6">
+      <div className="w-full max-w-md space-y-4">
+        <Skeleton className="mx-auto h-10 w-40 rounded-xl" />
+        <Skeleton className="h-32 rounded-3xl" />
+      </div>
     </div>
   );
 }

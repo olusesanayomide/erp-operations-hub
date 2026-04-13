@@ -5,6 +5,7 @@ import { useSettings } from '@/app/providers/SettingsContext';
 import { KPICard } from '@/shared/components/KPICard';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
+import { Skeleton } from '@/shared/ui/skeleton';
 import { getStockStatus } from '@/shared/types/erp';
 import { Link } from 'react-router-dom';
 import {
@@ -23,17 +24,109 @@ const CHART_COLORS = [
   'hsl(0,72%,51%)',
 ];
 
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <div
+            key={index}
+            className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-3">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+              <Skeleton className="h-10 w-10 rounded-xl" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="erp-card p-5 lg:col-span-2">
+          <Skeleton className="mb-5 h-5 w-44" />
+          <Skeleton className="h-60 w-full rounded-xl" />
+        </div>
+        <div className="erp-card p-5">
+          <Skeleton className="mb-5 h-5 w-32" />
+          <Skeleton className="mx-auto h-52 w-52 rounded-full" />
+        </div>
+      </div>
+
+      <div className="erp-card p-5">
+        <Skeleton className="mb-5 h-5 w-32" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-20 rounded-xl" />
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, index) => (
+          <div key={index} className="erp-card p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <Skeleton className="h-5 w-36" />
+              <Skeleton className="h-4 w-14" />
+            </div>
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((__, rowIndex) => (
+                <div
+                  key={rowIndex}
+                  className="flex items-center justify-between rounded-lg bg-muted/20 p-3"
+                >
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <div className="space-y-2 text-right">
+                    <Skeleton className="ml-auto h-4 w-16" />
+                    <Skeleton className="ml-auto h-5 w-20 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { canPerform } = useAuth();
   const { formatMoney } = useSettings();
 
-  const { data: products = [] } = useQuery({ queryKey: ['products', 'normalized'], queryFn: listProducts });
-  const { data: inventory = [] } = useQuery({ queryKey: ['inventory'], queryFn: listInventory });
-  const { data: orders = [] } = useQuery({ queryKey: ['orders'], queryFn: listOrders });
-  const { data: purchases = [] } = useQuery({ queryKey: ['purchases'], queryFn: listPurchases });
-  const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: listCustomers });
-  const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers });
-  const { data: warehouses = [] } = useQuery({ queryKey: ['warehouses'], queryFn: listWarehouses });
+  const productsQuery = useQuery({ queryKey: ['products', 'normalized'], queryFn: listProducts });
+  const inventoryQuery = useQuery({ queryKey: ['inventory'], queryFn: listInventory });
+  const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: listOrders });
+  const purchasesQuery = useQuery({ queryKey: ['purchases'], queryFn: listPurchases });
+  const customersQuery = useQuery({ queryKey: ['customers'], queryFn: listCustomers });
+  const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers });
+  const warehousesQuery = useQuery({ queryKey: ['warehouses'], queryFn: listWarehouses });
+
+  const products = productsQuery.data ?? [];
+  const inventory = inventoryQuery.data ?? [];
+  const orders = ordersQuery.data ?? [];
+  const purchases = purchasesQuery.data ?? [];
+  const customers = customersQuery.data ?? [];
+  const suppliers = suppliersQuery.data ?? [];
+  const warehouses = warehousesQuery.data ?? [];
+
+  const queries = [
+    productsQuery,
+    inventoryQuery,
+    ordersQuery,
+    purchasesQuery,
+    customersQuery,
+    suppliersQuery,
+    warehousesQuery,
+  ];
+
+  const isDashboardLoading = queries.some((query) => query.isLoading);
+  const hasLoadedDashboardData = queries.some((query) => query.data !== undefined);
 
   const lowStockItems = inventory.filter((item) => {
     const status = getStockStatus(item.quantity, item.minStock);
@@ -92,6 +185,10 @@ export default function DashboardPage() {
     { label: 'Add Supplier', icon: Factory, path: '/suppliers', perm: 'suppliers.create' },
     { label: 'Add Warehouse', icon: Warehouse, path: '/warehouses', perm: 'warehouses.create' },
   ].filter((action) => canPerform(action.perm));
+
+  if (isDashboardLoading && !hasLoadedDashboardData) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">

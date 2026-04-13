@@ -61,6 +61,7 @@ async function resolveAuthToken() {
 }
 
 type RequestInitWithJson = RequestInit & {
+  accessToken?: string | null;
   body?: BodyInit | object | null;
 };
 
@@ -68,7 +69,8 @@ export async function apiRequest<T>(
   path: string,
   init: RequestInitWithJson = {},
 ): Promise<T> {
-  const token = await resolveAuthToken();
+  const token =
+    init.accessToken !== undefined ? init.accessToken : await resolveAuthToken();
   const headers = new Headers(init.headers);
 
   if (!headers.has("Content-Type") && init.body && typeof init.body === "object" && !(init.body instanceof FormData)) {

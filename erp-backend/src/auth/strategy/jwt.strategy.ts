@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -57,7 +62,11 @@ function decodeJwtSection<T>(token: string, index: number): T | null {
 }
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+export class JwtStrategy
+  extends PassportStrategy(Strategy, 'jwt')
+  implements OnModuleInit
+{
+  private readonly logger = new Logger(JwtStrategy.name);
   private readonly signingKeyCache = new Map<string, CachedSigningKey>();
   private readonly expectedIssuer: string;
   private readonly expectedAudience: string;
@@ -102,6 +111,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       config.get<string>('SUPABASE_JWT_SECRET') || undefined;
   }
 
+  onModuleInit() {
+    if (this.supabaseJwtSecret) {
+      return;
+    }
+
+    void this.warmSigningKeyCache();
+  }
+
   private decodeHeader(token: string) {
     return decodeJwtSection<JwtHeader>(token, 0);
   }
@@ -126,20 +143,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
   }
 
-  private async getJwksSigningKey(token: string) {
-    const header = this.decodeHeader(token);
-
-    if (!header?.kid) {
-      throw new UnauthorizedException('Supabase token is missing a key id');
-    }
-
-    const cacheKey = `${this.expectedIssuer}:${header.kid}`;
-    const cached = this.signingKeyCache.get(cacheKey);
-
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.pem;
-    }
-
+  private async fetchJwks() {
     const response = await fetch(
       `${this.expectedIssuer}/.well-known/jwks.json`,
     );
@@ -148,13 +152,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Unable to load Supabase signing keys');
     }
 
-    const { keys } = (await response.json()) as JwksResponse;
-    const jwk = keys.find((item) => item.kid === header.kid);
+    return (await response.json()) as JwksResponse;
+  }
 
-    if (!jwk) {
-      throw new UnauthorizedException('No matching Supabase signing key found');
-    }
-
+  private cacheJwk(jwk: Jwk) {
     const pem = createPublicKey({
       key: jwk,
       format: 'jwk',
@@ -162,12 +163,55 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       .export({ format: 'pem', type: 'spki' })
       .toString();
 
-    this.signingKeyCache.set(cacheKey, {
+    this.signingKeyCache.set(`${this.expectedIssuer}:${jwk.kid}`, {
       pem,
       expiresAt: Date.now() + 60 * 60 * 1000,
     });
 
     return pem;
+  }
+
+  private getCachedSigningKey(kid: string) {
+    const cached = this.signingKeyCache.get(`${this.expectedIssuer}:${kid}`);
+    if (!cached || cached.expiresAt <= Date.now()) {
+      return null;
+    }
+
+    return cached.pem;
+  }
+
+  private async warmSigningKeyCache() {
+    try {
+      const { keys } = await this.fetchJwks();
+      for (const key of keys) {
+        this.cacheJwk(key);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Unable to warm Supabase signing key cache: ${message}`);
+    }
+  }
+
+  private async getJwksSigningKey(token: string) {
+    const header = this.decodeHeader(token);
+
+    if (!header?.kid) {
+      throw new UnauthorizedException('Supabase token is missing a key id');
+    }
+
+    const cachedKey = this.getCachedSigningKey(header.kid);
+    if (cachedKey) {
+      return cachedKey;
+    }
+
+    const { keys } = await this.fetchJwks();
+    const jwk = keys.find((item) => item.kid === header.kid);
+
+    if (!jwk) {
+      throw new UnauthorizedException('No matching Supabase signing key found');
+    }
+
+    return this.cacheJwk(jwk);
   }
 
   private async resolveVerificationKey(token: string) {
@@ -199,13 +243,53 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     let user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { roles: true, tenant: true },
+      select: {
+        id: true,
+        tenantId: true,
+        email: true,
+        name: true,
+        isPlatformAdmin: true,
+        createdAt: true,
+        roles: {
+          select: {
+            name: true,
+          },
+        },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+          },
+        },
+      },
     });
 
     if (!user) {
       user = await this.prisma.user.findUnique({
         where: { email: payload.email },
-        include: { roles: true, tenant: true },
+        select: {
+          id: true,
+          tenantId: true,
+          email: true,
+          name: true,
+          isPlatformAdmin: true,
+          createdAt: true,
+          roles: {
+            select: {
+              name: true,
+            },
+          },
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              status: true,
+            },
+          },
+        },
       });
     }
 
@@ -240,8 +324,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       userId: user.id,
       tenantId: user.tenantId,
       email: user.email,
+      name: user.name,
       roles: user.roles.map((role) => role.name),
       isPlatformAdmin: user.isPlatformAdmin,
+      createdAt: user.createdAt,
+      tenant: {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        slug: user.tenant.slug,
+        status: user.tenant.status,
+      },
     };
   }
 }

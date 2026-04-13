@@ -15,6 +15,7 @@ interface AuthContextType {
   isPlatformAdmin: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
+  authStatusMessage: string;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   hasRole: (role: UserRole | UserRole[]) => boolean;
@@ -50,6 +51,7 @@ const rolePermissions: Record<UserRole, string[]> = {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => getStoredUser<User>());
   const [isLoading, setIsLoading] = useState(true);
+  const [authStatusMessage, setAuthStatusMessage] = useState('Restoring your session...');
   const authTransitionRef = useRef<((value: { success: boolean; error?: string }) => void) | null>(null);
   const hasResolvedInitialSessionRef = useRef(false);
 
@@ -59,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearCurrentUserRequest();
       setStoredUser(null);
       setUser(null);
+      setAuthStatusMessage('');
       setIsLoading(false);
       return;
     }
@@ -76,9 +79,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
 
       const isInitialSessionRestore = !hasResolvedInitialSessionRef.current;
+      const isBlockingAuthTransition = authTransitionRef.current !== null;
+      const shouldBlockUi = isInitialSessionRestore || isBlockingAuthTransition;
 
-      if (isInitialSessionRestore) {
+      if (shouldBlockUi) {
         setIsLoading(true);
+        setAuthStatusMessage(
+          isInitialSessionRestore
+            ? 'Restoring your session...'
+            : 'Loading your workspace...',
+        );
       }
 
       if (!session?.user) {
@@ -86,14 +96,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setStoredUser(null);
         setUser(null);
         hasResolvedInitialSessionRef.current = true;
-        if (isInitialSessionRestore) {
+        if (shouldBlockUi) {
+          setAuthStatusMessage('');
           setIsLoading(false);
         }
         resolveTransition({ success: true });
         return;
       }
 
-      void getCurrentUser()
+      void getCurrentUser(session.access_token)
         .then((nextUser) => {
           if (!mounted) return;
           setStoredUser(nextUser);
@@ -112,12 +123,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               ? error.message
               : 'Signed in with Supabase, but failed to load your ERP user profile.';
 
+          if (shouldBlockUi) {
+            setAuthStatusMessage('');
+          }
           resolveTransition({ success: false, error: message });
         })
         .finally(() => {
           if (mounted) {
             hasResolvedInitialSessionRef.current = true;
-            if (isInitialSessionRestore) {
+            if (shouldBlockUi) {
+              setAuthStatusMessage('');
               setIsLoading(false);
             }
           }
@@ -141,6 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
+      setIsLoading(true);
+      setAuthStatusMessage('Signing you in...');
       const transition = new Promise<{ success: boolean; error?: string }>((resolve) => {
         authTransitionRef.current = resolve;
       });
@@ -149,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return transition;
     } catch (error) {
       authTransitionRef.current = null;
+      setAuthStatusMessage('');
       setIsLoading(false);
 
       if (!(error instanceof ApiError)) {
@@ -172,6 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearCurrentUserRequest();
     setStoredUser(null);
     setUser(null);
+    setAuthStatusMessage('');
   }, []);
 
   const hasRole = useCallback((role: UserRole | UserRole[]) => {
@@ -194,6 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isPlatformAdmin: user?.isPlatformAdmin ?? false,
         isAuthenticated: !!user,
         isLoading,
+        authStatusMessage,
         login,
         logout,
         hasRole,

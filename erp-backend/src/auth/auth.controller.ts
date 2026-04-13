@@ -42,7 +42,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current logged-in user profile' })
   @ApiResponse({ status: 200, description: 'Returns user payload from token.' })
   getme(@GetUser() user: UserPayload) {
-    return this.authService.getCurrentUser(user.userId);
+    return this.authService.serializeCurrentUser(user);
   }
 
   @Get('users')

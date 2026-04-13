@@ -208,6 +208,25 @@ export class AuthService {
     };
   }
 
+  serializeCurrentUser(user: UserPayload) {
+    if (!user.tenant) {
+      throw new UnauthorizedException(
+        'Authenticated user tenant context is missing',
+      );
+    }
+
+    return {
+      sub: user.userId,
+      email: user.email,
+      name: user.name,
+      tenantId: user.tenantId,
+      tenant: user.tenant,
+      roles: user.roles,
+      isPlatformAdmin: user.isPlatformAdmin,
+      createdAt: user.createdAt,
+    };
+  }
+
   async listUsers(currentUser: UserPayload) {
     const users = await this.prisma.user.findMany({
       where: currentUser.isPlatformAdmin

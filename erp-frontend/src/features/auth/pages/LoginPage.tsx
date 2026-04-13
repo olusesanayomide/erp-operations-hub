@@ -33,7 +33,7 @@ const itemVariants = {
 };
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, authStatusMessage } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const prefersReducedMotion = useReducedMotion();
@@ -53,12 +53,12 @@ export default function LoginPage() {
 
     setLoading(true);
     const result = await login(email, password);
-    setLoading(false);
 
     if (result.success) {
       toast.success('Welcome back!');
       navigate('/dashboard');
     } else {
+      setLoading(false);
       setError(result.error || 'Unable to sign in with Supabase.');
     }
   };
@@ -180,7 +180,16 @@ export default function LoginPage() {
                       className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
                       disabled={loading}
                     >
-                      {loading ? 'Signing in...' : 'Sign in'}
+                      {loading ? (
+                        <motion.span
+                          animate={prefersReducedMotion ? undefined : { opacity: [1, 0.55, 1] }}
+                          transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+                        >
+                          {authStatusMessage || 'Signing you in...'}
+                        </motion.span>
+                      ) : (
+                        'Sign in'
+                      )}
                     </Button>
                   </motion.div>
                 </form>

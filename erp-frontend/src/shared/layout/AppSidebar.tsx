@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthContext';
+import { preloadRoute } from '@/app/routeModules';
 import { cn } from '@/shared/lib/utils';
 import {
   LayoutDashboard, Package, Boxes, ShoppingCart, Truck,
@@ -28,6 +29,10 @@ export function AppSidebar() {
   const items = user?.isPlatformAdmin
     ? [...navItems, { label: 'Tenants', path: '/admin/tenants', icon: Building2 }]
     : navItems;
+
+  const handleIntent = (path: string) => {
+    void preloadRoute(path);
+  };
 
   return (
     <aside className={cn(
@@ -60,6 +65,9 @@ export function AppSidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onMouseEnter={() => handleIntent(item.path)}
+              onFocus={() => handleIntent(item.path)}
+              onTouchStart={() => handleIntent(item.path)}
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                 isActive
