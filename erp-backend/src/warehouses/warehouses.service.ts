@@ -49,7 +49,11 @@ export class WarehousesService {
     return warehouse;
   }
 
-  async update(id: string, updateWarehouseDto: UpdateWarehouseDto, user: UserPayload) {
+  async update(
+    id: string,
+    updateWarehouseDto: UpdateWarehouseDto,
+    user: UserPayload,
+  ) {
     await this.findOne(id, user);
 
     return this.prisma.warehouse.update({

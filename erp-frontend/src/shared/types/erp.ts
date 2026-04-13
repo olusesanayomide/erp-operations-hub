@@ -29,6 +29,25 @@ export interface User {
   createdAt: string;
 }
 
+export type NotificationEntityType = 'order' | 'purchase' | 'system';
+
+export interface NotificationItem {
+  id: string;
+  type:
+    | 'order_created'
+    | 'order_status_changed'
+    | 'purchase_created'
+    | 'purchase_status_changed'
+    | 'purchase_received';
+  title: string;
+  message: string;
+  entityType: NotificationEntityType;
+  entityId?: string;
+  createdAt: string;
+  readAt?: string;
+  isRead: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;

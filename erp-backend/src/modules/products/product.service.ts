@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Product } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 import { ProductImportMode } from './dto/product.dto';
@@ -170,8 +174,13 @@ export class ProductService {
     const normalizedData = {
       ...data,
       description:
-        data.description === undefined ? undefined : data.description.trim() || null,
-      category: data.category === undefined ? undefined : data.category.trim() || 'General',
+        data.description === undefined
+          ? undefined
+          : data.description.trim() || null,
+      category:
+        data.category === undefined
+          ? undefined
+          : data.category.trim() || 'General',
       unit: data.unit === undefined ? undefined : data.unit.trim() || 'unit',
     };
 

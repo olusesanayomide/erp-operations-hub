@@ -3,10 +3,15 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  NotificationEntityType,
+  NotificationType,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { PurchaseLifecycleStatus } from './purchase-status.enum';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 const PURCHASE_STATUS_TRANSITIONS: Record<
   PurchaseLifecycleStatus,
@@ -28,7 +33,10 @@ const PURCHASE_STATUS_TRANSITIONS: Record<
 
 @Injectable()
 export class PurchaseService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async findAll(tenantId: string) {
     return this.prisma.purchase.findMany({
@@ -59,8 +67,14 @@ export class PurchaseService {
     return purchase;
   }
 
-  async createPurchase(tenantId: string, dto: CreatePurchaseDto) {
-    const productIds = Array.from(new Set(dto.items.map((item) => item.productId)));
+  async createPurchase(
+    tenantId: string,
+    userId: string,
+    dto: CreatePurchaseDto,
+  ) {
+    const productIds = Array.from(
+      new Set(dto.items.map((item) => item.productId)),
+    );
 
     const [supplier, warehouse, products] = await Promise.all([
       this.prisma.supplier.findFirst({
@@ -93,10 +107,11 @@ export class PurchaseService {
     }
 
     const totalAmount = dto.items.reduce(
-      (sum, item) => sum.plus(new Prisma.Decimal(item.price).mul(item.quantity)),
+      (sum, item) =>
+        sum.plus(new Prisma.Decimal(item.price).mul(item.quantity)),
       new Prisma.Decimal(0),
     );
-    return this.prisma.purchase.create({
+    const purchase = await this.prisma.purchase.create({
       data: {
         tenantId,
         purchaseOrder: dto.purchaseOrder,
@@ -122,9 +137,21 @@ export class PurchaseService {
         warehouse: true,
       },
     });
+
+    await this.notificationsService.createForTenant({
+      tenantId,
+      createdByUserId: userId,
+      type: NotificationType.PURCHASE_CREATED,
+      title: 'New purchase order created',
+      message: `Purchase order ${purchase.purchaseOrder} was created as a draft.`,
+      entityType: NotificationEntityType.PURCHASE,
+      entityId: purchase.id,
+    });
+
+    return purchase;
   }
 
-  async recievePurchase(tenantId: string, purchaseId: string) {
+  async recievePurchase(tenantId: string, userId: string, purchaseId: string) {
     return await this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
         where: { id: purchaseId, tenantId },
@@ -183,6 +210,18 @@ export class PurchaseService {
         });
       });
       await Promise.all([...movementPromises, ...inventoryUpserts]);
+
+      await this.notificationsService.createForTenant({
+        client: tx,
+        tenantId,
+        createdByUserId: userId,
+        type: NotificationType.PURCHASE_RECEIVED,
+        title: 'Purchase order received',
+        message: `Purchase order ${purchase.purchaseOrder} was marked as received and inventory was updated.`,
+        entityType: NotificationEntityType.PURCHASE,
+        entityId: purchase.id,
+      });
+
       return {
         success: true,
         message: 'Purchase order received and stock updated',
@@ -192,11 +231,12 @@ export class PurchaseService {
 
   async updateStatus(
     tenantId: string,
+    userId: string,
     purchaseId: string,
     status: PurchaseLifecycleStatus,
   ) {
     if (status === PurchaseLifecycleStatus.RECEIVED) {
-      return this.recievePurchase(tenantId, purchaseId);
+      return this.recievePurchase(tenantId, userId, purchaseId);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -211,7 +251,9 @@ export class PurchaseService {
       const currentStatus = purchase.status as PurchaseLifecycleStatus;
 
       if (currentStatus === status) {
-        throw new BadRequestException('Purchase order is already in that status');
+        throw new BadRequestException(
+          'Purchase order is already in that status',
+        );
       }
 
       const allowedTransitions = PURCHASE_STATUS_TRANSITIONS[currentStatus];
@@ -221,7 +263,7 @@ export class PurchaseService {
         );
       }
 
-      return tx.purchase.update({
+      const updatedPurchase = await tx.purchase.update({
         where: { id: purchaseId },
         data: { status },
         include: {
@@ -234,6 +276,19 @@ export class PurchaseService {
           warehouse: true,
         },
       });
+
+      await this.notificationsService.createForTenant({
+        client: tx,
+        tenantId,
+        createdByUserId: userId,
+        type: NotificationType.PURCHASE_STATUS_CHANGED,
+        title: 'Purchase status updated',
+        message: `Purchase order ${purchase.purchaseOrder} moved from ${currentStatus.toLowerCase()} to ${status.toLowerCase()}.`,
+        entityType: NotificationEntityType.PURCHASE,
+        entityId: purchaseId,
+      });
+
+      return updatedPurchase;
     });
   }
 }

@@ -53,7 +53,10 @@ export class OrdersController {
       'Retrieves a single order by id, including alll associated line items and product  details',
   })
   @ApiResponse({ status: 200, description: 'Order details found' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser() user: UserPayload,
+  ) {
     return this.ordersService.getOrderById(user.tenantId, id);
   }
 
@@ -70,7 +73,7 @@ export class OrdersController {
   })
   @ApiResponse({ status: 404, description: 'Customer ID not found.' })
   create(@Body() dto: CreateOrderDto, @GetUser() user: UserPayload) {
-    return this.ordersService.createOrder(user.tenantId, dto);
+    return this.ordersService.createOrder(user.tenantId, user.userId, dto);
   }
 
   @Post(':id/items')
@@ -111,6 +114,11 @@ export class OrdersController {
     @Body() dto: UpdateOrderStatusDto,
     @GetUser() user: UserPayload,
   ) {
-    return this.ordersService.updateStatus(user.tenantId, orderId, dto.status);
+    return this.ordersService.updateStatus(
+      user.tenantId,
+      user.userId,
+      orderId,
+      dto.status,
+    );
   }
 }

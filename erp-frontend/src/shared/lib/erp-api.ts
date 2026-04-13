@@ -1,6 +1,7 @@
 import type {
   Customer,
   InventoryItem,
+  NotificationItem,
   Order,
   Product,
   Purchase,
@@ -57,6 +58,18 @@ type BackendCurrencySettings = {
   currencyCode: string;
   locale: string;
   exchangeRate: number;
+};
+
+type BackendNotification = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  entityType: string;
+  entityId?: string | null;
+  createdAt: string;
+  readAt?: string | null;
+  isRead: boolean;
 };
 
 type BackendProduct = {
@@ -275,6 +288,47 @@ function normalizeRole(role?: string | null): UserRole {
     return normalized;
   }
   return "staff";
+}
+
+function normalizeNotificationType(
+  type: string,
+): NotificationItem['type'] {
+  switch (type.toLowerCase()) {
+    case 'order_created':
+    case 'order_status_changed':
+    case 'purchase_created':
+    case 'purchase_status_changed':
+    case 'purchase_received':
+      return type.toLowerCase() as NotificationItem['type'];
+    default:
+      return 'order_created';
+  }
+}
+
+function normalizeNotificationEntityType(
+  entityType?: string | null,
+): NotificationItem['entityType'] {
+  switch (entityType?.toLowerCase()) {
+    case 'order':
+    case 'purchase':
+      return entityType.toLowerCase() as NotificationItem['entityType'];
+    default:
+      return 'system';
+  }
+}
+
+function normalizeNotification(raw: BackendNotification): NotificationItem {
+  return {
+    id: raw.id,
+    type: normalizeNotificationType(raw.type),
+    title: raw.title,
+    message: raw.message,
+    entityType: normalizeNotificationEntityType(raw.entityType),
+    entityId: raw.entityId || undefined,
+    createdAt: raw.createdAt,
+    readAt: raw.readAt || undefined,
+    isRead: raw.isRead,
+  };
 }
 
 function normalizeTenant(raw: {
@@ -676,6 +730,27 @@ export async function updateTenantStatus(
 
 export async function getCurrencySettings() {
   return apiRequest<BackendCurrencySettings>("/settings/currency");
+}
+
+export async function listNotifications(limit = 12) {
+  const items = await apiRequest<BackendNotification[]>(`/notifications?limit=${limit}`);
+  return items.map(normalizeNotification);
+}
+
+export async function getUnreadNotificationCount() {
+  return apiRequest<{ unreadCount: number }>('/notifications/unread-count');
+}
+
+export async function markNotificationAsRead(notificationId: string) {
+  return apiRequest(`/notifications/${notificationId}/read`, {
+    method: 'PATCH',
+  });
+}
+
+export async function markAllNotificationsAsRead() {
+  return apiRequest('/notifications/read-all', {
+    method: 'PATCH',
+  });
 }
 
 export async function updateCurrencySettings(payload: BackendCurrencySettings) {

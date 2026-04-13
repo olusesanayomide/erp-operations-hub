@@ -227,7 +227,9 @@ export class InventoryService {
         });
 
         if (sourceUpdate.count === 0) {
-          throw new BadRequestException('Insufficient stock in source warehouse');
+          throw new BadRequestException(
+            'Insufficient stock in source warehouse',
+          );
         }
 
         await tx.inventoryItem.upsert({

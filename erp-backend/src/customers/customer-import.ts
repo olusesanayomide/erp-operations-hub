@@ -94,7 +94,9 @@ function parseCsvLinearly(csv: string): string[][] {
 function resolveHeader(headers: string[], target: keyof typeof HEADER_ALIASES) {
   const normalizedHeaders = headers.map(normalizeHeader);
   const aliases = HEADER_ALIASES[target];
-  return normalizedHeaders.findIndex((header) => aliases.includes(header as never));
+  return normalizedHeaders.findIndex((header) =>
+    aliases.includes(header as never),
+  );
 }
 
 function parseCsvRecords(csv: string): CsvRecord[] {
@@ -116,8 +118,8 @@ function parseCsvRecords(csv: string): CsvRecord[] {
   return parsedRows.slice(1).map((row) => ({
     name: row[nameIndex] ?? '',
     email: row[emailIndex] ?? '',
-    phone: phoneIndex === -1 ? '' : row[phoneIndex] ?? '',
-    address: addressIndex === -1 ? '' : row[addressIndex] ?? '',
+    phone: phoneIndex === -1 ? '' : (row[phoneIndex] ?? ''),
+    address: addressIndex === -1 ? '' : (row[addressIndex] ?? ''),
   }));
 }
 
@@ -131,13 +133,18 @@ export function buildCustomerImportPreview(
   existingEmails: string[],
 ): CustomerImportPreviewResult {
   const records = parseCsvRecords(csv);
-  const existingEmailSet = new Set(existingEmails.map((email) => email.trim().toLowerCase()));
+  const existingEmailSet = new Set(
+    existingEmails.map((email) => email.trim().toLowerCase()),
+  );
   const emailOccurrences = new Map<string, number>();
 
   for (const record of records) {
     const normalizedEmail = record.email.trim().toLowerCase();
     if (!normalizedEmail) continue;
-    emailOccurrences.set(normalizedEmail, (emailOccurrences.get(normalizedEmail) ?? 0) + 1);
+    emailOccurrences.set(
+      normalizedEmail,
+      (emailOccurrences.get(normalizedEmail) ?? 0) + 1,
+    );
   }
 
   const rows: CustomerImportRowPreview[] = records.map((record, index) => {
@@ -160,7 +167,9 @@ export function buildCustomerImportPreview(
       issues.push('Duplicate email found in this file.');
     }
 
-    const existsInDatabase = normalizedEmail ? existingEmailSet.has(normalizedEmail) : false;
+    const existsInDatabase = normalizedEmail
+      ? existingEmailSet.has(normalizedEmail)
+      : false;
     let action: CustomerImportAction | null = null;
 
     if (issues.length === 0) {

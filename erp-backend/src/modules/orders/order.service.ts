@@ -3,10 +3,16 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  NotificationEntityType,
+  NotificationType,
+  OrderStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrderLifecycleStatus } from './order-status.enum';
 import { CreateOrderDto } from './dto/order.dto';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 const ORDER_STATUS_TRANSITIONS: Record<
   OrderLifecycleStatus,
@@ -29,9 +35,21 @@ const ORDER_STATUS_TRANSITIONS: Record<
   [OrderLifecycleStatus.CANCELLED]: [],
 };
 
+const ORDER_STATUS_DB_MAP: Record<OrderLifecycleStatus, OrderStatus> = {
+  [OrderLifecycleStatus.DRAFT]: OrderStatus.DRAFT,
+  [OrderLifecycleStatus.CONFIRMED]: OrderStatus.CONFIRMED,
+  [OrderLifecycleStatus.PICKED]: OrderStatus.PICKED,
+  [OrderLifecycleStatus.SHIPPED]: OrderStatus.SHIPPED,
+  [OrderLifecycleStatus.DELIVERED]: OrderStatus.DELIVERED,
+  [OrderLifecycleStatus.CANCELLED]: OrderStatus.CANCELLED,
+};
+
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private async reserveOrderItemStock(
     tx: Prisma.TransactionClient,
@@ -119,9 +137,11 @@ export class OrdersService {
     });
   }
 
-  async createOrder(tenantId: string, dto: CreateOrderDto) {
+  async createOrder(tenantId: string, userId: string, dto: CreateOrderDto) {
     if (!dto.items?.length) {
-      throw new BadRequestException('Add at least one item before creating the order');
+      throw new BadRequestException(
+        'Add at least one item before creating the order',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -135,7 +155,9 @@ export class OrdersService {
         }
       }
 
-      const productIds = Array.from(new Set(dto.items.map((item) => item.productId)));
+      const productIds = Array.from(
+        new Set(dto.items.map((item) => item.productId)),
+      );
       const warehouseIds = Array.from(
         new Set(dto.items.map((item) => item.warehouseId)),
       );
@@ -167,7 +189,9 @@ export class OrdersService {
         );
       }
 
-      const productsById = new Map(products.map((product) => [product.id, product]));
+      const productsById = new Map(
+        products.map((product) => [product.id, product]),
+      );
       const totalAmount = dto.items.reduce((sum, item) => {
         const product = productsById.get(item.productId);
         if (!product) {
@@ -177,11 +201,11 @@ export class OrdersService {
         return sum.plus(new Prisma.Decimal(product.price).mul(item.quantity));
       }, new Prisma.Decimal(0));
 
-      return tx.order.create({
+      const order = await tx.order.create({
         data: {
           tenantId,
           customerId: dto.customerId,
-          status: OrderLifecycleStatus.DRAFT as any,
+          status: ORDER_STATUS_DB_MAP[OrderLifecycleStatus.DRAFT],
           totalAmount,
           items: {
             create: dto.items.map((item) => {
@@ -202,6 +226,19 @@ export class OrdersService {
         },
         include: { items: true },
       });
+
+      await this.notificationsService.createForTenant({
+        client: tx,
+        tenantId,
+        createdByUserId: userId,
+        type: NotificationType.ORDER_CREATED,
+        title: 'New order created',
+        message: `Order ${order.id.slice(0, 8).toUpperCase()} was created as a draft.`,
+        entityType: NotificationEntityType.ORDER,
+        entityId: order.id,
+      });
+
+      return order;
     });
   }
 
@@ -280,6 +317,7 @@ export class OrdersService {
 
   async updateStatus(
     tenantId: string,
+    userId: string,
     orderId: string,
     status: OrderLifecycleStatus,
   ) {
@@ -363,10 +401,23 @@ export class OrdersService {
         }
       }
 
-      return tx.order.update({
+      const updatedOrder = await tx.order.update({
         where: { id: orderId },
-        data: { status: status as any },
+        data: { status: ORDER_STATUS_DB_MAP[status] },
       });
+
+      await this.notificationsService.createForTenant({
+        client: tx,
+        tenantId,
+        createdByUserId: userId,
+        type: NotificationType.ORDER_STATUS_CHANGED,
+        title: 'Order status updated',
+        message: `Order ${orderId.slice(0, 8).toUpperCase()} moved from ${currentStatus.toLowerCase()} to ${status.toLowerCase()}.`,
+        entityType: NotificationEntityType.ORDER,
+        entityId: orderId,
+      });
+
+      return updatedOrder;
     });
   }
 }

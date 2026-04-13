@@ -1,6 +1,5 @@
 import { PurchaseModule } from './modules/purchases/purchase.module';
 import { Module } from '@nestjs/common';
-import { PrismaService } from 'prisma/prisma.service';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProductsModule } from './modules/products/product.module';
 import { OrdersModule } from './modules/orders/order.module';
@@ -15,6 +14,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TenantContextInterceptor } from './common/tenant-context.interceptor';
 import { PrismaModule } from './common/prisma.module';
 import { SettingsModule } from './settings/settings.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +32,7 @@ import { SettingsModule } from './settings/settings.module';
     CustomersModule,
     AuthModule,
     SettingsModule,
+    NotificationsModule,
   ],
   controllers: [],
   providers: [

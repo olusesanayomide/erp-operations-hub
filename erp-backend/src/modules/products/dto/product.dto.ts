@@ -23,12 +23,18 @@ export class ProductDto {
   @Min(0)
   price: number;
 
-  @ApiProperty({ description: 'Short description of the product', required: false })
+  @ApiProperty({
+    description: 'Short description of the product',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({ description: 'Category used for grouping products', required: false })
+  @ApiProperty({
+    description: 'Category used for grouping products',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   category?: string;
@@ -56,12 +62,18 @@ export class UpdateProductDto {
   @Min(0)
   price?: number;
 
-  @ApiProperty({ description: 'Short description of the product', required: false })
+  @ApiProperty({
+    description: 'Short description of the product',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({ description: 'Category used for grouping products', required: false })
+  @ApiProperty({
+    description: 'Category used for grouping products',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   category?: string;

@@ -17,7 +17,8 @@ export class SignupTenantDto {
   @ApiProperty({
     required: false,
     example: 'acme',
-    description: 'Optional tenant slug. Generated from company name when omitted.',
+    description:
+      'Optional tenant slug. Generated from company name when omitted.',
   })
   @IsOptional()
   @IsString()

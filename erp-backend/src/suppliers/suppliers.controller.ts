@@ -38,7 +38,10 @@ export class SuppliersController {
     status: 201,
     description: 'the supplier has successfully been created',
   })
-  create(@Body() createSupplierDto: CreateSupplierDto, @GetUser() user: UserPayload) {
+  create(
+    @Body() createSupplierDto: CreateSupplierDto,
+    @GetUser() user: UserPayload,
+  ) {
     return this.suppliersService.create(createSupplierDto, user);
   }
 
@@ -52,7 +55,10 @@ export class SuppliersController {
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   @ApiOperation({ summary: 'Get a specific supplier by ID' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser() user: UserPayload,
+  ) {
     return this.suppliersService.findOne(id, user);
   }
 

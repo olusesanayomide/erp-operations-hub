@@ -134,7 +134,11 @@ export class CustomersService {
     return customer;
   }
 
-  async update(id: string, updateCustomerDto: UpdateCustomerDto, user: UserPayload) {
+  async update(
+    id: string,
+    updateCustomerDto: UpdateCustomerDto,
+    user: UserPayload,
+  ) {
     await this.findOne(id, user);
 
     return this.prisma.customer.update({

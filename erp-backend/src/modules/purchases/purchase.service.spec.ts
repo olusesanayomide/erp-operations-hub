@@ -117,9 +117,7 @@ describe('PurchaseService.updateStatus', () => {
       items: [],
     });
 
-    await expect(
-      service.recievePurchase(tenantId, purchaseId),
-    ).rejects.toThrow(
+    await expect(service.recievePurchase(tenantId, purchaseId)).rejects.toThrow(
       new BadRequestException(
         `Invalid status transition from ${PurchaseLifecycleStatus.DRAFT} to ${PurchaseLifecycleStatus.RECEIVED}`,
       ),

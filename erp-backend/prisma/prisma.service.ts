@@ -18,6 +18,8 @@ const TENANT_SCOPED_MODELS = new Set([
   'Customer',
   'Supplier',
   'Purchase',
+  'Notification',
+  'UserNotification',
 ]);
 
 @Injectable()

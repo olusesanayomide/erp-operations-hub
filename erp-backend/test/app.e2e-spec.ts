@@ -112,15 +112,11 @@ describe('Auth & RBAC (e2e)', () => {
   });
 
   it('rejects unauthenticated access to orders', () => {
-    return request(app.getHttpServer())
-      .get('/orders')
-      .expect(401);
+    return request(app.getHttpServer()).get('/orders').expect(401);
   });
 
   it('rejects unauthenticated access to purchases', () => {
-    return request(app.getHttpServer())
-      .get('/purchases')
-      .expect(401);
+    return request(app.getHttpServer()).get('/purchases').expect(401);
   });
 
   it('rejects orders access when authenticated role is insufficient', () => {

@@ -205,8 +205,20 @@ describe('OrdersService.createOrder', () => {
     prisma.order.create.mockResolvedValue({
       id: 'order-1',
       items: [
-        { id: 'item-1', productId: 'product-1', quantity: 2, warehouseId: 'warehouse-1', price: 12.5 },
-        { id: 'item-2', productId: 'product-2', quantity: 1, warehouseId: 'warehouse-1', price: 7.25 },
+        {
+          id: 'item-1',
+          productId: 'product-1',
+          quantity: 2,
+          warehouseId: 'warehouse-1',
+          price: 12.5,
+        },
+        {
+          id: 'item-2',
+          productId: 'product-2',
+          quantity: 1,
+          warehouseId: 'warehouse-1',
+          price: 7.25,
+        },
       ],
     });
 
@@ -250,7 +262,9 @@ describe('OrdersService.createOrder', () => {
         items: [],
       }),
     ).rejects.toThrow(
-      new BadRequestException('Add at least one item before creating the order'),
+      new BadRequestException(
+        'Add at least one item before creating the order',
+      ),
     );
 
     expect(prisma.order.create).not.toHaveBeenCalled();

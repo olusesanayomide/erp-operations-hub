@@ -41,7 +41,11 @@ export class SuppliersService {
     return supplier;
   }
 
-  async update(id: string, updateSupplierDto: UpdateSupplierDto, user: UserPayload) {
+  async update(
+    id: string,
+    updateSupplierDto: UpdateSupplierDto,
+    user: UserPayload,
+  ) {
     await this.findOne(id, user);
 
     return this.prisma.supplier.update({

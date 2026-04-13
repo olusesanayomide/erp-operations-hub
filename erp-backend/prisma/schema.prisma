@@ -21,6 +21,20 @@ enum TenantStatus {
   ARCHIVED
 }
 
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  PURCHASE_CREATED
+  PURCHASE_STATUS_CHANGED
+  PURCHASE_RECEIVED
+}
+
+enum NotificationEntityType {
+  ORDER
+  PURCHASE
+  SYSTEM
+}
+
 model Tenant {
   id        String       @id @default(uuid())
   name      String
@@ -41,6 +55,8 @@ model Tenant {
   customers      Customer[]
   suppliers      Supplier[]
   purchases      Purchase[]
+  notifications  Notification[]
+  userNotifications UserNotification[]
 }
 
 model Role {
@@ -58,8 +74,45 @@ model User {
   createdAt       DateTime @default(now())
   roles           Role[]   @relation("UserRoles")
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  createdNotifications Notification[] @relation("NotificationActor")
+  userNotifications UserNotification[]
 
   @@index([tenantId])
+}
+
+model Notification {
+  id              String                 @id @default(uuid())
+  tenantId        String
+  type            NotificationType
+  title           String
+  message         String
+  entityType      NotificationEntityType @default(SYSTEM)
+  entityId        String?
+  createdByUserId String?
+  createdAt       DateTime               @default(now())
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  createdBy       User?                  @relation("NotificationActor", fields: [createdByUserId], references: [id])
+  recipients      UserNotification[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+}
+
+model UserNotification {
+  id             String       @id @default(uuid())
+  tenantId       String
+  notificationId String
+  userId         String
+  readAt         DateTime?
+  archivedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([tenantId])
+  @@index([tenantId, userId, readAt, archivedAt])
 }
 
 // INVENTORY

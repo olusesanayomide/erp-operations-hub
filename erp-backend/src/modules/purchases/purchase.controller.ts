@@ -56,7 +56,11 @@ export class PurchaseContoller {
   @ApiResponse({ status: 201, description: 'Purchase Order created.' })
   @ApiResponse({ status: 404, description: 'Supplier or Product not found.' })
   async create(@Body() dto: CreatePurchaseDto, @GetUser() user: UserPayload) {
-    return await this.purchaseService.createPurchase(user.tenantId, dto);
+    return await this.purchaseService.createPurchase(
+      user.tenantId,
+      user.userId,
+      dto,
+    );
   }
 
   @Patch(':id/receive')
@@ -75,7 +79,11 @@ export class PurchaseContoller {
     description: 'Order already received or cancelled.',
   })
   async receive(@Param('id') id: string, @GetUser() user: UserPayload) {
-    return await this.purchaseService.recievePurchase(user.tenantId, id);
+    return await this.purchaseService.recievePurchase(
+      user.tenantId,
+      user.userId,
+      id,
+    );
   }
 
   @Patch(':id/status')
@@ -100,6 +108,7 @@ export class PurchaseContoller {
   ) {
     return await this.purchaseService.updateStatus(
       user.tenantId,
+      user.userId,
       id,
       dto.status,
     );

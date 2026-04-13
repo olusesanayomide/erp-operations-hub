@@ -94,7 +94,9 @@ function resolveHeader(headers: string[], target: keyof typeof HEADER_ALIASES) {
   const normalizedHeaders = headers.map(normalizeHeader);
   const aliases = HEADER_ALIASES[target];
 
-  return normalizedHeaders.findIndex((header) => aliases.includes(header as never));
+  return normalizedHeaders.findIndex((header) =>
+    aliases.includes(header as never),
+  );
 }
 
 function parseCsvRecords(csv: string): CsvRecord[] {
@@ -127,7 +129,9 @@ export function buildProductImportPreview(
   existingSkus: string[],
 ): ProductImportPreviewResult {
   const records = parseCsvRecords(csv);
-  const existingSkuSet = new Set(existingSkus.map((sku) => sku.trim().toUpperCase()));
+  const existingSkuSet = new Set(
+    existingSkus.map((sku) => sku.trim().toUpperCase()),
+  );
   const skuOccurrences = new Map<string, number>();
 
   for (const record of records) {
@@ -135,7 +139,10 @@ export function buildProductImportPreview(
     if (!normalizedSku) {
       continue;
     }
-    skuOccurrences.set(normalizedSku, (skuOccurrences.get(normalizedSku) ?? 0) + 1);
+    skuOccurrences.set(
+      normalizedSku,
+      (skuOccurrences.get(normalizedSku) ?? 0) + 1,
+    );
   }
 
   const rows: ProductImportRowPreview[] = records.map((record, index) => {
@@ -165,7 +172,9 @@ export function buildProductImportPreview(
       issues.push('Duplicate SKU found in this file.');
     }
 
-    const existsInDatabase = normalizedSku ? existingSkuSet.has(normalizedSku) : false;
+    const existsInDatabase = normalizedSku
+      ? existingSkuSet.has(normalizedSku)
+      : false;
     let action: ProductImportAction | null = null;
 
     if (issues.length === 0) {

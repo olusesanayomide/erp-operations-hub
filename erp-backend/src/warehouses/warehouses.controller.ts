@@ -39,7 +39,10 @@ export class WarehousesController {
   })
   @ApiResponse({ status: 201, description: 'Warehouse created successfully.' })
   @ApiResponse({ status: 400, description: 'Invalid data provided.' })
-  create(@Body() createWarehouseDto: CreateWarehouseDto, @GetUser() user: UserPayload) {
+  create(
+    @Body() createWarehouseDto: CreateWarehouseDto,
+    @GetUser() user: UserPayload,
+  ) {
     return this.warehousesService.create(createWarehouseDto, user);
   }
 
@@ -64,7 +67,10 @@ export class WarehousesController {
   })
   @ApiResponse({ status: 200, description: 'Warehouse found.' })
   @ApiResponse({ status: 404, description: 'Warehouse not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser() user: UserPayload,
+  ) {
     return this.warehousesService.findOne(id, user);
   }
 

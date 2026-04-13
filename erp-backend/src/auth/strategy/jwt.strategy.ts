@@ -73,7 +73,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       .replace(/\/$/, '');
 
     if (!supabaseUrl) {
-      throw new Error('SUPABASE_URL is required for Supabase token verification');
+      throw new Error(
+        'SUPABASE_URL is required for Supabase token verification',
+      );
     }
 
     super({
@@ -138,7 +140,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       return cached.pem;
     }
 
-    const response = await fetch(`${this.expectedIssuer}/.well-known/jwks.json`);
+    const response = await fetch(
+      `${this.expectedIssuer}/.well-known/jwks.json`,
+    );
 
     if (!response.ok) {
       throw new UnauthorizedException('Unable to load Supabase signing keys');

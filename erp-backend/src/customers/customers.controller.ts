@@ -110,7 +110,10 @@ export class CustomersController {
   })
   @ApiResponse({ status: 200, description: 'Customer found.' })
   @ApiResponse({ status: 404, description: 'Customer not found.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser() user: UserPayload,
+  ) {
     return this.customersService.findOne(id, user);
   }
 

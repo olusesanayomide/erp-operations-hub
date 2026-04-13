@@ -58,8 +58,15 @@ export class ProductController {
     status: 200,
     description: 'Import preview generated successfully.',
   })
-  async previewImport(@Body() dto: ProductImportDto, @GetUser() user: UserPayload) {
-    return this.productService.previewImport(dto.csv, user, dto.mode ?? 'upsert');
+  async previewImport(
+    @Body() dto: ProductImportDto,
+    @GetUser() user: UserPayload,
+  ) {
+    return this.productService.previewImport(
+      dto.csv,
+      user,
+      dto.mode ?? 'upsert',
+    );
   }
 
   @Post('import/commit')
@@ -73,8 +80,15 @@ export class ProductController {
     status: 201,
     description: 'Products imported successfully.',
   })
-  async commitImport(@Body() dto: ProductImportDto, @GetUser() user: UserPayload) {
-    return this.productService.commitImport(dto.csv, user, dto.mode ?? 'upsert');
+  async commitImport(
+    @Body() dto: ProductImportDto,
+    @GetUser() user: UserPayload,
+  ) {
+    return this.productService.commitImport(
+      dto.csv,
+      user,
+      dto.mode ?? 'upsert',
+    );
   }
 
   @Get(':id')
@@ -86,7 +100,10 @@ export class ProductController {
   })
   @ApiResponse({ status: 200, description: 'Product found.' })
   @ApiResponse({ status: 404, description: 'Product not found.' })
-  async getProductById(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
+  async getProductById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser() user: UserPayload,
+  ) {
     return this.productService.getById(id, user);
   }
 
@@ -98,7 +115,10 @@ export class ProductController {
       'Adds a new item to the master catalog. This does not set stock levels (use Inventory Stock-In for that).',
   })
   @ApiResponse({ status: 201, description: 'Product created successfully.' })
-  async create(@Body() dto: ProductDto, @GetUser() user: UserPayload): Promise<Product> {
+  async create(
+    @Body() dto: ProductDto,
+    @GetUser() user: UserPayload,
+  ): Promise<Product> {
     return this.productService.createproduct(dto, user);
   }
 
@@ -131,7 +151,10 @@ export class ProductController {
     status: 409,
     description: 'Conflict: Product is linked to existing orders.',
   })
-  async delete(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload): Promise<Product> {
+  async delete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser() user: UserPayload,
+  ): Promise<Product> {
     return this.productService.deleteProduct(id, user);
   }
 }
