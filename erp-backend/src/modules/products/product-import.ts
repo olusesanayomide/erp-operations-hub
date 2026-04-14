@@ -10,6 +10,7 @@ export interface ProductImportRowPreview {
   name: string;
   sku: string;
   price: number | null;
+  minStock: number | null;
   action: ProductImportAction | null;
   issues: string[];
 }
@@ -30,6 +31,7 @@ const HEADER_ALIASES = {
   name: ['name', 'productname', 'product'],
   sku: ['sku', 'productsku', 'code', 'itemcode'],
   price: ['price', 'unitprice', 'baseprice', 'cost'],
+  minStock: ['minstock', 'minimumstock', 'reorderlevel', 'threshold'],
 } as const;
 
 function normalizeHeader(value: string) {
@@ -109,10 +111,16 @@ function parseCsvRecords(csv: string): CsvRecord[] {
   const nameIndex = resolveHeader(headers, 'name');
   const skuIndex = resolveHeader(headers, 'sku');
   const priceIndex = resolveHeader(headers, 'price');
+  const minStockIndex = resolveHeader(headers, 'minStock');
 
-  if (nameIndex === -1 || skuIndex === -1 || priceIndex === -1) {
+  if (
+    nameIndex === -1 ||
+    skuIndex === -1 ||
+    priceIndex === -1 ||
+    minStockIndex === -1
+  ) {
     throw new BadRequestException(
-      'CSV must include name, sku, and price columns.',
+      'CSV must include name, sku, price, and minStock columns.',
     );
   }
 
@@ -120,6 +128,7 @@ function parseCsvRecords(csv: string): CsvRecord[] {
     name: row[nameIndex] ?? '',
     sku: row[skuIndex] ?? '',
     price: row[priceIndex] ?? '',
+    minStock: row[minStockIndex] ?? '',
   }));
 }
 
@@ -152,6 +161,8 @@ export function buildProductImportPreview(
     const normalizedSku = sku.toUpperCase();
     const rawPrice = record.price.trim();
     const parsedPrice = rawPrice ? Number(rawPrice) : Number.NaN;
+    const rawMinStock = record.minStock.trim();
+    const parsedMinStock = rawMinStock ? Number(rawMinStock) : Number.NaN;
     const issues: string[] = [];
 
     if (!name) {
@@ -166,6 +177,14 @@ export function buildProductImportPreview(
       issues.push('Price is required.');
     } else if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
       issues.push('Price must be a valid number greater than or equal to 0.');
+    }
+
+    if (!rawMinStock) {
+      issues.push('Min stock is required.');
+    } else if (!Number.isFinite(parsedMinStock) || parsedMinStock < 0) {
+      issues.push(
+        'Min stock must be a valid number greater than or equal to 0.',
+      );
     }
 
     if (normalizedSku && (skuOccurrences.get(normalizedSku) ?? 0) > 1) {
@@ -194,6 +213,7 @@ export function buildProductImportPreview(
       name,
       sku,
       price: Number.isFinite(parsedPrice) ? parsedPrice : null,
+      minStock: Number.isFinite(parsedMinStock) ? parsedMinStock : null,
       action,
       issues,
     };

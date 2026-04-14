@@ -47,6 +47,7 @@ export class ProductService {
       name: string;
       sku: string;
       price: number;
+      minStock?: number;
       description?: string;
       category?: string;
       unit?: string;
@@ -60,6 +61,7 @@ export class ProductService {
     const description = data.description?.trim() || null;
     const category = data.category?.trim() || 'General';
     const unit = data.unit?.trim() || 'unit';
+    const minStock = data.minStock ?? 10;
 
     return this.prisma.product.create({
       data: {
@@ -67,6 +69,7 @@ export class ProductService {
         name: data.name,
         sku: data.sku,
         price: data.price,
+        minStock,
         description,
         category,
         unit,
@@ -122,6 +125,7 @@ export class ProductService {
               name: row.name,
               sku: row.sku,
               price: row.price ?? 0,
+              minStock: row.minStock ?? 10,
             },
           });
         }
@@ -138,10 +142,12 @@ export class ProductService {
             name: row.name,
             sku: row.sku,
             price: row.price ?? 0,
+            minStock: row.minStock ?? 10,
           },
           update: {
             name: row.name,
             price: row.price ?? 0,
+            minStock: row.minStock ?? 10,
           },
         });
       }),
@@ -163,6 +169,7 @@ export class ProductService {
       name?: string;
       sku?: string;
       price?: number;
+      minStock?: number;
       description?: string;
       category?: string;
       unit?: string;

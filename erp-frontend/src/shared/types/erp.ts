@@ -56,6 +56,7 @@ export interface Product {
   basePrice: number;
   category: string;
   unit: string;
+  minStock: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, ChevronDown, LogOut, UserCircle, CheckCheck } from 'lucide-react';
-import { Input } from '@/shared/ui/input';
+import { Bell, ChevronDown, LogOut, CheckCheck } from 'lucide-react';
 import { RoleBadge } from '@/shared/components/StatusBadge';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -43,7 +42,6 @@ export function AppHeader({ title }: { title: string }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
 
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications'],
@@ -98,17 +96,6 @@ export function AppHeader({ title }: { title: string }) {
       <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
 
       <div className="flex items-center gap-3">
-        {/* Search */}
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 w-64 h-9 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
-          />
-        </div>
-
         <Popover>
           <PopoverTrigger asChild>
             <button
@@ -203,8 +190,6 @@ export function AppHeader({ title }: { title: string }) {
                 <p className="text-xs text-muted-foreground">{user.email}</p>
                 <RoleBadge role={user.role} />
               </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem><UserCircle className="mr-2 h-4 w-4" /> Profile</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" /> Log out

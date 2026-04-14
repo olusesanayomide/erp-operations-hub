@@ -79,6 +79,7 @@ type BackendProduct = {
   description?: string | null;
   category?: string | null;
   unit?: string | null;
+  minStock?: number | null;
   price: number;
   createdAt: string;
   updatedAt?: string | null;
@@ -108,6 +109,7 @@ type ProductImportRowPreview = {
   name: string;
   sku: string;
   price: number | null;
+  minStock: number | null;
   action: "create" | "update" | null;
   issues: string[];
 };
@@ -270,6 +272,7 @@ type BackendInventorySummary = {
   availableStock: number;
   reservedStock?: number;
   onHandStock?: number;
+  minStock?: number;
   status: string;
 };
 
@@ -392,6 +395,7 @@ export function normalizeProduct(raw: BackendProduct): Product {
     basePrice: raw.price,
     category: raw.category || "General",
     unit: raw.unit || "unit",
+    minStock: raw.minStock ?? 10,
     createdAt: formatDate(raw.createdAt),
     updatedAt: formatDate(raw.updatedAt || raw.createdAt),
   };
@@ -462,7 +466,7 @@ export function normalizeInventoryItem(
     quantity,
     reservedQuantity,
     onHandQuantity,
-    minStock: 10,
+    minStock: "minStock" in raw ? raw.minStock || 0 : raw.product ? raw.product.minStock ?? 10 : productsById.get(productId)?.minStock ?? 10,
     product: "product" in raw ? productsById.get(productId) : raw.product ? normalizeProduct(raw.product) : productsById.get(productId),
     warehouse:
       "warehouse" in raw
@@ -784,7 +788,7 @@ export async function getProductById(id: string) {
       quantity: inventoryItem.quantity,
       reservedQuantity: inventoryItem.reservedQuantity || 0,
       onHandQuantity: inventoryItem.quantity + (inventoryItem.reservedQuantity || 0),
-      minStock: 10,
+      minStock: item.minStock,
     })),
     movements: (item.stockMovements || []).map(normalizeMovement),
     relatedOrderIds: Array.from(new Set((item.orderItems || []).map((orderItem) => orderItem.orderId))),
@@ -795,6 +799,7 @@ export async function createProduct(payload: {
   name: string;
   sku: string;
   price: number;
+  minStock?: number;
   description?: string;
   category?: string;
   unit?: string;
@@ -914,7 +919,7 @@ export async function getWarehouseById(id: string) {
       quantity: inventoryItem.quantity,
       reservedQuantity: inventoryItem.reservedQuantity || 0,
       onHandQuantity: inventoryItem.quantity + (inventoryItem.reservedQuantity || 0),
-      minStock: 10,
+      minStock: inventoryItem.product?.minStock ?? 10,
       product: inventoryItem.product ? normalizeProduct(inventoryItem.product) : undefined,
     })),
   };

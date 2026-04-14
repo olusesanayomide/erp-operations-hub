@@ -31,6 +31,7 @@ export default function ProductsPage() {
     name: '',
     sku: '',
     price: '',
+    minStock: '10',
     category: '',
     unit: '',
     description: '',
@@ -51,7 +52,7 @@ export default function ProductsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setDialogOpen(false);
-      setForm({ name: '', sku: '', price: '', category: '', unit: '', description: '' });
+      setForm({ name: '', sku: '', price: '', minStock: '10', category: '', unit: '', description: '' });
       toast.success('Product created');
     },
     onError: (error: Error) => toast.error(error.message),
@@ -124,7 +125,7 @@ export default function ProductsPage() {
   }
 
   function handleDownloadTemplate() {
-    const csvTemplate = 'name,sku,price\nIndustrial Valve,VALVE-001,149.99\nWarehouse Scanner,SCAN-002,89.50\n';
+    const csvTemplate = 'name,sku,price,minStock\nIndustrial Valve,VALVE-001,149.99,12\nWarehouse Scanner,SCAN-002,89.50,6\n';
     const blob = new Blob([csvTemplate], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -166,7 +167,7 @@ export default function ProductsPage() {
                         <div>
                           <p className="text-sm font-medium">CSV source</p>
                           <p className="text-sm text-muted-foreground">
-                            Required columns: <span className="font-mono">name</span>, <span className="font-mono">sku</span>, <span className="font-mono">price</span>
+                            Required columns: <span className="font-mono">name</span>, <span className="font-mono">sku</span>, <span className="font-mono">price</span>, <span className="font-mono">minStock</span>
                           </p>
                         </div>
                         <Button type="button" variant="ghost" size="sm" onClick={handleDownloadTemplate}>
@@ -261,6 +262,7 @@ export default function ProductsPage() {
                                     <TableHead className="min-w-[220px]">Name</TableHead>
                                     <TableHead className="w-[140px]">SKU</TableHead>
                                     <TableHead className="w-[180px] text-right">Price</TableHead>
+                                    <TableHead className="w-[140px] text-right">Min Stock</TableHead>
                                     <TableHead className="w-[120px]">Action</TableHead>
                                     <TableHead className="min-w-[240px]">Issues</TableHead>
                                   </TableRow>
@@ -275,6 +277,9 @@ export default function ProductsPage() {
                                       <TableCell className="font-mono text-xs">{row.sku || <span className="text-muted-foreground">Missing</span>}</TableCell>
                                       <TableCell className="whitespace-nowrap text-right">
                                         {typeof row.price === 'number' ? formatMoney(row.price) : <span className="text-muted-foreground">Invalid</span>}
+                                      </TableCell>
+                                      <TableCell className="whitespace-nowrap text-right">
+                                        {typeof row.minStock === 'number' ? row.minStock : <span className="text-muted-foreground">Invalid</span>}
                                       </TableCell>
                                       <TableCell>
                                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${row.action === 'create' ? 'bg-emerald-100 text-emerald-700' : row.action === 'update' ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
@@ -335,9 +340,10 @@ export default function ProductsPage() {
                     <div className="space-y-2"><Label>Price</Label><Input type="number" placeholder="0.00" value={form.price} onChange={(e) => setForm((current) => ({ ...current, price: e.target.value }))} /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Min Stock</Label><Input type="number" min="0" placeholder="10" value={form.minStock} onChange={(e) => setForm((current) => ({ ...current, minStock: e.target.value }))} /></div>
                     <div className="space-y-2"><Label>Category</Label><Input placeholder="Category" value={form.category} onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))} /></div>
-                    <div className="space-y-2"><Label>Unit</Label><Input placeholder="pc" value={form.unit} onChange={(e) => setForm((current) => ({ ...current, unit: e.target.value }))} /></div>
                   </div>
+                  <div className="space-y-2"><Label>Unit</Label><Input placeholder="pc" value={form.unit} onChange={(e) => setForm((current) => ({ ...current, unit: e.target.value }))} /></div>
                   <div className="space-y-2"><Label>Description</Label><Input placeholder="Short product description" value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} /></div>
                   <Button
                     className="w-full"
@@ -351,6 +357,7 @@ export default function ProductsPage() {
                         name: form.name,
                         sku: form.sku,
                         price: Number(form.price),
+                        minStock: Number(form.minStock || 0),
                         category: form.category,
                         unit: form.unit,
                         description: form.description,
@@ -382,6 +389,7 @@ export default function ProductsPage() {
                 <th className="text-left p-3">SKU</th>
                 <th className="text-left p-3">Category</th>
                 <th className="text-right p-3">Base Price</th>
+                <th className="text-right p-3">Min Stock</th>
                 <th className="text-right p-3">Total Stock</th>
                 <th className="text-left p-3">Created</th>
               </tr>
@@ -395,6 +403,7 @@ export default function ProductsPage() {
                   <td className="p-3 text-sm text-muted-foreground font-mono">{p.sku}</td>
                   <td className="p-3 text-sm">{p.category}</td>
                   <td className="p-3 text-sm text-right font-medium">{formatMoney(p.basePrice)}</td>
+                  <td className="p-3 text-sm text-right text-muted-foreground">{p.minStock}</td>
                   <td className="p-3 text-sm text-right">{getTotalInventory(p.id)}</td>
                   <td className="p-3 text-sm text-muted-foreground">{p.createdAt}</td>
                 </tr>
@@ -402,7 +411,7 @@ export default function ProductsPage() {
             </tbody>
           </table>
         </div>
-        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={6} /></div>}
+        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={7} /></div>}
         {isError && (
           <ErrorState
             title="Unable to load products"

@@ -45,6 +45,13 @@ export class InventoryService {
   async getInventory(tenantId: string) {
     const groups = await this.prisma.inventoryItem.findMany({
       where: { tenantId },
+      include: {
+        product: {
+          select: {
+            minStock: true,
+          },
+        },
+      },
     });
 
     return groups.map((item) => ({
@@ -53,8 +60,9 @@ export class InventoryService {
       availableStock: item.quantity || 0,
       reservedStock: item.reservedQuantity || 0,
       onHandStock: (item.quantity || 0) + (item.reservedQuantity || 0),
+      minStock: item.product?.minStock ?? 10,
       status:
-        (item.quantity || 0) > 10
+        (item.quantity || 0) > (item.product?.minStock ?? 10)
           ? 'IN_STOCK'
           : (item.quantity || 0) > 0
             ? 'LOW_STOCK'
@@ -95,7 +103,7 @@ export class InventoryService {
           warehouseId,
           quantity,
           type: StockMovementType.IN,
-          reference: 'API_STOCK_IN',
+          reference: 'STOCK_IN',
         },
       }),
       this.prisma.inventoryItem.upsert({
@@ -146,7 +154,7 @@ export class InventoryService {
           warehouseId,
           quantity: -quantity,
           type: StockMovementType.OUT,
-          reference: 'API_STOCK_OUT',
+          reference: 'STOCK_OUT',
         },
       }),
       this.prisma.inventoryItem.update({

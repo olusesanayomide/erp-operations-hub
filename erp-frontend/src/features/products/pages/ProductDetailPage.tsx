@@ -81,6 +81,10 @@ export default function ProductDetailPage() {
           <p className="text-2xl font-bold capitalize">{product.unit}</p>
         </div>
         <div className="erp-card p-5">
+          <p className="text-sm text-muted-foreground mb-1">Min Stock</p>
+          <p className="text-2xl font-bold">{product.minStock}</p>
+        </div>
+        <div className="erp-card p-5">
           <p className="text-sm text-muted-foreground mb-1">Description</p>
           <p className="text-sm">{product.description}</p>
         </div>

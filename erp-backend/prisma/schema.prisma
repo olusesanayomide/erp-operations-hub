@@ -139,6 +139,7 @@ model Product {
   description String?
   category  String   @default("General")
   unit      String   @default("unit")
+  minStock  Int      @default(10)
   price     Decimal  @db.Decimal(12, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime? @updatedAt
