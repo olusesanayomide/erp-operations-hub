@@ -9,6 +9,7 @@ import { Label } from '@/shared/ui/label';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { toast } from 'sonner';
 import { isSupabaseAuthConfigured } from '@/shared/lib/supabase';
+import { LoadingText } from '@/shared/components/LoadingMotion';
 
 const containerVariants = {
   hidden: { opacity: 0, y: 24 },
@@ -181,12 +182,9 @@ export default function LoginPage() {
                       disabled={loading}
                     >
                       {loading ? (
-                        <motion.span
-                          animate={prefersReducedMotion ? undefined : { opacity: [1, 0.55, 1] }}
-                          transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
-                        >
+                        <LoadingText>
                           {authStatusMessage || 'Signing you in...'}
-                        </motion.span>
+                        </LoadingText>
                       ) : (
                         'Sign in'
                       )}

@@ -38,6 +38,30 @@ export class PurchaseService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  private formatPurchaseOrderDate(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+  }
+
+  private async generatePurchaseOrderNumber(
+    client: Prisma.TransactionClient | PrismaService,
+    tenantId: string,
+  ) {
+    const prefix = `PO-${this.formatPurchaseOrderDate()}`;
+    const existingCount = await client.purchase.count({
+      where: {
+        tenantId,
+        purchaseOrder: {
+          startsWith: prefix,
+        },
+      },
+    });
+
+    return `${prefix}-${String(existingCount + 1).padStart(4, '0')}`;
+  }
+
   async findAll(tenantId: string) {
     return this.prisma.purchase.findMany({
       where: { tenantId },
@@ -111,31 +135,64 @@ export class PurchaseService {
         sum.plus(new Prisma.Decimal(item.price).mul(item.quantity)),
       new Prisma.Decimal(0),
     );
-    const purchase = await this.prisma.purchase.create({
-      data: {
-        tenantId,
-        purchaseOrder: dto.purchaseOrder,
-        supplierId: dto.supplierId,
-        warehouseId: dto.warehouseId,
-        totalAmount: totalAmount,
-        status: PurchaseLifecycleStatus.DRAFT,
-        items: {
-          create: dto.items.map((items) => ({
-            productId: items.productId,
-            quantity: items.quantity,
-            price: items.price,
-          })),
-        },
-      },
-      include: {
-        items: {
-          include: {
-            product: true,
-          },
-        },
-        supplier: true,
-        warehouse: true,
-      },
+    const manualPurchaseOrder = dto.purchaseOrder?.trim();
+
+    const purchase = await this.prisma.$transaction(async (tx) => {
+      const maxAttempts = manualPurchaseOrder ? 1 : 5;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const purchaseOrder =
+          manualPurchaseOrder ||
+          (await this.generatePurchaseOrderNumber(tx, tenantId));
+
+        try {
+          return await tx.purchase.create({
+            data: {
+              tenantId,
+              purchaseOrder,
+              supplierId: dto.supplierId,
+              warehouseId: dto.warehouseId,
+              totalAmount: totalAmount,
+              status: PurchaseLifecycleStatus.DRAFT,
+              items: {
+                create: dto.items.map((items) => ({
+                  productId: items.productId,
+                  quantity: items.quantity,
+                  price: items.price,
+                })),
+              },
+            },
+            include: {
+              items: {
+                include: {
+                  product: true,
+                },
+              },
+              supplier: true,
+              warehouse: true,
+            },
+          });
+        } catch (error) {
+          const isPurchaseOrderConflict =
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === 'P2002' &&
+            Array.isArray(error.meta?.target) &&
+            error.meta.target.includes('tenantId') &&
+            error.meta.target.includes('purchaseOrder');
+
+          if (!isPurchaseOrderConflict || manualPurchaseOrder) {
+            throw error;
+          }
+
+          if (attempt === maxAttempts - 1) {
+            throw new BadRequestException(
+              'Unable to generate a unique purchase order number. Please try again.',
+            );
+          }
+        }
+      }
+
+      throw new BadRequestException('Purchase order could not be created.');
     });
 
     await this.notificationsService.createForTenant({

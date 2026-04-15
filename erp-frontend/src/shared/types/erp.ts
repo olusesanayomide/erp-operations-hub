@@ -85,7 +85,7 @@ export interface StockMovement {
   referenceType?: 'order' | 'purchase';
   notes: string;
   createdAt: string;
-  createdBy: string;
+  createdBy?: string;
   product?: Product;
   warehouse?: Warehouse;
 }

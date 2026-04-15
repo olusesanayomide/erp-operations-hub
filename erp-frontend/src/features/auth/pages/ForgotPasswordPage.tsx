@@ -7,6 +7,7 @@ import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { sendPasswordResetEmail } from '@/shared/lib/erp-api';
 import { toast } from 'sonner';
+import { LoadingText } from '@/shared/components/LoadingMotion';
 
 export default function ForgotPasswordPage() {
   const prefersReducedMotion = useReducedMotion();
@@ -94,7 +95,7 @@ export default function ForgotPasswordPage() {
                   className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
                   disabled={loading}
                 >
-                  {loading ? 'Sending reset link...' : 'Send reset link'}
+                  {loading ? <LoadingText>Sending reset link...</LoadingText> : 'Send reset link'}
                 </Button>
               </form>
             </div>

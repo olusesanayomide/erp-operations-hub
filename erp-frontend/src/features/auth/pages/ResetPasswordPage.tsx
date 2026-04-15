@@ -8,6 +8,7 @@ import { Label } from '@/shared/ui/label';
 import { supabase } from '@/shared/lib/supabase';
 import { logoutSupabase, updateSupabasePassword } from '@/shared/lib/erp-api';
 import { toast } from 'sonner';
+import { LoadingText } from '@/shared/components/LoadingMotion';
 
 function hasRecoveryToken() {
   if (typeof window === 'undefined') {
@@ -135,7 +136,7 @@ export default function ResetPasswordPage() {
 
               {recoveryLinkDetected && !isRecoverySessionReady && (
                 <p className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                  Verifying your recovery link...
+                  <LoadingText>Verifying your recovery link...</LoadingText>
                 </p>
               )}
 
@@ -185,7 +186,7 @@ export default function ResetPasswordPage() {
                   className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
                   disabled={loading || !recoveryLinkDetected || !isRecoverySessionReady}
                 >
-                  {loading ? 'Updating password...' : 'Update password'}
+                  {loading ? <LoadingText>Updating password...</LoadingText> : 'Update password'}
                 </Button>
               </form>
             </div>

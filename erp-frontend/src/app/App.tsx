@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/app/providers/AuthContext";
 import { SettingsProvider } from "@/app/providers/SettingsContext";
 import { AppLayout } from "@/shared/layout/AppLayout";
 import { Skeleton } from "@/shared/ui/skeleton";
+import { LoadingScreen } from "@/shared/components/LoadingMotion";
 import {
   CustomersPage,
   CustomerDetailPage,
@@ -41,9 +42,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, authStatusMessage } = useAuth();
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
-        {authStatusMessage || 'Restoring your session...'}
-      </div>
+      <LoadingScreen message={authStatusMessage || 'Restoring your session...'} />
     );
   }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -55,9 +54,7 @@ function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
-        {authStatusMessage || 'Restoring your session...'}
-      </div>
+      <LoadingScreen message={authStatusMessage || 'Restoring your session...'} />
     );
   }
 

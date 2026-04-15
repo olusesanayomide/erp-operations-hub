@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useSettings } from '@/app/providers/SettingsContext';
 import { KPICard } from '@/shared/components/KPICard';
@@ -25,8 +26,15 @@ const CHART_COLORS = [
 ];
 
 function DashboardSkeleton() {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <motion.div
+      className="space-y-6"
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
+      animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+    >
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {Array.from({ length: 8 }).map((_, index) => (
           <div
@@ -91,7 +99,7 @@ function DashboardSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 }
 

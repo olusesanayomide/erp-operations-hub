@@ -1,10 +1,18 @@
 import { Skeleton } from '@/shared/ui/skeleton';
 import { Button } from '@/shared/ui/button';
 import { AlertTriangle, Package } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <div className="space-y-3">
+    <motion.div
+      className="space-y-3"
+      initial={prefersReducedMotion ? false : { opacity: 0 }}
+      animate={prefersReducedMotion ? undefined : { opacity: 1 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+    >
       <div className="flex gap-4">
         {Array.from({ length: cols }).map((_, i) => (
           <Skeleton key={i} className="h-4 flex-1" />
@@ -17,7 +25,7 @@ export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: nu
           ))}
         </div>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
@@ -77,8 +85,15 @@ export function RetryButton({
 }
 
 export function DetailPageSkeleton() {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <motion.div
+      className="space-y-6"
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
+      animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+    >
       <Skeleton className="h-9 w-24" />
       <div className="space-y-2">
         <Skeleton className="h-9 w-64" />
@@ -92,7 +107,7 @@ export function DetailPageSkeleton() {
       <div className="rounded-xl border p-5">
         <TableSkeleton rows={5} cols={4} />
       </div>
-    </div>
+    </motion.div>
   );
 }
 

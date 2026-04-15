@@ -10,6 +10,7 @@ import {
   Min,
   ValidateNested,
   IsEnum,
+  IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PurchaseLifecycleStatus } from '../purchase-status.enum';
@@ -31,7 +32,8 @@ export class PurchaseItemDto {
 }
 
 export class CreatePurchaseDto {
-  @ApiProperty({ example: 'PO-2026-001' })
+  @ApiProperty({ example: 'PO-2026-001', required: false })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   purchaseOrder: string;

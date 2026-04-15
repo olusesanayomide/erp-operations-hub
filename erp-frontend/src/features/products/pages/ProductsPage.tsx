@@ -343,7 +343,7 @@ export default function ProductsPage() {
                     <div className="space-y-2"><Label>Min Stock</Label><Input type="number" min="0" placeholder="10" value={form.minStock} onChange={(e) => setForm((current) => ({ ...current, minStock: e.target.value }))} /></div>
                     <div className="space-y-2"><Label>Category</Label><Input placeholder="Category" value={form.category} onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))} /></div>
                   </div>
-                  <div className="space-y-2"><Label>Unit</Label><Input placeholder="pc" value={form.unit} onChange={(e) => setForm((current) => ({ ...current, unit: e.target.value }))} /></div>
+                  <div className="space-y-2"><Label>Unit</Label><Input placeholder="e.g. piece, box, kg" value={form.unit} onChange={(e) => setForm((current) => ({ ...current, unit: e.target.value }))} /></div>
                   <div className="space-y-2"><Label>Description</Label><Input placeholder="Short product description" value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} /></div>
                   <Button
                     className="w-full"

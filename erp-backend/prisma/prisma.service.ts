@@ -77,7 +77,6 @@ export class PrismaService
 
         case 'upsert':
           params.args = params.args ?? {};
-          params.args.where = this.mergeWhere(params.args.where, tenantFilter);
           params.args.create = this.enforceTenantOnCreate(
             params.args.create,
             tenantId,

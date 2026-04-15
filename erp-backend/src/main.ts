@@ -22,10 +22,16 @@ function getAllowedOrigins() {
   return new Set([...defaultOrigins, ...configuredOrigins]);
 }
 
+function isLocalhostOrigin(origin: string) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+}
+
 async function bootstrap() {
   const app: INestApplication = await NestFactory.create(AppModule);
   const allowedOrigins = getAllowedOrigins();
   const allowNgrokOrigins = process.env.CORS_ALLOW_NGROK !== 'false';
+  const allowAllOrigins = process.env.CORS_ALLOW_ALL === 'true';
+  const isProduction = process.env.NODE_ENV === 'production';
 
   // 1. GLOBAL MIDDLEWARE & PIPES (Must come BEFORE listen)
   app.useGlobalPipes(
@@ -44,13 +50,19 @@ async function bootstrap() {
       }
 
       const normalizedOrigin = normalizeOrigin(origin);
+      const isLocalOrigin = isLocalhostOrigin(normalizedOrigin);
       const isNgrokOrigin =
         allowNgrokOrigins &&
         /^https:\/\/[a-z0-9-]+\.(ngrok-free\.app|ngrok-free\.dev|ngrok\.io)$/i.test(
           normalizedOrigin,
         );
 
-      if (allowedOrigins.has(normalizedOrigin) || isNgrokOrigin) {
+      if (
+        allowAllOrigins ||
+        (!isProduction && isLocalOrigin) ||
+        allowedOrigins.has(normalizedOrigin) ||
+        isNgrokOrigin
+      ) {
         callback(null, true);
         return;
       }

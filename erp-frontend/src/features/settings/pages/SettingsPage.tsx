@@ -7,6 +7,7 @@ import { Settings } from 'lucide-react';
 import { useSettings } from '@/app/providers/SettingsContext';
 import { useAuth } from '@/app/providers/AuthContext';
 import { toast } from 'sonner';
+import { LoadingText } from '@/shared/components/LoadingMotion';
 
 export default function SettingsPage() {
   const { currency, updateCurrency, formatMoney, isLoading, isSaving } = useSettings();
@@ -67,7 +68,7 @@ export default function SettingsPage() {
 
           {isLoading && (
             <p className="text-sm text-muted-foreground">
-              Loading tenant currency settings...
+              <LoadingText>Loading tenant currency settings...</LoadingText>
             </p>
           )}
 
@@ -114,7 +115,7 @@ export default function SettingsPage() {
           {canManageCurrency ? (
             <div className="flex justify-end">
               <Button onClick={handleSave} disabled={isLoading || isSaving}>
-                {isSaving ? 'Saving...' : 'Save Currency Settings'}
+                {isSaving ? <LoadingText>Saving...</LoadingText> : 'Save Currency Settings'}
               </Button>
             </div>
           ) : (

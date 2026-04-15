@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { Skeleton } from '@/shared/ui/skeleton';
+import { motion, useReducedMotion } from 'framer-motion';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -24,8 +25,15 @@ function getTitle(pathname: string) {
 }
 
 function AppContentFallback() {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <motion.div
+      className="space-y-6"
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
+      animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+    >
       <div className="space-y-2">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-4 w-72 max-w-full" />
@@ -41,7 +49,7 @@ function AppContentFallback() {
         <Skeleton className="h-72 rounded-2xl lg:col-span-2" />
         <Skeleton className="h-72 rounded-2xl" />
       </div>
-    </div>
+    </motion.div>
   );
 }
 

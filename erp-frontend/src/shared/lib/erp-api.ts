@@ -544,7 +544,6 @@ export function normalizeMovement(raw: BackendStockMovement): StockMovement {
     quantity: raw.quantity,
     notes: raw.reference || "",
     createdAt: formatDate(raw.createdAt),
-    createdBy: "system",
     product: raw.product ? normalizeProduct(raw.product) : undefined,
     warehouse: raw.warehouse ? normalizeWarehouse(raw.warehouse) : undefined,
   };
@@ -998,11 +997,9 @@ export async function createPurchase(payload: {
   warehouseId: string;
   items: Array<{ productId: string; quantity: number; price: number }>;
 }) {
-  const purchaseOrder = `PO-${Date.now()}`;
   const item = await apiRequest<BackendPurchase>("/purchases", {
     method: "POST",
     body: {
-      purchaseOrder,
       supplierId: payload.supplierId,
       warehouseId: payload.warehouseId,
       items: payload.items,
@@ -1010,7 +1007,6 @@ export async function createPurchase(payload: {
   });
   return normalizePurchase({
     ...item,
-    purchaseOrder,
     items: item.items || [],
   });
 }
