@@ -33,7 +33,7 @@ vi.mock('@/app/providers/AuthContext', () => ({
 }));
 
 vi.mock('@/shared/lib/erp-api', () => ({
-  listInventory: vi.fn(),
+  listInventorySummary: vi.fn(),
   listProducts: vi.fn(),
   listWarehouses: vi.fn(),
   stockIn: vi.fn(),

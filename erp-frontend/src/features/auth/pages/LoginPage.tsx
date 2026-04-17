@@ -38,11 +38,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const prefersReducedMotion = useReducedMotion();
-  const [email, setEmail] = useState(() => (location.state as { email?: string } | null)?.email || '');
+  const routeState = location.state as { authError?: string; email?: string } | null;
+  const [email, setEmail] = useState(() => routeState?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(routeState?.authError || '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -12,7 +12,7 @@ import { getStockStatus } from '@/shared/types/erp';
 import { useAuth } from '@/app/providers/AuthContext';
 import { Search, Boxes, ArrowDownRight, ArrowUpRight, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
-import { listInventory, listProducts, listWarehouses, stockIn, stockOut, transferStock } from '@/shared/lib/erp-api';
+import { listInventorySummary, listProducts, listWarehouses, stockIn, stockOut, transferStock } from '@/shared/lib/erp-api';
 
 function StockDialog({
   type,
@@ -206,7 +206,7 @@ export default function InventoryPage() {
 
   const { data: inventory = [], isLoading: isInventoryLoading, isError: isInventoryError, error: inventoryError, refetch: refetchInventory } = useQuery({
     queryKey: ['inventory'],
-    queryFn: listInventory,
+    queryFn: listInventorySummary,
   });
 
   const { data: products = [], isLoading: isProductsLoading, isError: isProductsError, error: productsError, refetch: refetchProducts } = useQuery({

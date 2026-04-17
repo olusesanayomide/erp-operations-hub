@@ -13,8 +13,26 @@ import { useSettings } from '@/app/providers/SettingsContext';
 
 interface DraftItem {
   productId: string;
-  quantity: number;
-  unitPrice: number;
+  quantity: string;
+  unitPrice: string;
+}
+
+function parsePositiveInteger(value: string) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || !Number.isInteger(numericValue) || numericValue <= 0) {
+    return null;
+  }
+
+  return numericValue;
+}
+
+function parsePositiveAmount(value: string) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return null;
+  }
+
+  return numericValue;
 }
 
 export default function PurchaseCreatePage() {
@@ -23,7 +41,7 @@ export default function PurchaseCreatePage() {
   const queryClient = useQueryClient();
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
-  const [items, setItems] = useState<DraftItem[]>([{ productId: '', quantity: 1, unitPrice: 0 }]);
+  const [items, setItems] = useState<DraftItem[]>([{ productId: '', quantity: '1', unitPrice: '' }]);
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ['suppliers'],
@@ -50,9 +68,9 @@ export default function PurchaseCreatePage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const addItem = () => setItems([...items, { productId: '', quantity: 1, unitPrice: 0 }]);
+  const addItem = () => setItems([...items, { productId: '', quantity: '1', unitPrice: '' }]);
   const removeItem = (index: number) => setItems(items.filter((_, itemIndex) => itemIndex !== index));
-  const updateItem = (index: number, field: keyof DraftItem, value: string | number) => {
+  const updateItem = (index: number, field: keyof DraftItem, value: string) => {
     setItems((current) =>
       current.map((item, itemIndex) =>
         itemIndex === index ? { ...item, [field]: value } : item,
@@ -60,11 +78,27 @@ export default function PurchaseCreatePage() {
     );
   };
 
-  const total = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const total = items.reduce((sum, item) => {
+    const quantity = parsePositiveInteger(item.quantity) ?? 0;
+    const unitPrice = parsePositiveAmount(item.unitPrice) ?? 0;
+    return sum + unitPrice * quantity;
+  }, 0);
 
   const handleSubmit = () => {
     if (!supplierId || !warehouseId || items.some((item) => !item.productId)) {
       toast.error('Please fill all required fields');
+      return;
+    }
+
+    const invalidQuantityIndex = items.findIndex((item) => parsePositiveInteger(item.quantity) === null);
+    if (invalidQuantityIndex >= 0) {
+      toast.error(`Line ${invalidQuantityIndex + 1}: quantity must be a whole number greater than 0.`);
+      return;
+    }
+
+    const invalidPriceIndex = items.findIndex((item) => parsePositiveAmount(item.unitPrice) === null);
+    if (invalidPriceIndex >= 0) {
+      toast.error(`Line ${invalidPriceIndex + 1}: unit price must be greater than 0.`);
       return;
     }
 
@@ -73,8 +107,8 @@ export default function PurchaseCreatePage() {
       warehouseId,
       items: items.map((item) => ({
         productId: item.productId,
-        quantity: item.quantity,
-        price: item.unitPrice,
+        quantity: parsePositiveInteger(item.quantity) as number,
+        price: parsePositiveAmount(item.unitPrice) as number,
       })),
     });
   };
@@ -117,7 +151,7 @@ export default function PurchaseCreatePage() {
                             ...entry,
                             productId: value,
                             unitPrice: product
-                              ? Number((product.basePrice * 0.65).toFixed(2))
+                              ? (product.basePrice * 0.65).toFixed(2)
                               : entry.unitPrice,
                           }
                         : entry,
@@ -130,14 +164,14 @@ export default function PurchaseCreatePage() {
               </div>
               <div className="w-20 space-y-1">
                 <Label className="text-xs">Qty</Label>
-                <Input type="number" min={1} value={item.quantity} onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} />
+                <Input type="number" min={1} step={1} value={item.quantity} onChange={(e) => updateItem(index, 'quantity', e.target.value)} />
               </div>
               <div className="w-28 space-y-1">
                 <Label className="text-xs">Unit Price</Label>
-                <Input type="number" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(index, 'unitPrice', Number(e.target.value))} />
+                <Input type="number" min="0.01" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(index, 'unitPrice', e.target.value)} />
               </div>
               <div className="w-24 text-right">
-                <p className="text-sm font-semibold">{formatMoney(item.unitPrice * item.quantity)}</p>
+                <p className="text-sm font-semibold">{formatMoney((parsePositiveAmount(item.unitPrice) ?? 0) * (parsePositiveInteger(item.quantity) ?? 0))}</p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => removeItem(index)} disabled={items.length === 1}><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>
             </div>

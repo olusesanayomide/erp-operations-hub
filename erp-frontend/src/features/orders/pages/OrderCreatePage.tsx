@@ -8,12 +8,21 @@ import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { ArrowLeft, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { createOrder, listCustomers, listInventory, listProducts, listWarehouses } from '@/shared/lib/erp-api';
+import { createOrder, listCustomers, listInventorySummary, listProducts, listWarehouses } from '@/shared/lib/erp-api';
 import { useSettings } from '@/app/providers/SettingsContext';
 
 interface DraftItem {
   productId: string;
-  quantity: number;
+  quantity: string;
+}
+
+function parsePositiveInteger(value: string) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || !Number.isInteger(numericValue) || numericValue <= 0) {
+    return null;
+  }
+
+  return numericValue;
 }
 
 export default function OrderCreatePage() {
@@ -22,7 +31,7 @@ export default function OrderCreatePage() {
   const queryClient = useQueryClient();
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
-  const [items, setItems] = useState<DraftItem[]>([{ productId: '', quantity: 1 }]);
+  const [items, setItems] = useState<DraftItem[]>([{ productId: '', quantity: '1' }]);
 
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
@@ -41,7 +50,7 @@ export default function OrderCreatePage() {
 
   const { data: inventory = [] } = useQuery({
     queryKey: ['inventory'],
-    queryFn: listInventory,
+    queryFn: listInventorySummary,
   });
 
   const createMutation = useMutation({
@@ -55,9 +64,9 @@ export default function OrderCreatePage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const addItem = () => setItems([...items, { productId: '', quantity: 1 }]);
+  const addItem = () => setItems([...items, { productId: '', quantity: '1' }]);
   const removeItem = (index: number) => setItems(items.filter((_, itemIndex) => itemIndex !== index));
-  const updateItem = (index: number, field: keyof DraftItem, value: string | number) => {
+  const updateItem = (index: number, field: keyof DraftItem, value: string) => {
     const updated = [...items];
     updated[index] = { ...updated[index], [field]: value };
     setItems(updated);
@@ -71,7 +80,8 @@ export default function OrderCreatePage() {
 
   const total = items.reduce((sum, item) => {
     const product = products.find((entry) => entry.id === item.productId);
-    return sum + (product?.basePrice || 0) * item.quantity;
+    const quantity = parsePositiveInteger(item.quantity) ?? 0;
+    return sum + (product?.basePrice || 0) * quantity;
   }, 0);
 
   const handleSubmit = () => {
@@ -80,10 +90,35 @@ export default function OrderCreatePage() {
       return;
     }
 
+    const invalidQuantityIndex = items.findIndex((item) => parsePositiveInteger(item.quantity) === null);
+    if (invalidQuantityIndex >= 0) {
+      toast.error(`Line ${invalidQuantityIndex + 1}: quantity must be a whole number greater than 0.`);
+      return;
+    }
+
+    const insufficientStockIndex = items.findIndex((item) => {
+      const quantity = parsePositiveInteger(item.quantity) ?? 0;
+      const availableStock = getAvailableStock(item.productId);
+      return availableStock !== null && quantity > availableStock;
+    });
+
+    if (insufficientStockIndex >= 0) {
+      const item = items[insufficientStockIndex];
+      const product = products.find((entry) => entry.id === item.productId);
+      const availableStock = getAvailableStock(item.productId) ?? 0;
+      toast.error(
+        `Line ${insufficientStockIndex + 1}: ${product?.name || 'selected product'} only has ${availableStock} available.`,
+      );
+      return;
+    }
+
     createMutation.mutate({
       customerId,
       warehouseId,
-      items,
+      items: items.map((item) => ({
+        productId: item.productId,
+        quantity: parsePositiveInteger(item.quantity) as number,
+      })),
     });
   };
 
@@ -114,7 +149,8 @@ export default function OrderCreatePage() {
         <div className="space-y-3">
           {items.map((item, index) => {
             const stock = getAvailableStock(item.productId);
-            const insufficientStock = stock !== null && item.quantity > stock;
+            const quantity = parsePositiveInteger(item.quantity) ?? 0;
+            const insufficientStock = stock !== null && quantity > stock;
             const product = products.find((entry) => entry.id === item.productId);
             return (
               <div key={index} className="flex items-end gap-3 p-3 rounded-lg bg-muted/30">
@@ -127,10 +163,10 @@ export default function OrderCreatePage() {
                 </div>
                 <div className="w-24 space-y-1">
                   <Label className="text-xs">Qty</Label>
-                  <Input type="number" min={1} value={item.quantity} onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))} />
+                  <Input type="number" min={1} step={1} value={item.quantity} onChange={(e) => updateItem(index, 'quantity', e.target.value)} />
                 </div>
                 <div className="w-24 text-right">
-                  <p className="text-sm font-semibold">{formatMoney((product?.basePrice || 0) * item.quantity)}</p>
+                  <p className="text-sm font-semibold">{formatMoney((product?.basePrice || 0) * quantity)}</p>
                   {stock !== null && (
                     <p className={`text-xs ${insufficientStock ? 'text-destructive' : 'text-muted-foreground'}`}>
                       {insufficientStock && <AlertTriangle className="inline h-3 w-3 mr-0.5" />}

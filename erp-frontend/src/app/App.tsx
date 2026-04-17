@@ -36,21 +36,31 @@ import {
   WarehousesPage,
 } from "@/app/routeModules";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+  },
+});
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, authStatusMessage } = useAuth();
+  const { isAuthenticated, isLoading, authStatusMessage, authError } = useAuth();
   if (isLoading) {
     return (
       <LoadingScreen message={authStatusMessage || 'Restoring your session...'} />
     );
   }
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ authError }} />;
   return <>{children}</>;
 }
 
 function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, isPlatformAdmin, authStatusMessage } = useAuth();
+  const { isAuthenticated, isLoading, isPlatformAdmin, authStatusMessage, authError } = useAuth();
 
   if (isLoading) {
     return (
@@ -58,7 +68,7 @@ function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ authError }} />;
   if (!isPlatformAdmin) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
@@ -80,48 +90,46 @@ const App = () => (
     <TooltipProvider>
       <Sonner />
       <AuthProvider>
-        <SettingsProvider>
-          <BrowserRouter>
-            <Suspense fallback={<RouteFallback />}>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/signup" element={<SignupPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-                <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/products" element={<ProductsPage />} />
-                  <Route path="/products/:id" element={<ProductDetailPage />} />
-                  <Route path="/inventory" element={<InventoryPage />} />
-                  <Route path="/orders" element={<OrdersPage />} />
-                  <Route path="/orders/new" element={<OrderCreatePage />} />
-                  <Route path="/orders/:id" element={<OrderDetailPage />} />
-                  <Route path="/purchases" element={<PurchasesPage />} />
-                  <Route path="/purchases/new" element={<PurchaseCreatePage />} />
-                  <Route path="/purchases/:id" element={<PurchaseDetailPage />} />
-                  <Route path="/customers" element={<CustomersPage />} />
-                  <Route path="/customers/:id" element={<CustomerDetailPage />} />
-                  <Route path="/suppliers" element={<SuppliersPage />} />
-                  <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
-                  <Route path="/warehouses" element={<WarehousesPage />} />
-                  <Route path="/warehouses/:id" element={<WarehouseDetailPage />} />
-                  <Route path="/users" element={<UsersPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route
-                    path="/admin/tenants"
-                    element={
-                      <PlatformAdminRoute>
-                        <TenantsPage />
-                      </PlatformAdminRoute>
-                    }
-                  />
-                </Route>
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </SettingsProvider>
+        <BrowserRouter>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+              <Route element={<ProtectedRoute><SettingsProvider><AppLayout /></SettingsProvider></ProtectedRoute>}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/products/:id" element={<ProductDetailPage />} />
+                <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/orders/new" element={<OrderCreatePage />} />
+                <Route path="/orders/:id" element={<OrderDetailPage />} />
+                <Route path="/purchases" element={<PurchasesPage />} />
+                <Route path="/purchases/new" element={<PurchaseCreatePage />} />
+                <Route path="/purchases/:id" element={<PurchaseDetailPage />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                <Route path="/suppliers" element={<SuppliersPage />} />
+                <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
+                <Route path="/warehouses" element={<WarehousesPage />} />
+                <Route path="/warehouses/:id" element={<WarehouseDetailPage />} />
+                <Route path="/users" element={<UsersPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route
+                  path="/admin/tenants"
+                  element={
+                    <PlatformAdminRoute>
+                      <TenantsPage />
+                    </PlatformAdminRoute>
+                  }
+                />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

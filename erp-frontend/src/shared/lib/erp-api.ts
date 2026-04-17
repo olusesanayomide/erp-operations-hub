@@ -276,6 +276,51 @@ type BackendInventorySummary = {
   status: string;
 };
 
+type BackendDashboardSummary = {
+  counts: {
+    products: number;
+    customers: number;
+    suppliers: number;
+    warehouses: number;
+  };
+  inventory: {
+    availableQuantity: number;
+    reservedQuantity: number;
+    lowStockCount: number;
+    lowStockItems: Array<{
+      id: string;
+      productId: string;
+      warehouseId: string;
+      productName: string;
+      productSku: string;
+      warehouseName: string;
+      quantity: number;
+      reservedQuantity: number;
+      onHandQuantity: number;
+      minStock: number;
+      status: string;
+    }>;
+  };
+  orders: {
+    activeCount: number;
+    byStatus: Array<{ name: string; value: number }>;
+    recent: Array<{
+      id: string;
+      orderNumber: string;
+      customerId?: string | null;
+      customerName?: string | null;
+      status: Order["status"];
+      totalAmount: number;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+  purchases: {
+    draftCount: number;
+  };
+  stockTrend: Array<{ month: string; in: number; out: number }>;
+};
+
 let currentUserRequest: Promise<User> | null = null;
 
 function normalizeAuthUser(data: BackendAuthUser): User {
@@ -767,6 +812,10 @@ export async function updateCurrencySettings(payload: BackendCurrencySettings) {
   });
 }
 
+export async function getDashboardSummary() {
+  return apiRequest<BackendDashboardSummary>("/dashboard/summary");
+}
+
 export async function listProducts() {
   const items = await apiRequest<BackendProduct[]>("/products");
   return items.map(normalizeProduct);
@@ -1040,6 +1089,11 @@ export async function listInventory() {
   const warehousesById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
 
   return summary.map((item) => normalizeInventoryItem(item, productsById, warehousesById));
+}
+
+export async function listInventorySummary() {
+  const summary = await apiRequest<BackendInventorySummary[]>("/inventory");
+  return summary.map((item) => normalizeInventoryItem(item, new Map(), new Map()));
 }
 
 export async function stockIn(payload: {

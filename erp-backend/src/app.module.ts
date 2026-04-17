@@ -15,6 +15,7 @@ import { TenantContextInterceptor } from './common/tenant-context.interceptor';
 import { PrismaModule } from './common/prisma.module';
 import { SettingsModule } from './settings/settings.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AuthModule,
     SettingsModule,
     NotificationsModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [

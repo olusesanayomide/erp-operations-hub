@@ -16,13 +16,19 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   authStatusMessage: string;
+  authError: string;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  refreshUser: () => Promise<User | null>;
   hasRole: (role: UserRole | UserRole[]) => boolean;
   canPerform: (action: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+const AUTH_PROFILE_TIMEOUT_MS = 12000;
+const AUTH_RESTORE_TIMEOUT_MESSAGE =
+  'We could not verify your session. Please sign in again.';
 
 const rolePermissions: Record<UserRole, string[]> = {
   admin: ['*'],
@@ -50,8 +56,10 @@ const rolePermissions: Record<UserRole, string[]> = {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(() => getStoredUser<User>());
+  const [isVerifiedSession, setIsVerifiedSession] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [authStatusMessage, setAuthStatusMessage] = useState('Restoring your session...');
+  const [authError, setAuthError] = useState('');
   const authTransitionRef = useRef<((value: { success: boolean; error?: string }) => void) | null>(null);
   const hasResolvedInitialSessionRef = useRef(false);
 
@@ -61,7 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearCurrentUserRequest();
       setStoredUser(null);
       setUser(null);
+      setIsVerifiedSession(false);
       setAuthStatusMessage('');
+      setAuthError('');
       setIsLoading(false);
       return;
     }
@@ -72,6 +82,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authTransitionRef.current?.(value);
       authTransitionRef.current = null;
     };
+
+    const resolveCurrentUserWithTimeout = (accessToken: string) =>
+      Promise.race([
+        getCurrentUser(accessToken),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(
+            () => reject(new Error(AUTH_RESTORE_TIMEOUT_MESSAGE)),
+            AUTH_PROFILE_TIMEOUT_MS,
+          );
+        }),
+      ]);
 
     const {
       data: { subscription },
@@ -84,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (shouldBlockUi) {
         setIsLoading(true);
+        setAuthError('');
         setAuthStatusMessage(
           isInitialSessionRestore
             ? 'Restoring your session...'
@@ -95,6 +117,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearCurrentUserRequest();
         setStoredUser(null);
         setUser(null);
+        setIsVerifiedSession(false);
+        setAuthError('');
         hasResolvedInitialSessionRef.current = true;
         if (shouldBlockUi) {
           setAuthStatusMessage('');
@@ -104,28 +128,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      void getCurrentUser(session.access_token)
+      void resolveCurrentUserWithTimeout(session.access_token)
         .then((nextUser) => {
           if (!mounted) return;
           setStoredUser(nextUser);
           setUser(nextUser);
+          setIsVerifiedSession(true);
+          setAuthError('');
           resolveTransition({ success: true });
         })
         .catch((error) => {
           if (!mounted) return;
           setStoredUser(null);
           setUser(null);
+          setIsVerifiedSession(false);
           clearCurrentUserRequest();
           void logoutSupabase();
 
           const message =
             error instanceof ApiError
               ? error.message
-              : 'Signed in with Supabase, but failed to load your ERP user profile.';
+              : error instanceof Error
+                ? error.message
+                : 'Signed in with Supabase, but failed to load your ERP user profile.';
 
           if (shouldBlockUi) {
             setAuthStatusMessage('');
           }
+          setAuthError(message);
           resolveTransition({ success: false, error: message });
         })
         .finally(() => {
@@ -150,6 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!isSupabaseAuthConfigured) {
         console.warn('Supabase auth is enabled, but VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are missing.');
+        setAuthError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
         return {
           success: false,
           error: 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
@@ -158,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setIsLoading(true);
       setAuthStatusMessage('Signing you in...');
+      setAuthError('');
       const transition = new Promise<{ success: boolean; error?: string }>((resolve) => {
         authTransitionRef.current = resolve;
       });
@@ -173,14 +205,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error(error);
       }
 
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Unable to sign in.';
+      setAuthError(message);
+
       return {
         success: false,
-        error:
-          error instanceof ApiError
-            ? error.message
-            : error instanceof Error
-              ? error.message
-              : 'Unable to sign in.',
+        error: message,
       };
     }
   }, []);
@@ -190,32 +225,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearCurrentUserRequest();
     setStoredUser(null);
     setUser(null);
+    setIsVerifiedSession(false);
     setAuthStatusMessage('');
+    setAuthError('');
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    if (!isSupabaseAuthConfigured || !supabase) {
+      return null;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      clearCurrentUserRequest();
+      setStoredUser(null);
+      setUser(null);
+      setIsVerifiedSession(false);
+      setAuthError('');
+      return null;
+    }
+
+    clearCurrentUserRequest();
+    const nextUser = await getCurrentUser(session.access_token);
+    setStoredUser(nextUser);
+    setUser(nextUser);
+    setIsVerifiedSession(true);
+    setAuthError('');
+    return nextUser;
   }, []);
 
   const hasRole = useCallback((role: UserRole | UserRole[]) => {
-    if (!user) return false;
+    if (!isVerifiedSession || !user) return false;
     const roles = Array.isArray(role) ? role : [role];
     return roles.includes(user.role);
-  }, [user]);
+  }, [isVerifiedSession, user]);
 
   const canPerform = useCallback((action: string) => {
-    if (!user) return false;
+    if (!isVerifiedSession || !user) return false;
     const perms = rolePermissions[user.role];
     return perms.includes('*') || perms.includes(action);
-  }, [user]);
+  }, [isVerifiedSession, user]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         tenant: user?.tenant ?? null,
-        isPlatformAdmin: user?.isPlatformAdmin ?? false,
-        isAuthenticated: !!user,
+        isPlatformAdmin: isVerifiedSession ? user?.isPlatformAdmin ?? false : false,
+        isAuthenticated: isVerifiedSession && !!user,
         isLoading,
         authStatusMessage,
+        authError,
         login,
         logout,
+        refreshUser,
         hasRole,
         canPerform,
       }}

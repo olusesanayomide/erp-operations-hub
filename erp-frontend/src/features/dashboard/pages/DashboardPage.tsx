@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/app/providers/AuthContext';
@@ -7,14 +6,14 @@ import { KPICard } from '@/shared/components/KPICard';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { getStockStatus } from '@/shared/types/erp';
 import { Link } from 'react-router-dom';
 import {
   Package, Boxes, AlertTriangle, ShoppingCart, Truck, Users,
   Factory, Warehouse, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { listCustomers, listInventory, listOrders, listProducts, listPurchases, listSuppliers, listWarehouses } from '@/shared/lib/erp-api';
+import { getDashboardSummary } from '@/shared/lib/erp-api';
+import type { OrderStatus, StockStatus } from '@/shared/types/erp';
 
 const CHART_COLORS = [
   'hsl(220,14%,80%)',
@@ -107,82 +106,18 @@ export default function DashboardPage() {
   const { canPerform } = useAuth();
   const { formatMoney } = useSettings();
 
-  const productsQuery = useQuery({ queryKey: ['products', 'normalized'], queryFn: listProducts });
-  const inventoryQuery = useQuery({ queryKey: ['inventory'], queryFn: listInventory });
-  const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: listOrders });
-  const purchasesQuery = useQuery({ queryKey: ['purchases'], queryFn: listPurchases });
-  const customersQuery = useQuery({ queryKey: ['customers'], queryFn: listCustomers });
-  const suppliersQuery = useQuery({ queryKey: ['suppliers'], queryFn: listSuppliers });
-  const warehousesQuery = useQuery({ queryKey: ['warehouses'], queryFn: listWarehouses });
-
-  const products = productsQuery.data ?? [];
-  const inventory = inventoryQuery.data ?? [];
-  const orders = ordersQuery.data ?? [];
-  const purchases = purchasesQuery.data ?? [];
-  const customers = customersQuery.data ?? [];
-  const suppliers = suppliersQuery.data ?? [];
-  const warehouses = warehousesQuery.data ?? [];
-
-  const queries = [
-    productsQuery,
-    inventoryQuery,
-    ordersQuery,
-    purchasesQuery,
-    customersQuery,
-    suppliersQuery,
-    warehousesQuery,
-  ];
-
-  const isDashboardLoading = queries.some((query) => query.isLoading);
-  const hasLoadedDashboardData = queries.some((query) => query.data !== undefined);
-
-  const lowStockItems = inventory.filter((item) => {
-    const status = getStockStatus(item.quantity, item.minStock);
-    return status === 'low-stock' || status === 'out-of-stock';
+  const dashboardQuery = useQuery({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: getDashboardSummary,
   });
 
-  const totalAvailableInventoryQty = inventory.reduce(
-    (sum, item) => sum + item.quantity,
-    0,
-  );
-  const totalReservedInventoryQty = inventory.reduce(
-    (sum, item) => sum + item.reservedQuantity,
-    0,
-  );
-  const activeOrders = orders.filter((order) =>
-    ['draft', 'confirmed', 'picked', 'shipped'].includes(order.status),
-  ).length;
-  const draftPurchases = purchases.filter((purchase) => purchase.status === 'draft').length;
-
-  const ordersByStatus = [
-    { name: 'Draft', value: orders.filter((order) => order.status === 'draft').length },
-    { name: 'Confirmed', value: orders.filter((order) => order.status === 'confirmed').length },
-    { name: 'Picked', value: orders.filter((order) => order.status === 'picked').length },
-    { name: 'Shipped', value: orders.filter((order) => order.status === 'shipped').length },
-    { name: 'Delivered', value: orders.filter((order) => order.status === 'delivered').length },
-    { name: 'Cancelled', value: orders.filter((order) => order.status === 'cancelled').length },
+  const summary = dashboardQuery.data;
+  const lowStockItems = summary?.inventory.lowStockItems ?? [];
+  const ordersByStatus = summary?.orders.byStatus ?? [];
+  const stockTrend = summary?.stockTrend ?? [
+    { month: '01', in: 0, out: 0 },
+    { month: '02', in: 0, out: 0 },
   ];
-
-  const stockTrend = useMemo(() => {
-    const recentPurchases = purchases.slice(0, 6).map((purchase) => ({
-      month: purchase.createdAt.slice(5, 7),
-      in: purchase.totalAmount,
-      out: 0,
-    }));
-    const recentOrders = orders.slice(0, 6).map((order) => ({
-      month: order.createdAt.slice(5, 7),
-      in: 0,
-      out: order.totalAmount,
-    }));
-    const combined = [...recentPurchases, ...recentOrders];
-    if (combined.length === 0) {
-      return [
-        { month: '01', in: 0, out: 0 },
-        { month: '02', in: 0, out: 0 },
-      ];
-    }
-    return combined;
-  }, [orders, purchases]);
 
   const quickActions = [
     { label: 'New Order', icon: ShoppingCart, path: '/orders/new', perm: 'orders.create' },
@@ -194,22 +129,22 @@ export default function DashboardPage() {
     { label: 'Add Warehouse', icon: Warehouse, path: '/warehouses', perm: 'warehouses.create' },
   ].filter((action) => canPerform(action.perm));
 
-  if (isDashboardLoading && !hasLoadedDashboardData) {
+  if (dashboardQuery.isLoading && !summary) {
     return <DashboardSkeleton />;
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard title="Total Products" value={products.length} icon={Package} />
-        <KPICard title="Available Inventory" value={totalAvailableInventoryQty.toLocaleString()} icon={Boxes} />
-        <KPICard title="Reserved Inventory" value={totalReservedInventoryQty.toLocaleString()} icon={Boxes} />
-        <KPICard title="Low Stock Items" value={lowStockItems.length} icon={AlertTriangle} variant={lowStockItems.length > 0 ? 'warning' : 'default'} />
-        <KPICard title="Active Orders" value={activeOrders} icon={ShoppingCart} />
-        <KPICard title="Draft Purchases" value={draftPurchases} icon={Truck} variant={draftPurchases > 0 ? 'warning' : 'default'} />
-        <KPICard title="Customers" value={customers.length} icon={Users} />
-        <KPICard title="Suppliers" value={suppliers.length} icon={Factory} />
-        <KPICard title="Warehouses" value={warehouses.length} icon={Warehouse} />
+        <KPICard title="Total Products" value={summary?.counts.products ?? 0} icon={Package} />
+        <KPICard title="Available Inventory" value={(summary?.inventory.availableQuantity ?? 0).toLocaleString()} icon={Boxes} />
+        <KPICard title="Reserved Inventory" value={(summary?.inventory.reservedQuantity ?? 0).toLocaleString()} icon={Boxes} />
+        <KPICard title="Low Stock Items" value={summary?.inventory.lowStockCount ?? 0} icon={AlertTriangle} variant={(summary?.inventory.lowStockCount ?? 0) > 0 ? 'warning' : 'default'} />
+        <KPICard title="Active Orders" value={summary?.orders.activeCount ?? 0} icon={ShoppingCart} />
+        <KPICard title="Draft Purchases" value={summary?.purchases.draftCount ?? 0} icon={Truck} variant={(summary?.purchases.draftCount ?? 0) > 0 ? 'warning' : 'default'} />
+        <KPICard title="Customers" value={summary?.counts.customers ?? 0} icon={Users} />
+        <KPICard title="Suppliers" value={summary?.counts.suppliers ?? 0} icon={Factory} />
+        <KPICard title="Warehouses" value={summary?.counts.warehouses ?? 0} icon={Warehouse} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -273,12 +208,12 @@ export default function DashboardPage() {
             {lowStockItems.slice(0, 5).map((item) => (
               <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30">
                 <div>
-                  <p className="text-sm font-medium">{item.product?.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.warehouse?.name}</p>
+                  <p className="text-sm font-medium">{item.productName}</p>
+                  <p className="text-xs text-muted-foreground">{item.warehouseName}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold">{item.quantity} / {item.minStock}</p>
-                  <StatusBadge status={getStockStatus(item.quantity, item.minStock)} />
+                  <StatusBadge status={item.status as StockStatus} />
                 </div>
               </div>
             ))}
@@ -292,15 +227,15 @@ export default function DashboardPage() {
             <Link to="/orders" className="text-xs text-primary hover:underline">View all</Link>
           </div>
           <div className="space-y-2">
-            {orders.slice(0, 5).map((order) => (
+            {(summary?.orders.recent ?? []).map((order) => (
               <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/30 transition-colors">
                 <div>
                   <p className="text-sm font-medium">{order.orderNumber}</p>
-                  <p className="text-xs text-muted-foreground">{order.customer?.name || customers.find((customer) => customer.id === order.customerId)?.name}</p>
+                  <p className="text-xs text-muted-foreground">{order.customerName}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold">{formatMoney(order.totalAmount)}</p>
-                  <StatusBadge status={order.status} />
+                  <StatusBadge status={order.status as OrderStatus} />
                 </div>
               </Link>
             ))}

@@ -14,7 +14,7 @@ import type { UserRole } from '@/shared/types/erp';
 import { toast } from 'sonner';
 
 export default function UsersPage() {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -55,7 +55,9 @@ export default function UsersPage() {
         ),
       );
       if (updatedUser.id === user?.id) {
-        queryClient.invalidateQueries({ queryKey: ['current-user'] });
+        void refreshUser().catch((refreshError: Error) => {
+          toast.error(refreshError.message || 'User updated, but your session profile could not be refreshed.');
+        });
       }
       setEditingUserId(null);
       toast.success('User updated');

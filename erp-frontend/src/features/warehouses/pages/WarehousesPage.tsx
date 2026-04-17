@@ -9,7 +9,7 @@ import { Label } from '@/shared/ui/label';
 import { useAuth } from '@/app/providers/AuthContext';
 import { Plus, Search, Warehouse, MapPin, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { createWarehouse, getWarehouseById, listWarehouses } from '@/shared/lib/erp-api';
+import { createWarehouse, listInventorySummary, listWarehouses } from '@/shared/lib/erp-api';
 
 export default function WarehousesPage() {
   const { canPerform } = useAuth();
@@ -30,23 +30,14 @@ export default function WarehousesPage() {
   });
 
   const {
-    data: warehouseInventory = {},
+    data: inventorySummary = [],
     isLoading: isInventorySummaryLoading,
     isError: isInventorySummaryError,
     error: inventorySummaryError,
     refetch: refetchInventorySummary,
   } = useQuery({
-    queryKey: ['warehouses', 'inventory-summary', warehouses.map((warehouse) => warehouse.id).join(',')],
-    queryFn: async () => {
-      const entries = await Promise.all(
-        warehouses.map(async (warehouse) => {
-          const detail = await getWarehouseById(warehouse.id);
-          return [warehouse.id, detail.inventory] as const;
-        }),
-      );
-      return Object.fromEntries(entries);
-    },
-    enabled: warehouses.length > 0,
+    queryKey: ['inventory'],
+    queryFn: listInventorySummary,
   });
 
   const createMutation = useMutation({
@@ -112,7 +103,7 @@ export default function WarehousesPage() {
       )}
       {!isLoading && !isError && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(w => {
-          const inv = warehouseInventory[w.id] || [];
+          const inv = inventorySummary.filter((item) => item.warehouseId === w.id);
           const totalQty = inv.reduce((s, i) => s + i.quantity, 0);
           return (
             <Link key={w.id} to={`/warehouses/${w.id}`} className="erp-card p-5 hover:shadow-md transition-shadow">
