@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   ParseUUIDPipe,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
@@ -23,6 +24,7 @@ import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Role } from 'src/auth/enums/role.enum';
 import { Roles } from 'src/auth/decorator/role.decorator';
 import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
+import type { ListQuery } from 'src/common/pagination';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -48,8 +50,8 @@ export class SuppliersController {
   @Get()
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   @ApiOperation({ summary: 'Fetch all suppliers' })
-  findAll(@GetUser() user: UserPayload) {
-    return this.suppliersService.findAll(user);
+  findAll(@GetUser() user: UserPayload, @Query() query: ListQuery) {
+    return this.suppliersService.findAll(user, query);
   }
 
   @Get(':id')

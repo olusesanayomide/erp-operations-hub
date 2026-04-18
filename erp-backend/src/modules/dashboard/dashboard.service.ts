@@ -23,11 +23,49 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return Number(value);
 }
 
+function getPreviousPeriodWindow() {
+  const currentEnd = new Date();
+  const currentStart = new Date(currentEnd);
+  currentStart.setDate(currentStart.getDate() - 30);
+
+  const previousStart = new Date(currentStart);
+  previousStart.setDate(previousStart.getDate() - 30);
+
+  return {
+    currentStart,
+    currentEnd,
+    previousStart,
+    previousEnd: currentStart,
+  };
+}
+
+function calculateTrend(current: number, previous: number) {
+  if (previous === 0) {
+    if (current > 0) return 100;
+    if (current < 0) return -100;
+    return 0;
+  }
+
+  return Math.round(((current - previous) / Math.abs(previous)) * 100);
+}
+
+function createTrend(current: number, previous: number, label = 'vs previous 30d') {
+  return {
+    value: calculateTrend(current, previous),
+    label,
+    current,
+    previous,
+  };
+}
+
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
   async getSummary(tenantId: string) {
+    const { currentStart, currentEnd, previousStart, previousEnd } =
+      getPreviousPeriodWindow();
+
     const [
       productCount,
       customerCount,
@@ -40,6 +78,20 @@ export class DashboardService {
       recentOrders,
       recentOrdersForTrend,
       recentPurchasesForTrend,
+      currentProductsCreated,
+      previousProductsCreated,
+      currentCustomersCreated,
+      previousCustomersCreated,
+      currentSuppliersCreated,
+      previousSuppliersCreated,
+      currentWarehousesCreated,
+      previousWarehousesCreated,
+      currentActiveOrdersCreated,
+      previousActiveOrdersCreated,
+      currentDraftPurchasesCreated,
+      previousDraftPurchasesCreated,
+      currentInventoryMovements,
+      previousInventoryMovements,
     ] = await Promise.all([
       this.prisma.product.count({ where: { tenantId } }),
       this.prisma.customer.count({ where: { tenantId } }),
@@ -112,6 +164,72 @@ export class DashboardService {
           totalAmount: true,
         },
       }),
+      this.prisma.product.count({
+        where: { tenantId, createdAt: { gte: currentStart, lt: currentEnd } },
+      }),
+      this.prisma.product.count({
+        where: { tenantId, createdAt: { gte: previousStart, lt: previousEnd } },
+      }),
+      this.prisma.customer.count({
+        where: { tenantId, createdAt: { gte: currentStart, lt: currentEnd } },
+      }),
+      this.prisma.customer.count({
+        where: { tenantId, createdAt: { gte: previousStart, lt: previousEnd } },
+      }),
+      this.prisma.supplier.count({
+        where: { tenantId, createdAt: { gte: currentStart, lt: currentEnd } },
+      }),
+      this.prisma.supplier.count({
+        where: { tenantId, createdAt: { gte: previousStart, lt: previousEnd } },
+      }),
+      this.prisma.warehouse.count({
+        where: { tenantId, createdAt: { gte: currentStart, lt: currentEnd } },
+      }),
+      this.prisma.warehouse.count({
+        where: { tenantId, createdAt: { gte: previousStart, lt: previousEnd } },
+      }),
+      this.prisma.order.count({
+        where: {
+          tenantId,
+          status: { in: ACTIVE_ORDER_STATUSES },
+          createdAt: { gte: currentStart, lt: currentEnd },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          tenantId,
+          status: { in: ACTIVE_ORDER_STATUSES },
+          createdAt: { gte: previousStart, lt: previousEnd },
+        },
+      }),
+      this.prisma.purchase.count({
+        where: {
+          tenantId,
+          status: PurchaseStatus.DRAFT,
+          createdAt: { gte: currentStart, lt: currentEnd },
+        },
+      }),
+      this.prisma.purchase.count({
+        where: {
+          tenantId,
+          status: PurchaseStatus.DRAFT,
+          createdAt: { gte: previousStart, lt: previousEnd },
+        },
+      }),
+      this.prisma.stockMovement.findMany({
+        where: { tenantId, createdAt: { gte: currentStart, lt: currentEnd } },
+        select: {
+          quantity: true,
+          type: true,
+        },
+      }),
+      this.prisma.stockMovement.findMany({
+        where: { tenantId, createdAt: { gte: previousStart, lt: previousEnd } },
+        select: {
+          quantity: true,
+          type: true,
+        },
+      }),
     ]);
 
     const availableQuantity = inventoryItems.reduce(
@@ -171,6 +289,22 @@ export class DashboardService {
       })),
     ];
 
+    const getNetInventoryMovement = (
+      movements: typeof currentInventoryMovements,
+    ) =>
+      movements.reduce((sum, movement) => {
+        if (movement.type === 'IN') return sum + movement.quantity;
+        if (movement.type === 'OUT') return sum - movement.quantity;
+        return sum + movement.quantity;
+      }, 0);
+
+    const currentNetInventoryMovement = getNetInventoryMovement(
+      currentInventoryMovements,
+    );
+    const previousNetInventoryMovement = getNetInventoryMovement(
+      previousInventoryMovements,
+    );
+
     return {
       counts: {
         products: productCount,
@@ -208,6 +342,28 @@ export class DashboardService {
               { month: '01', in: 0, out: 0 },
               { month: '02', in: 0, out: 0 },
             ],
+      trends: {
+        products: createTrend(currentProductsCreated, previousProductsCreated),
+        customers: createTrend(currentCustomersCreated, previousCustomersCreated),
+        suppliers: createTrend(currentSuppliersCreated, previousSuppliersCreated),
+        warehouses: createTrend(
+          currentWarehousesCreated,
+          previousWarehousesCreated,
+        ),
+        activeOrders: createTrend(
+          currentActiveOrdersCreated,
+          previousActiveOrdersCreated,
+        ),
+        draftPurchases: createTrend(
+          currentDraftPurchasesCreated,
+          previousDraftPurchasesCreated,
+        ),
+        availableInventory: createTrend(
+          currentNetInventoryMovement,
+          previousNetInventoryMovement,
+          'net stock vs previous 30d',
+        ),
+      },
     };
   }
 }

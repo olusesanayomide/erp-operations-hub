@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   ParseUUIDPipe,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { WarehousesService } from './warehouses.service';
@@ -23,6 +24,7 @@ import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/auth/decorator/role.decorator';
 import { Role } from 'src/auth/enums/role.enum';
 import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
+import type { ListQuery } from 'src/common/pagination';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -54,8 +56,8 @@ export class WarehousesController {
       'Retrieves all locations including a count of their inventory items.',
   })
   @ApiResponse({ status: 200, description: 'Return all warehouses.' })
-  findAll(@GetUser() user: UserPayload) {
-    return this.warehousesService.findAll(user);
+  findAll(@GetUser() user: UserPayload, @Query() query: ListQuery) {
+    return this.warehousesService.findAll(user, query);
   }
 
   @Get(':id')

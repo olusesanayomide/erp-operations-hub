@@ -1,6 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User, UserRole } from '@/shared/types/erp';
-import { ApiError, getStoredUser, setStoredUser } from '@/shared/lib/api';
+import {
+  AUTH_API_ERROR_EVENT,
+  ApiError,
+  getStoredUser,
+  setStoredUser,
+  type AuthApiErrorEventDetail,
+} from '@/shared/lib/api';
 import {
   clearCurrentUserRequest,
   getCurrentUser,
@@ -26,9 +33,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const AUTH_PROFILE_TIMEOUT_MS = 12000;
+const AUTH_PROFILE_TIMEOUT_MS = 120000;
 const AUTH_RESTORE_TIMEOUT_MESSAGE =
   'We could not verify your session. Please sign in again.';
+const AUTH_LOGIN_TIMEOUT_MESSAGE =
+  'Signed in, but we could not load your ERP profile. Please check that the backend is running and try again.';
+const AUTH_EXPIRED_MESSAGE =
+  'Your session has expired or is no longer valid. Please sign in again.';
 
 const rolePermissions: Record<UserRole, string[]> = {
   admin: ['*'],
@@ -55,6 +66,7 @@ const rolePermissions: Record<UserRole, string[]> = {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(() => getStoredUser<User>());
   const [isVerifiedSession, setIsVerifiedSession] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authError, setAuthError] = useState('');
   const authTransitionRef = useRef<((value: { success: boolean; error?: string }) => void) | null>(null);
   const hasResolvedInitialSessionRef = useRef(false);
+  const isHandlingForbiddenRef = useRef(false);
 
   useEffect(() => {
     if (!isSupabaseAuthConfigured || !supabase) {
@@ -83,12 +96,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authTransitionRef.current = null;
     };
 
-    const resolveCurrentUserWithTimeout = (accessToken: string) =>
+    const resolveCurrentUserWithTimeout = (accessToken: string, timeoutMessage: string) =>
       Promise.race([
         getCurrentUser(accessToken),
         new Promise<never>((_, reject) => {
           window.setTimeout(
-            () => reject(new Error(AUTH_RESTORE_TIMEOUT_MESSAGE)),
+            () => reject(new Error(timeoutMessage)),
             AUTH_PROFILE_TIMEOUT_MS,
           );
         }),
@@ -128,7 +141,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      void resolveCurrentUserWithTimeout(session.access_token)
+      void resolveCurrentUserWithTimeout(
+        session.access_token,
+        isBlockingAuthTransition ? AUTH_LOGIN_TIMEOUT_MESSAGE : AUTH_RESTORE_TIMEOUT_MESSAGE,
+      )
         .then((nextUser) => {
           if (!mounted) return;
           setStoredUser(nextUser);
@@ -222,13 +238,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     void logoutSupabase();
+    queryClient.clear();
     clearCurrentUserRequest();
     setStoredUser(null);
     setUser(null);
     setIsVerifiedSession(false);
     setAuthStatusMessage('');
     setAuthError('');
-  }, []);
+  }, [queryClient]);
 
   const refreshUser = useCallback(async () => {
     if (!isSupabaseAuthConfigured || !supabase) {
@@ -256,6 +273,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthError('');
     return nextUser;
   }, []);
+
+  useEffect(() => {
+    const handleAuthApiError = (event: Event) => {
+      const detail = (event as CustomEvent<AuthApiErrorEventDetail>).detail;
+
+      if (!detail) return;
+
+      if (detail.status === 401) {
+        authTransitionRef.current?.({
+          success: false,
+          error: AUTH_EXPIRED_MESSAGE,
+        });
+        authTransitionRef.current = null;
+        clearCurrentUserRequest();
+        void logoutSupabase();
+        queryClient.clear();
+        setStoredUser(null);
+        setUser(null);
+        setIsVerifiedSession(false);
+        setIsLoading(false);
+        setAuthStatusMessage('');
+        setAuthError(AUTH_EXPIRED_MESSAGE);
+        return;
+      }
+
+      if (detail.status === 403 && !isHandlingForbiddenRef.current) {
+        isHandlingForbiddenRef.current = true;
+
+        void refreshUser()
+          .catch(() => {
+            setAuthError(
+              detail.message ||
+                'Your permissions changed and could not be refreshed. Please sign in again.',
+            );
+          })
+          .finally(() => {
+            isHandlingForbiddenRef.current = false;
+          });
+      }
+    };
+
+    window.addEventListener(AUTH_API_ERROR_EVENT, handleAuthApiError);
+
+    return () => {
+      window.removeEventListener(AUTH_API_ERROR_EVENT, handleAuthApiError);
+    };
+  }, [queryClient, refreshUser]);
 
   const hasRole = useCallback((role: UserRole | UserRole[]) => {
     if (!isVerifiedSession || !user) return false;

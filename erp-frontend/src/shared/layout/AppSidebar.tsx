@@ -5,33 +5,72 @@ import { preloadRoute } from '@/app/routeModules';
 import { cn } from '@/shared/lib/utils';
 import {
   LayoutDashboard, Package, Boxes, ShoppingCart, Truck,
-  Users, Factory, Warehouse, Settings, ChevronLeft, LogOut, UserCircle, Building2
+  Users, Factory, Warehouse, Settings, ChevronLeft, LogOut, UserCircle, Building2, ChevronDown
 } from 'lucide-react';
 import { RoleBadge } from '@/shared/components/StatusBadge';
 
-const navItems = [
-  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Products', path: '/products', icon: Package },
-  { label: 'Inventory', path: '/inventory', icon: Boxes },
-  { label: 'Orders', path: '/orders', icon: ShoppingCart },
-  { label: 'Purchases', path: '/purchases', icon: Truck },
-  { label: 'Customers', path: '/customers', icon: Users },
-  { label: 'Suppliers', path: '/suppliers', icon: Factory },
-  { label: 'Warehouses', path: '/warehouses', icon: Warehouse },
-  { label: 'Users', path: '/users', icon: UserCircle },
-  { label: 'Settings', path: '/settings', icon: Settings },
+const navGroups = [
+  {
+    label: 'Overview',
+    items: [{ label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }],
+  },
+  {
+    label: 'Inventory',
+    items: [
+      { label: 'Products', path: '/products', icon: Package },
+      { label: 'Inventory', path: '/inventory', icon: Boxes },
+      { label: 'Warehouses', path: '/warehouses', icon: Warehouse },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { label: 'Orders', path: '/orders', icon: ShoppingCart },
+      { label: 'Purchases', path: '/purchases', icon: Truck },
+    ],
+  },
+  {
+    label: 'Directory',
+    items: [
+      { label: 'Customers', path: '/customers', icon: Users },
+      { label: 'Suppliers', path: '/suppliers', icon: Factory },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { label: 'Users', path: '/users', icon: UserCircle },
+      { label: 'Settings', path: '/settings', icon: Settings },
+    ],
+  },
 ];
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [closedGroups, setClosedGroups] = useState<string[]>([]);
   const { user, logout } = useAuth();
   const location = useLocation();
-  const items = user?.isPlatformAdmin
-    ? [...navItems, { label: 'Tenants', path: '/admin/tenants', icon: Building2 }]
-    : navItems;
+  const groups = user?.isPlatformAdmin
+    ? navGroups.map((group) =>
+        group.label === 'Admin'
+          ? {
+              ...group,
+              items: [...group.items, { label: 'Tenants', path: '/admin/tenants', icon: Building2 }],
+            }
+          : group,
+      )
+    : navGroups;
 
   const handleIntent = (path: string) => {
     void preloadRoute(path);
+  };
+
+  const toggleGroup = (label: string) => {
+    setClosedGroups((current) =>
+      current.includes(label)
+        ? current.filter((groupLabel) => groupLabel !== label)
+        : [...current, label],
+    );
   };
 
   return (
@@ -58,27 +97,53 @@ export function AppSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto scrollbar-thin">
-        {items.map(item => {
-          const isActive = location.pathname.startsWith(item.path);
+      <nav className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin">
+        {groups.map((group) => {
+          const isGroupActive = group.items.some((item) => location.pathname.startsWith(item.path));
+          const isOpen = collapsed || isGroupActive || !closedGroups.includes(group.label);
+
           return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onMouseEnter={() => handleIntent(item.path)}
-              onFocus={() => handleIntent(item.path)}
-              onTouchStart={() => handleIntent(item.path)}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-sidebar-accent text-sidebar-primary-foreground'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            <div key={group.label} className={cn(!collapsed && 'mb-3')}>
+              {!collapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  className="mb-1 flex w-full items-center justify-between px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted transition-colors hover:text-sidebar-foreground"
+                  aria-expanded={isOpen}
+                >
+                  <span>{group.label}</span>
+                  <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !isOpen && '-rotate-90')} />
+                </button>
               )}
-              title={collapsed ? item.label : undefined}
-            >
-              <item.icon className="h-4.5 w-4.5 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </NavLink>
+
+              {isOpen && (
+                <div className="space-y-0.5">
+                  {group.items.map(item => {
+                    const isActive = location.pathname.startsWith(item.path);
+                    return (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        onMouseEnter={() => handleIntent(item.path)}
+                        onFocus={() => handleIntent(item.path)}
+                        onTouchStart={() => handleIntent(item.path)}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-sidebar-accent text-sidebar-primary-foreground'
+                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                          collapsed && 'justify-center px-2'
+                        )}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <item.icon className="h-4.5 w-4.5 shrink-0" strokeWidth={2} />
+                        {!collapsed && <span className="truncate">{item.label}</span>}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>

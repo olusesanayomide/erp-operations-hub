@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
+import { PaginationControls } from '@/shared/components/PaginationControls';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { useAuth } from '@/app/providers/AuthContext';
@@ -11,7 +12,7 @@ import {
 } from '@/shared/ui/dialog';
 import { Label } from '@/shared/ui/label';
 import { toast } from 'sonner';
-import { commitProductImport, createProduct, listRawProducts, normalizeProduct, previewProductImport } from '@/shared/lib/erp-api';
+import { commitProductImport, createProduct, listPaginatedRawProducts, normalizeProduct, previewProductImport } from '@/shared/lib/erp-api';
 import { useSettings } from '@/app/providers/SettingsContext';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
@@ -19,12 +20,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 type ProductImportMode = 'create' | 'upsert';
 
 type ProductImportPreview = Awaited<ReturnType<typeof previewProductImport>>;
+const PAGE_SIZE = 25;
 
 export default function ProductsPage() {
   const { canPerform } = useAuth();
   const { formatMoney } = useSettings();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [form, setForm] = useState({
@@ -42,10 +45,16 @@ export default function ProductsPage() {
   const [preview, setPreview] = useState<ProductImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { data: rawProducts = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['products'],
-    queryFn: listRawProducts,
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: ['products', { page, pageSize: PAGE_SIZE, search }],
+    queryFn: () => listPaginatedRawProducts({ page, pageSize: PAGE_SIZE, search }),
   });
+  const rawProducts = data?.items ?? [];
+  const pagination = data?.meta ?? { page, pageSize: PAGE_SIZE, total: 0, totalPages: 1 };
 
   const createMutation = useMutation({
     mutationFn: createProduct,
@@ -87,11 +96,6 @@ export default function ProductsPage() {
     rawProducts
       .find((product) => product.id === productId)
       ?.inventoryItems?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
-
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku.toLowerCase().includes(search.toLowerCase())
-  );
 
   function resetImportDialog() {
     setImportMode('upsert');
@@ -137,7 +141,7 @@ export default function ProductsPage() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Products" description={`${products.length} products`}>
+      <PageHeader title="Products" description={`${pagination.total} products`}>
         {canPerform('products.create') && (
           <>
             <Dialog open={importDialogOpen} onOpenChange={(open) => {
@@ -395,7 +399,7 @@ export default function ProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
+              {products.map(p => (
                 <tr key={p.id} className="erp-table-row">
                   <td className="p-3">
                     <Link to={`/products/${p.id}`} className="font-medium text-primary hover:underline">{p.name}</Link>
@@ -419,7 +423,17 @@ export default function ProductsPage() {
             action={<RetryButton onClick={() => void refetch()} />}
           />
         )}
-        {!isLoading && !isError && filtered.length === 0 && <EmptyState icon={Package} title="No products found" description="Try adjusting your search" />}
+        {!isLoading && !isError && products.length === 0 && <EmptyState icon={Package} title="No products found" description="Try adjusting your search" />}
+        {!isLoading && !isError && pagination.total > 0 && (
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            isFetching={isFetching}
+            onPageChange={setPage}
+          />
+        )}
       </div>
     </div>
   );

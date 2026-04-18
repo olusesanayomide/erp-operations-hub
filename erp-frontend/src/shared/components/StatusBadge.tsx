@@ -36,9 +36,9 @@ export function StatusBadge({ status, className }: { status: BadgeStatus; classN
 
 export function RoleBadge({ role }: { role: string }) {
   const colors: Record<string, string> = {
-    admin: 'bg-primary/10 text-primary',
-    manager: 'bg-info/10 text-info',
-    staff: 'bg-muted text-muted-foreground',
+    admin: 'border border-primary/20 bg-primary text-primary-foreground shadow-sm',
+    manager: 'border border-info/20 bg-info/10 text-info',
+    staff: 'border border-border bg-muted text-muted-foreground',
   };
   return (
     <span className={cn(

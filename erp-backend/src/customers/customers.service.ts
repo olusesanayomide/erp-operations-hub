@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { PrismaService } from 'prisma/prisma.service';
@@ -12,6 +13,12 @@ import {
   CustomerImportPreviewResult,
 } from './customer-import';
 import { UserPayload } from 'src/auth/decorator/get-user.decorator';
+import {
+  createPaginatedResult,
+  getPaginationOptions,
+  hasListQuery,
+  ListQuery,
+} from 'src/common/pagination';
 
 @Injectable()
 export class CustomersService {
@@ -112,7 +119,39 @@ export class CustomersService {
     };
   }
 
-  async findAll(user: UserPayload) {
+  async findAll(user: UserPayload, query: ListQuery = {}) {
+    if (hasListQuery(query)) {
+      const options = getPaginationOptions(query);
+      const where: Prisma.CustomerWhereInput = {
+        tenantId: user.tenantId,
+        ...(options.search
+          ? {
+              OR: [
+                { name: { contains: options.search, mode: 'insensitive' } },
+                { email: { contains: options.search, mode: 'insensitive' } },
+                { phone: { contains: options.search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      } as const;
+      const [items, total] = await Promise.all([
+        this.prisma.customer.findMany({
+          where,
+          include: {
+            _count: {
+              select: { orders: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: options.skip,
+          take: options.pageSize,
+        }),
+        this.prisma.customer.count({ where }),
+      ]);
+
+      return createPaginatedResult(items, total, options);
+    }
+
     return this.prisma.customer.findMany({
       where: { tenantId: user.tenantId },
       include: {

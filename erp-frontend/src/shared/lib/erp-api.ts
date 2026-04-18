@@ -319,9 +319,74 @@ type BackendDashboardSummary = {
     draftCount: number;
   };
   stockTrend: Array<{ month: string; in: number; out: number }>;
+  trends: {
+    products: DashboardTrend;
+    customers: DashboardTrend;
+    suppliers: DashboardTrend;
+    warehouses: DashboardTrend;
+    activeOrders: DashboardTrend;
+    draftPurchases: DashboardTrend;
+    availableInventory: DashboardTrend;
+  };
+};
+
+type DashboardTrend = {
+  value: number;
+  label: string;
+  current: number;
+  previous: number;
+};
+
+export type ListPageParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+};
+
+export type PaginatedResponse<T> = {
+  items: T[];
+  meta: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export type SystemHealth = {
+  status: "ok" | "degraded";
+  api: "ok";
+  database: "ok" | "down";
+  checkedAt: string;
+  message?: string;
 };
 
 let currentUserRequest: Promise<User> | null = null;
+
+function buildListQuery(params: ListPageParams) {
+  const searchParams = new URLSearchParams();
+
+  if (params.page) searchParams.set("page", String(params.page));
+  if (params.pageSize) searchParams.set("pageSize", String(params.pageSize));
+  if (params.search?.trim()) searchParams.set("search", params.search.trim());
+  if (params.status?.trim() && params.status !== "all") {
+    searchParams.set("status", params.status.trim());
+  }
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+function mapPaginatedResponse<TInput, TOutput>(
+  response: PaginatedResponse<TInput>,
+  mapItem: (item: TInput) => TOutput,
+) {
+  return {
+    items: response.items.map(mapItem),
+    meta: response.meta,
+  } satisfies PaginatedResponse<TOutput>;
+}
 
 function normalizeAuthUser(data: BackendAuthUser): User {
   return {
@@ -784,6 +849,12 @@ export async function getCurrencySettings() {
   return apiRequest<BackendCurrencySettings>("/settings/currency");
 }
 
+export async function getSystemHealth() {
+  return apiRequest<SystemHealth>("/health", {
+    accessToken: null,
+  });
+}
+
 export async function listNotifications(limit = 12) {
   const items = await apiRequest<BackendNotification[]>(`/notifications?limit=${limit}`);
   return items.map(normalizeNotification);
@@ -823,6 +894,10 @@ export async function listProducts() {
 
 export async function listRawProducts() {
   return apiRequest<BackendProduct[]>("/products");
+}
+
+export async function listPaginatedRawProducts(params: ListPageParams) {
+  return apiRequest<PaginatedResponse<BackendProduct>>(`/products${buildListQuery(params)}`);
 }
 
 export async function getProductById(id: string) {
@@ -884,6 +959,11 @@ export async function listCustomers() {
   return items.map(normalizeCustomer);
 }
 
+export async function listPaginatedCustomers(params: ListPageParams) {
+  const response = await apiRequest<PaginatedResponse<BackendCustomer>>(`/customers${buildListQuery(params)}`);
+  return mapPaginatedResponse(response, normalizeCustomer);
+}
+
 export async function getCustomerById(id: string) {
   const item = await apiRequest<BackendCustomer>(`/customers/${id}`);
   return {
@@ -930,6 +1010,11 @@ export async function listSuppliers() {
   return items.map(normalizeSupplier);
 }
 
+export async function listPaginatedSuppliers(params: ListPageParams) {
+  const response = await apiRequest<PaginatedResponse<BackendSupplier>>(`/suppliers${buildListQuery(params)}`);
+  return mapPaginatedResponse(response, normalizeSupplier);
+}
+
 export async function getSupplierById(id: string) {
   const item = await apiRequest<BackendSupplier>(`/suppliers/${id}`);
   return {
@@ -954,6 +1039,11 @@ export async function createSupplier(payload: {
 export async function listWarehouses() {
   const items = await apiRequest<BackendWarehouse[]>("/warehouses");
   return items.map(normalizeWarehouse);
+}
+
+export async function listPaginatedWarehouses(params: ListPageParams) {
+  const response = await apiRequest<PaginatedResponse<BackendWarehouse>>(`/warehouses${buildListQuery(params)}`);
+  return mapPaginatedResponse(response, normalizeWarehouse);
 }
 
 export async function getWarehouseById(id: string) {
@@ -988,6 +1078,11 @@ export async function createWarehouse(payload: {
 export async function listOrders() {
   const items = await apiRequest<BackendOrder[]>("/orders");
   return items.map(normalizeOrder);
+}
+
+export async function listPaginatedOrders(params: ListPageParams) {
+  const response = await apiRequest<PaginatedResponse<BackendOrder>>(`/orders${buildListQuery(params)}`);
+  return mapPaginatedResponse(response, normalizeOrder);
 }
 
 export async function getOrderById(id: string) {
@@ -1029,6 +1124,16 @@ export async function updateOrderStatus(
 export async function listPurchases() {
   const items = await apiRequest<BackendPurchase[]>("/purchases");
   return items.map((item) =>
+    normalizePurchase({
+      ...item,
+      items: item.items || [],
+    }),
+  );
+}
+
+export async function listPaginatedPurchases(params: ListPageParams) {
+  const response = await apiRequest<PaginatedResponse<BackendPurchase>>(`/purchases${buildListQuery(params)}`);
+  return mapPaginatedResponse(response, (item) =>
     normalizePurchase({
       ...item,
       items: item.items || [],

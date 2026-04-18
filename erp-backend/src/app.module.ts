@@ -16,6 +16,7 @@ import { PrismaModule } from './common/prisma.module';
 import { SettingsModule } from './settings/settings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     SettingsModule,
     NotificationsModule,
     DashboardModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [

@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Product } from '@prisma/client';
+import { Prisma, Product } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 import { ProductImportMode } from './dto/product.dto';
 import {
@@ -11,12 +11,50 @@ import {
   ProductImportPreviewResult,
 } from './product-import';
 import { UserPayload } from 'src/auth/decorator/get-user.decorator';
+import {
+  createPaginatedResult,
+  getPaginationOptions,
+  hasListQuery,
+  ListQuery,
+} from 'src/common/pagination';
 
 @Injectable()
 export class ProductService {
   constructor(private prisma: PrismaService) {}
 
-  async getAll(user: UserPayload): Promise<any[]> {
+  async getAll(user: UserPayload, query: ListQuery = {}): Promise<any> {
+    if (hasListQuery(query)) {
+      const options = getPaginationOptions(query);
+      const where: Prisma.ProductWhereInput = {
+        tenantId: user.tenantId,
+        ...(options.search
+          ? {
+              OR: [
+                { name: { contains: options.search, mode: 'insensitive' } },
+                { sku: { contains: options.search, mode: 'insensitive' } },
+                { category: { contains: options.search, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      } as const;
+      const [items, total] = await Promise.all([
+        this.prisma.product.findMany({
+          where,
+          include: {
+            inventoryItems: true,
+            orderItems: true,
+            stockMovements: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: options.skip,
+          take: options.pageSize,
+        }),
+        this.prisma.product.count({ where }),
+      ]);
+
+      return createPaginatedResult(items, total, options);
+    }
+
     return this.prisma.product.findMany({
       where: { tenantId: user.tenantId },
       include: {

@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { OrdersService } from './order.service';
@@ -25,6 +26,7 @@ import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Role } from 'src/auth/enums/role.enum';
 import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
+import type { ListQuery } from 'src/common/pagination';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -41,8 +43,8 @@ export class OrdersController {
       'Returns a history of all customer orders, including their current statuses (PENDING, SHIPPED, etc.).',
   })
   @ApiResponse({ status: 200, description: 'List of orders retrieved.' })
-  findAll(@GetUser() user: UserPayload) {
-    return this.ordersService.getOrders(user.tenantId);
+  findAll(@GetUser() user: UserPayload, @Query() query: ListQuery) {
+    return this.ordersService.getOrders(user.tenantId, query);
   }
 
   @Get(':id')

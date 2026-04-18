@@ -13,6 +13,15 @@ const API_BASE_URL = (() => {
 })();
 
 const USER_STORAGE_KEY = "erp.auth.user";
+const DEFAULT_API_TIMEOUT_MS = 20000;
+const API_TIMEOUT_MESSAGE =
+  "The server is taking too long to respond. Please try again.";
+export const AUTH_API_ERROR_EVENT = "manifest:auth-api-error";
+
+export type AuthApiErrorEventDetail = {
+  status: 401 | 403;
+  message: string;
+};
 
 export class ApiError extends Error {
   status: number;
@@ -63,7 +72,51 @@ async function resolveAuthToken() {
 type RequestInitWithJson = RequestInit & {
   accessToken?: string | null;
   body?: BodyInit | object | null;
+  timeoutMs?: number;
 };
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function createTimeoutSignal(
+  externalSignal: AbortSignal | null | undefined,
+  timeoutMs: number,
+) {
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
+
+  const abortFromExternalSignal = () => {
+    controller.abort(externalSignal?.reason);
+  };
+
+  if (externalSignal?.aborted) {
+    abortFromExternalSignal();
+  } else {
+    externalSignal?.addEventListener("abort", abortFromExternalSignal, { once: true });
+    timeoutId = window.setTimeout(() => {
+      controller.abort(new DOMException(API_TIMEOUT_MESSAGE, "TimeoutError"));
+    }, timeoutMs);
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      externalSignal?.removeEventListener("abort", abortFromExternalSignal);
+    },
+  };
+}
+
+function notifyAuthApiError(detail: AuthApiErrorEventDetail) {
+  window.dispatchEvent(
+    new CustomEvent<AuthApiErrorEventDetail>(AUTH_API_ERROR_EVENT, {
+      detail,
+    }),
+  );
+}
 
 export async function apiRequest<T>(
   path: string,
@@ -82,21 +135,37 @@ export async function apiRequest<T>(
   }
 
   let response: Response;
+  const timeoutMs = init.timeoutMs ?? DEFAULT_API_TIMEOUT_MS;
+  const { accessToken: _accessToken, timeoutMs: _timeoutMs, signal: externalSignal, ...fetchInit } = init;
+  const timeout = createTimeoutSignal(externalSignal, timeoutMs);
 
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
+      ...fetchInit,
       headers,
+      signal: timeout.signal,
       body:
         init.body && typeof init.body === "object" && !(init.body instanceof FormData)
           ? JSON.stringify(init.body)
           : init.body ?? undefined,
     });
-  } catch {
+  } catch (error) {
+    if (isAbortError(error) || timeout.signal.reason instanceof DOMException) {
+      const reason = timeout.signal.reason;
+      throw new ApiError(
+        reason instanceof DOMException && reason.name === "TimeoutError"
+          ? API_TIMEOUT_MESSAGE
+          : "The request was cancelled before it completed.",
+        0,
+      );
+    }
+
     throw new ApiError(
       `Unable to reach the ERP backend at ${API_BASE_URL}. Make sure the API server is running.`,
       0,
     );
+  } finally {
+    timeout.cleanup();
   }
 
   if (!response.ok) {
@@ -118,6 +187,13 @@ export async function apiRequest<T>(
       } catch {
         // ignore secondary parsing errors
       }
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      notifyAuthApiError({
+        status: response.status,
+        message,
+      });
     }
 
     throw new ApiError(message, response.status);

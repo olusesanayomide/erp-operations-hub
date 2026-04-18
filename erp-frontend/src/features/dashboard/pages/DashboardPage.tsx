@@ -11,7 +11,7 @@ import {
   Package, Boxes, AlertTriangle, ShoppingCart, Truck, Users,
   Factory, Warehouse, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, CartesianGrid, Legend, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { getDashboardSummary } from '@/shared/lib/erp-api';
 import type { OrderStatus, StockStatus } from '@/shared/types/erp';
 
@@ -119,6 +119,10 @@ export default function DashboardPage() {
     { month: '02', in: 0, out: 0 },
   ];
 
+  const totalOrdersByStatus = ordersByStatus.reduce((total, status) => total + status.value, 0);
+  const lowStockCount = summary?.inventory.lowStockCount ?? 0;
+  const draftPurchaseCount = summary?.purchases.draftCount ?? 0;
+
   const quickActions = [
     { label: 'New Order', icon: ShoppingCart, path: '/orders/new', perm: 'orders.create' },
     { label: 'New Purchase', icon: Truck, path: '/purchases/new', perm: 'purchases.create' },
@@ -135,39 +139,70 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard title="Total Products" value={summary?.counts.products ?? 0} icon={Package} />
-        <KPICard title="Available Inventory" value={(summary?.inventory.availableQuantity ?? 0).toLocaleString()} icon={Boxes} />
-        <KPICard title="Reserved Inventory" value={(summary?.inventory.reservedQuantity ?? 0).toLocaleString()} icon={Boxes} />
-        <KPICard title="Low Stock Items" value={summary?.inventory.lowStockCount ?? 0} icon={AlertTriangle} variant={(summary?.inventory.lowStockCount ?? 0) > 0 ? 'warning' : 'default'} />
-        <KPICard title="Active Orders" value={summary?.orders.activeCount ?? 0} icon={ShoppingCart} />
-        <KPICard title="Draft Purchases" value={summary?.purchases.draftCount ?? 0} icon={Truck} variant={(summary?.purchases.draftCount ?? 0) > 0 ? 'warning' : 'default'} />
-        <KPICard title="Customers" value={summary?.counts.customers ?? 0} icon={Users} />
-        <KPICard title="Suppliers" value={summary?.counts.suppliers ?? 0} icon={Factory} />
-        <KPICard title="Warehouses" value={summary?.counts.warehouses ?? 0} icon={Warehouse} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <KPICard title="Total Products" value={summary?.counts.products ?? 0} icon={Package} trend={summary?.trends.products} description={summary?.trends.products?.label ?? 'catalog'} />
+        <KPICard title="Available Inventory" value={(summary?.inventory.availableQuantity ?? 0).toLocaleString()} icon={Boxes} trend={summary?.trends.availableInventory} description={summary?.trends.availableInventory?.label ?? 'sellable'} />
+        <KPICard title="Reserved Inventory" value={(summary?.inventory.reservedQuantity ?? 0).toLocaleString()} icon={Boxes} description="committed" />
+        <KPICard title="Low Stock Items" value={lowStockCount} icon={AlertTriangle} variant={lowStockCount > 0 ? 'warning' : 'success'} description={lowStockCount > 0 ? 'needs action' : 'healthy'} />
+        <KPICard title="Active Orders" value={summary?.orders.activeCount ?? 0} icon={ShoppingCart} trend={summary?.trends.activeOrders} description={summary?.trends.activeOrders?.label ?? 'open flow'} />
+        <KPICard title="Draft Purchases" value={draftPurchaseCount} icon={Truck} variant={draftPurchaseCount > 0 ? 'warning' : 'default'} trend={summary?.trends.draftPurchases} description={summary?.trends.draftPurchases?.label ?? 'awaiting action'} />
+        <KPICard title="Customers" value={summary?.counts.customers ?? 0} icon={Users} trend={summary?.trends.customers} description={summary?.trends.customers?.label ?? 'accounts'} />
+        <KPICard title="Suppliers" value={summary?.counts.suppliers ?? 0} icon={Factory} trend={summary?.trends.suppliers} description={summary?.trends.suppliers?.label ?? 'vendors'} />
+        <KPICard title="Warehouses" value={summary?.counts.warehouses ?? 0} icon={Warehouse} trend={summary?.trends.warehouses} description={summary?.trends.warehouses?.label ?? 'locations'} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="erp-card p-5 lg:col-span-2">
           <h3 className="erp-section-title">Order vs Purchase Value</h3>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={stockTrend}>
-              <XAxis dataKey="month" axisLine={false} tickLine={false} className="text-xs" />
-              <YAxis axisLine={false} tickLine={false} className="text-xs" />
+            <BarChart data={stockTrend} barGap={8} barCategoryGap="28%">
+              <CartesianGrid vertical={false} stroke="hsl(220,28%,89%)" strokeDasharray="3 3" />
+              <XAxis
+                dataKey="month"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'hsl(224,18%,22%)', fontSize: 12, fontWeight: 600 }}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'hsl(224,18%,22%)', fontSize: 12, fontWeight: 600 }}
+              />
               <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(220,13%,91%)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
-              <Bar dataKey="in" name="Purchases" fill="hsl(152,60%,40%)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="out" name="Orders" fill="hsl(0,72%,51%)" radius={[4, 4, 0, 0]} />
+              <Legend
+                verticalAlign="top"
+                align="right"
+                iconType="circle"
+                wrapperStyle={{ color: 'hsl(224,18%,22%)', fontSize: 12, fontWeight: 600, paddingBottom: 12 }}
+              />
+              <Bar dataKey="in" name="Purchases" fill="hsl(152,60%,40%)" radius={[8, 8, 0, 0]} barSize={30} />
+              <Bar dataKey="out" name="Orders" fill="hsl(223,100%,61%)" radius={[8, 8, 0, 0]} barSize={30} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="erp-card p-5">
           <h3 className="erp-section-title">Orders by Status</h3>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={210}>
             <PieChart>
-              <Pie data={ordersByStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={40}>
+              <Pie
+                data={ordersByStatus}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={76}
+                innerRadius={60}
+                paddingAngle={2}
+              >
                 {ordersByStatus.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
               </Pie>
+              <text x="50%" y="48%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-950 text-xl font-bold">
+                {totalOrdersByStatus}
+              </text>
+              <text x="50%" y="60%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-500 text-xs font-semibold">
+                Total Orders
+              </text>
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
@@ -206,7 +241,7 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-2">
             {lowStockItems.slice(0, 5).map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30">
+              <div key={item.id} className="flex items-center justify-between rounded-lg border border-warning/20 bg-warning/10 p-2.5">
                 <div>
                   <p className="text-sm font-medium">{item.productName}</p>
                   <p className="text-xs text-muted-foreground">{item.warehouseName}</p>

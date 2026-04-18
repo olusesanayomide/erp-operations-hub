@@ -5,6 +5,7 @@ import {
   Post,
   Param,
   Get,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
@@ -23,6 +24,7 @@ import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Role } from 'src/auth/enums/role.enum';
 import { Roles } from 'src/auth/decorator/role.decorator';
 import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
+import type { ListQuery } from 'src/common/pagination';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -42,8 +44,8 @@ export class PurchaseContoller {
     status: 200,
     description: 'Purchase orders retrieved successfully.',
   })
-  async findAll(@GetUser() user: UserPayload) {
-    return await this.purchaseService.findAll(user.tenantId);
+  async findAll(@GetUser() user: UserPayload, @Query() query: ListQuery) {
+    return await this.purchaseService.findAll(user.tenantId, query);
   }
 
   @Post()

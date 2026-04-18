@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -27,6 +28,7 @@ import { Role } from 'src/auth/enums/role.enum';
 import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
+import type { ListQuery } from 'src/common/pagination';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -43,8 +45,11 @@ export class ProductController {
       'Retrieves the full catalog of products available in the system.',
   })
   @ApiResponse({ status: 200, description: 'Products retrieved successfully.' })
-  async getAllProducts(@GetUser() user: UserPayload) {
-    return this.productService.getAll(user);
+  async getAllProducts(
+    @GetUser() user: UserPayload,
+    @Query() query: ListQuery,
+  ) {
+    return this.productService.getAll(user, query);
   }
 
   @Post('import/preview')

@@ -10,6 +10,12 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import {
+  createPaginatedResult,
+  getPaginationOptions,
+  hasListQuery,
+  ListQuery,
+} from 'src/common/pagination';
 import { OrderLifecycleStatus } from './order-status.enum';
 import { CreateOrderDto } from './dto/order.dto';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -289,7 +295,47 @@ export class OrdersService {
     return orderItem;
   }
 
-  async getOrders(tenantId: string) {
+  async getOrders(tenantId: string, query: ListQuery = {}) {
+    if (hasListQuery(query)) {
+      const options = getPaginationOptions(query);
+      const requestedStatus = query.status?.trim().toUpperCase();
+      const status = Object.values(OrderStatus).includes(
+        requestedStatus as OrderStatus,
+      )
+        ? (requestedStatus as OrderStatus)
+        : undefined;
+      const where: Prisma.OrderWhereInput = {
+        tenantId,
+        ...(status ? { status } : {}),
+        ...(options.search
+          ? {
+              OR: [
+                { id: { contains: options.search, mode: 'insensitive' } },
+                {
+                  customer: {
+                    is: {
+                      name: { contains: options.search, mode: 'insensitive' },
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+      } as const;
+      const [items, total] = await Promise.all([
+        this.prisma.order.findMany({
+          where,
+          include: { items: true, customer: true },
+          orderBy: { createdAt: 'desc' },
+          skip: options.skip,
+          take: options.pageSize,
+        }),
+        this.prisma.order.count({ where }),
+      ]);
+
+      return createPaginatedResult(items, total, options);
+    }
+
     return this.prisma.order.findMany({
       where: { tenantId },
       include: { items: true },

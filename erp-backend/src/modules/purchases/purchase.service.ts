@@ -7,11 +7,18 @@ import {
   NotificationEntityType,
   NotificationType,
   Prisma,
+  PurchaseStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { PurchaseLifecycleStatus } from './purchase-status.enum';
 import { NotificationsService } from '../../notifications/notifications.service';
+import {
+  createPaginatedResult,
+  getPaginationOptions,
+  hasListQuery,
+  ListQuery,
+} from 'src/common/pagination';
 
 const PURCHASE_STATUS_TRANSITIONS: Record<
   PurchaseLifecycleStatus,
@@ -62,7 +69,60 @@ export class PurchaseService {
     return `${prefix}-${String(existingCount + 1).padStart(4, '0')}`;
   }
 
-  async findAll(tenantId: string) {
+  async findAll(tenantId: string, query: ListQuery = {}) {
+    if (hasListQuery(query)) {
+      const options = getPaginationOptions(query);
+      const requestedStatus = query.status?.trim().toUpperCase();
+      const status = Object.values(PurchaseStatus).includes(
+        requestedStatus as PurchaseStatus,
+      )
+        ? (requestedStatus as PurchaseStatus)
+        : undefined;
+      const where: Prisma.PurchaseWhereInput = {
+        tenantId,
+        ...(status ? { status } : {}),
+        ...(options.search
+          ? {
+              OR: [
+                {
+                  purchaseOrder: {
+                    contains: options.search,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  supplier: {
+                    is: {
+                      name: { contains: options.search, mode: 'insensitive' },
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+      } as const;
+      const [items, total] = await Promise.all([
+        this.prisma.purchase.findMany({
+          where,
+          include: {
+            supplier: true,
+            warehouse: true,
+            _count: {
+              select: { items: true },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          skip: options.skip,
+          take: options.pageSize,
+        }),
+        this.prisma.purchase.count({ where }),
+      ]);
+
+      return createPaginatedResult(items, total, options);
+    }
+
     return this.prisma.purchase.findMany({
       where: { tenantId },
       include: {

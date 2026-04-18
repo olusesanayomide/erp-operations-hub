@@ -473,37 +473,40 @@ export default function InventoryPage() {
       </p>
 
       <div className="erp-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr className="erp-table-header">
-              <th className="text-left p-3">Product</th>
-              <th className="text-left p-3">SKU</th>
-              <th className="text-left p-3">Warehouse</th>
-              <th className="text-right p-3">Available</th>
-              <th className="text-right p-3">Reserved</th>
-              <th className="text-right p-3">On Hand</th>
-              <th className="text-right p-3">Min Stock</th>
-              <th className="text-left p-3">Status</th>
-            </tr></thead>
-            <tbody>
-              {filtered.map((item) => (
-                <tr key={item.id} className="erp-table-row">
-                  <td className="p-3 text-sm font-medium">{item.product?.name}</td>
-                  <td className="p-3 text-sm text-muted-foreground font-mono">{item.product?.sku}</td>
-                  <td className="p-3 text-sm">{item.warehouse?.name}</td>
-                  <td className={`p-3 text-sm text-right font-semibold ${item.stockStatus === 'low-stock' ? 'text-warning' : item.stockStatus === 'out-of-stock' ? 'text-destructive' : ''}`}>
-                    {item.quantity}
-                  </td>
-                  <td className="p-3 text-sm text-right">{item.reservedQuantity}</td>
-                  <td className="p-3 text-sm text-right font-medium">{item.onHandQuantity}</td>
-                  <td className="p-3 text-sm text-right text-muted-foreground">{item.minStock}</td>
-                  <td className="p-3"><StatusBadge status={item.stockStatus} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>}
+        {isLoading ? (
+          <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr className="erp-table-header">
+                <th className="text-left p-3">Product</th>
+                <th className="text-left p-3">SKU</th>
+                <th className="text-left p-3">Warehouse</th>
+                <th className="text-right p-3">Available</th>
+                <th className="text-right p-3">Reserved</th>
+                <th className="text-right p-3">On Hand</th>
+                <th className="text-right p-3">Min Stock</th>
+                <th className="text-left p-3">Status</th>
+              </tr></thead>
+              <tbody>
+                {filtered.map((item) => (
+                  <tr key={item.id} className="erp-table-row">
+                    <td className="p-3 text-sm font-medium">{item.product?.name}</td>
+                    <td className="p-3 text-sm text-muted-foreground font-mono">{item.product?.sku}</td>
+                    <td className="p-3 text-sm">{item.warehouse?.name}</td>
+                    <td className={`p-3 text-sm text-right font-semibold ${item.stockStatus === 'low-stock' ? 'text-warning' : item.stockStatus === 'out-of-stock' ? 'text-destructive' : ''}`}>
+                      {item.quantity}
+                    </td>
+                    <td className="p-3 text-sm text-right">{item.reservedQuantity}</td>
+                    <td className="p-3 text-sm text-right font-medium">{item.onHandQuantity}</td>
+                    <td className="p-3 text-sm text-right text-muted-foreground">{item.minStock}</td>
+                    <td className="p-3"><StatusBadge status={item.stockStatus} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         {isError && (
           <ErrorState
             title="Unable to load inventory"

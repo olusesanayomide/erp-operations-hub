@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
+import { PaginationControls } from '@/shared/components/PaginationControls';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import {
@@ -20,7 +21,7 @@ import { toast } from 'sonner';
 import {
   commitCustomerImport,
   createCustomer,
-  listCustomers,
+  listPaginatedCustomers,
   previewCustomerImport,
 } from '@/shared/lib/erp-api';
 import { ScrollArea } from '@/shared/ui/scroll-area';
@@ -35,11 +36,13 @@ import {
 
 type CustomerImportMode = 'create' | 'upsert';
 type CustomerImportPreview = Awaited<ReturnType<typeof previewCustomerImport>>;
+const PAGE_SIZE = 25;
 
 export default function CustomersPage() {
   const { canPerform } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', address: '' });
@@ -49,10 +52,16 @@ export default function CustomersPage() {
   const [preview, setPreview] = useState<CustomerImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { data: customers = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['customers'],
-    queryFn: listCustomers,
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: ['customers', { page, pageSize: PAGE_SIZE, search }],
+    queryFn: () => listPaginatedCustomers({ page, pageSize: PAGE_SIZE, search }),
   });
+  const customers = data?.items ?? [];
+  const pagination = data?.meta ?? { page, pageSize: PAGE_SIZE, total: 0, totalPages: 1 };
 
   const createMutation = useMutation({
     mutationFn: createCustomer,
@@ -88,12 +97,6 @@ export default function CustomersPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
-
-  const filtered = customers.filter(
-    (customer) =>
-      customer.name.toLowerCase().includes(search.toLowerCase()) ||
-      customer.email.toLowerCase().includes(search.toLowerCase()),
-  );
 
   function resetImportDialog() {
     setImportMode('upsert');
@@ -142,7 +145,7 @@ export default function CustomersPage() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Customers" description={`${customers.length} customers`}>
+      <PageHeader title="Customers" description={`${pagination.total} customers`}>
         {canPerform('customers.create') && (
           <>
             <Dialog
@@ -552,7 +555,7 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((customer) => (
+              {customers.map((customer) => (
                 <tr key={customer.id} className="erp-table-row">
                   <td className="p-3">
                     <Link
@@ -585,11 +588,21 @@ export default function CustomersPage() {
             action={<RetryButton onClick={() => void refetch()} />}
           />
         )}
-        {!isLoading && !isError && filtered.length === 0 && (
+        {!isLoading && !isError && customers.length === 0 && (
           <EmptyState
             icon={Users}
             title="No customers found"
             description="Add your first customer"
+          />
+        )}
+        {!isLoading && !isError && pagination.total > 0 && (
+          <PaginationControls
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            isFetching={isFetching}
+            onPageChange={setPage}
           />
         )}
       </div>

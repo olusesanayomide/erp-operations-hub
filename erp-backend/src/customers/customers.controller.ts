@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   ParseUUIDPipe,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
@@ -24,6 +25,7 @@ import { RolesGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/auth/decorator/role.decorator';
 import { Role } from 'src/auth/enums/role.enum';
 import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
+import type { ListQuery } from 'src/common/pagination';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -97,8 +99,8 @@ export class CustomersController {
       'Returns a list of all registered customers with their total order counts.',
   })
   @ApiResponse({ status: 200, description: 'List retrieved successfully.' })
-  findAll(@GetUser() user: UserPayload) {
-    return this.customersService.findAll(user);
+  findAll(@GetUser() user: UserPayload, @Query() query: ListQuery) {
+    return this.customersService.findAll(user, query);
   }
 
   @Get(':id')
