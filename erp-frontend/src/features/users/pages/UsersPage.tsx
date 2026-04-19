@@ -42,12 +42,18 @@ export default function UsersPage() {
     setEditRole(editingUser.role);
   }, [editingUser]);
 
-  const updateMutation = useMutation({
-    mutationFn: (payload: { id: string; name: string; role: UserRole }) =>
-      updateUser(payload.id, {
-        name: payload.name,
-        role: payload.role.toUpperCase() as 'ADMIN' | 'MANAGER' | 'STAFF',
-      }),
+	  const updateMutation = useMutation({
+	    mutationFn: (payload: {
+	      id: string;
+	      name: string;
+	      role: UserRole;
+	      expectedUpdatedAt?: string;
+	    }) =>
+	      updateUser(payload.id, {
+	        name: payload.name,
+	        role: payload.role.toUpperCase() as 'ADMIN' | 'MANAGER' | 'STAFF',
+	        expectedUpdatedAt: payload.expectedUpdatedAt,
+	      }),
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['users'], (current: typeof users | undefined) =>
         (current || []).map((item) =>
@@ -92,10 +98,11 @@ export default function UsersPage() {
     }
 
     updateMutation.mutate({
-      id: editingUser.id,
-      name: editName.trim(),
-      role: editRole,
-    });
+	      id: editingUser.id,
+	      name: editName.trim(),
+	      role: editRole,
+	      expectedUpdatedAt: editingUser.concurrencyStamp,
+	    });
   };
 
   return (
@@ -218,7 +225,7 @@ export default function UsersPage() {
                     >
                       Cancel
                     </Button>
-                    <Button onClick={handleSave} disabled={updateMutation.isPending}>
+                    <Button requiresOnline onClick={handleSave} disabled={updateMutation.isPending}>
                       {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>

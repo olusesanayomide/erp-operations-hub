@@ -80,13 +80,18 @@ export class PurchaseContoller {
     status: 400,
     description: 'Order already received or cancelled.',
   })
-  async receive(@Param('id') id: string, @GetUser() user: UserPayload) {
-    return await this.purchaseService.recievePurchase(
-      user.tenantId,
-      user.userId,
-      id,
-    );
-  }
+	  async receive(
+	    @Param('id') id: string,
+	    @Body() dto: Partial<UpdatePurchaseStatusDto>,
+	    @GetUser() user: UserPayload,
+	  ) {
+	    return await this.purchaseService.recievePurchase(
+	      user.tenantId,
+	      user.userId,
+	      id,
+	      dto.expectedUpdatedAt,
+	    );
+	  }
 
   @Patch(':id/status')
   @Roles(Role.ADMIN, Role.MANAGER)
@@ -110,10 +115,11 @@ export class PurchaseContoller {
   ) {
     return await this.purchaseService.updateStatus(
       user.tenantId,
-      user.userId,
-      id,
-      dto.status,
-    );
+	      user.userId,
+	      id,
+	      dto.status,
+	      dto.expectedUpdatedAt,
+	    );
   }
 
   @Get(':id')

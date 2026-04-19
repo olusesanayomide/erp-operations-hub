@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { OFFLINE_MESSAGE, isBrowserOnline } from "./online-status";
 
 const DEFAULT_LOCAL_API_BASE_URL = "http://localhost:3000";
 
@@ -16,6 +17,7 @@ const USER_STORAGE_KEY = "erp.auth.user";
 const DEFAULT_API_TIMEOUT_MS = 20000;
 const API_TIMEOUT_MESSAGE =
   "The server is taking too long to respond. Please try again.";
+const API_CANCELLED_MESSAGE = "The request was cancelled before it completed.";
 export const AUTH_API_ERROR_EVENT = "manifest:auth-api-error";
 
 export type AuthApiErrorEventDetail = {
@@ -31,6 +33,11 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
   }
+}
+
+function isReadRequest(method: string | undefined) {
+  const normalizedMethod = method?.toUpperCase() ?? "GET";
+  return normalizedMethod === "GET" || normalizedMethod === "HEAD";
 }
 
 export function getApiBaseUrl() {
@@ -75,8 +82,20 @@ type RequestInitWithJson = RequestInit & {
   timeoutMs?: number;
 };
 
+function hasErrorName(error: unknown, name: string) {
+  return error instanceof Error && error.name === name;
+}
+
 function isAbortError(error: unknown) {
-  return error instanceof DOMException && error.name === "AbortError";
+  return (
+    error instanceof DOMException && error.name === "AbortError"
+  ) || hasErrorName(error, "AbortError");
+}
+
+function isTimeoutError(error: unknown) {
+  return (
+    error instanceof DOMException && error.name === "TimeoutError"
+  ) || hasErrorName(error, "TimeoutError");
 }
 
 function createTimeoutSignal(
@@ -122,6 +141,10 @@ export async function apiRequest<T>(
   path: string,
   init: RequestInitWithJson = {},
 ): Promise<T> {
+  if (!isBrowserOnline() && !isReadRequest(init.method)) {
+    throw new ApiError(OFFLINE_MESSAGE, 0);
+  }
+
   const token =
     init.accessToken !== undefined ? init.accessToken : await resolveAuthToken();
   const headers = new Headers(init.headers);
@@ -150,12 +173,16 @@ export async function apiRequest<T>(
           : init.body ?? undefined,
     });
   } catch (error) {
-    if (isAbortError(error) || timeout.signal.reason instanceof DOMException) {
+    const abortReason = timeout.signal.reason;
+
+    if (isTimeoutError(error) || isTimeoutError(abortReason)) {
+      throw new ApiError(API_TIMEOUT_MESSAGE, 0);
+    }
+
+    if (isAbortError(error) || timeout.signal.aborted) {
       const reason = timeout.signal.reason;
       throw new ApiError(
-        reason instanceof DOMException && reason.name === "TimeoutError"
-          ? API_TIMEOUT_MESSAGE
-          : "The request was cancelled before it completed.",
+        isTimeoutError(reason) ? API_TIMEOUT_MESSAGE : API_CANCELLED_MESSAGE,
         0,
       );
     }

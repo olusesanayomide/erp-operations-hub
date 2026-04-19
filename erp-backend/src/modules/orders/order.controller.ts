@@ -118,9 +118,10 @@ export class OrdersController {
   ) {
     return this.ordersService.updateStatus(
       user.tenantId,
-      user.userId,
-      orderId,
-      dto.status,
-    );
+	      user.userId,
+	      orderId,
+	      dto.status,
+	      dto.expectedUpdatedAt,
+	    );
   }
 }

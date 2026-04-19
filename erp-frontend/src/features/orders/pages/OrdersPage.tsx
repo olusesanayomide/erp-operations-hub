@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
+import { ReferenceDataWarning } from '@/shared/components/ReferenceDataWarning';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -22,18 +23,16 @@ export default function OrdersPage() {
     queryFn: listOrders,
   });
 
-  const { data: customers = [], isLoading: isCustomersLoading, isError: isCustomersError, error: customersError, refetch: refetchCustomers } = useQuery({
+  const { data: customers = [], isError: isCustomersError } = useQuery({
     queryKey: ['customers'],
     queryFn: listCustomers,
   });
 
-  const { data: warehouses = [], isLoading: isWarehousesLoading, isError: isWarehousesError, error: warehousesError, refetch: refetchWarehouses } = useQuery({
+  const { data: warehouses = [], isError: isWarehousesError } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   });
-  const isLoading = isOrdersLoading || isCustomersLoading || isWarehousesLoading;
-  const isError = isOrdersError || isCustomersError || isWarehousesError;
-  const loadError = (ordersError || customersError || warehousesError) as Error | null;
+  const isReferenceDataError = isCustomersError || isWarehousesError;
 
   const filtered = orders.filter((order) => {
     const customer = order.customer || customers.find((item) => item.id === order.customerId);
@@ -53,7 +52,9 @@ export default function OrdersPage() {
         )}
       </PageHeader>
 
-      <div className="flex flex-wrap gap-3 mb-4">
+      {isReferenceDataError && <ReferenceDataWarning />}
+
+	      <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
@@ -91,8 +92,8 @@ export default function OrdersPage() {
                 return (
                   <tr key={order.id} className="erp-table-row">
                     <td className="p-3"><Link to={`/orders/${order.id}`} className="font-medium text-primary hover:underline text-sm">{order.orderNumber}</Link></td>
-                    <td className="p-3 text-sm">{customer?.name}</td>
-                    <td className="p-3 text-sm text-muted-foreground">{warehouse?.name}</td>
+	                    <td className="p-3 text-sm">{customer?.name ?? 'Unknown customer'}</td>
+	                    <td className="p-3 text-sm text-muted-foreground">{warehouse?.name ?? 'Unknown warehouse'}</td>
                     <td className="p-3 text-sm text-right">{order.items.length}</td>
                     <td className="p-3 text-sm text-right font-medium">{formatMoney(order.totalAmount)}</td>
                     <td className="p-3"><StatusBadge status={order.status} /></td>
@@ -103,15 +104,15 @@ export default function OrdersPage() {
             </tbody>
           </table>
         </div>
-        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={7} /></div>}
-        {isError && (
-          <ErrorState
-            title="Unable to load orders"
-            description={loadError?.message || 'Orders and related reference data could not be loaded right now.'}
-            action={<RetryButton onClick={() => { void refetchOrders(); void refetchCustomers(); void refetchWarehouses(); }} />}
-          />
-        )}
-        {!isLoading && !isError && filtered.length === 0 && <EmptyState icon={ShoppingCart} title="No orders found" description="Create your first order" />}
+	        {isOrdersLoading && <div className="p-6"><TableSkeleton rows={6} cols={7} /></div>}
+	        {isOrdersError && (
+	          <ErrorState
+	            title="Unable to load orders"
+	            description={(ordersError as Error)?.message || 'Orders could not be loaded right now.'}
+	            action={<RetryButton onClick={() => void refetchOrders()} />}
+	          />
+	        )}
+	        {!isOrdersLoading && !isOrdersError && filtered.length === 0 && <EmptyState icon={ShoppingCart} title="No orders found" description="Create your first order" />}
       </div>
     </div>
   );

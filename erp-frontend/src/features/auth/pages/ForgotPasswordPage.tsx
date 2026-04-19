@@ -92,6 +92,7 @@ export default function ForgotPasswordPage() {
 
                 <Button
                   type="submit"
+                  requiresOnline
                   className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
                   disabled={loading}
                 >

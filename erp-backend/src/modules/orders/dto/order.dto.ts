@@ -8,6 +8,7 @@ import {
   IsUUID,
   IsPositive,
   IsEnum,
+  IsISO8601,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { OrderLifecycleStatus } from '../order-status.enum';
@@ -53,4 +54,13 @@ export class UpdateOrderStatusDto {
   })
   @IsEnum(OrderLifecycleStatus)
   status: OrderLifecycleStatus;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Order updatedAt value from when the user loaded the record. Used to detect stale updates.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  expectedUpdatedAt?: string;
 }

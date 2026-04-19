@@ -6,6 +6,7 @@ type CurrencySettings = {
   currencyCode: string;
   locale: string;
   exchangeRate: number;
+  updatedAt?: string;
 };
 
 type SettingsContextType = {
@@ -49,9 +50,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         maximumFractionDigits: 2,
       }).format(convertAmount(amount));
 
-    const updateCurrency = async (next: CurrencySettings) => {
-      await mutation.mutateAsync(next);
-    };
+	  const updateCurrency = async (next: CurrencySettings) => {
+	      await mutation.mutateAsync({
+	        ...next,
+	        expectedUpdatedAt: currency.updatedAt,
+	      });
+	  };
 
     return {
       currency,

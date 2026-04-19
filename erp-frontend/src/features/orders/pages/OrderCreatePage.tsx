@@ -194,7 +194,7 @@ export default function OrderCreatePage() {
 
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={() => navigate('/orders')}>Cancel</Button>
-        <Button disabled={createMutation.isPending} onClick={handleSubmit}>{createMutation.isPending ? 'Creating...' : 'Create Draft Order'}</Button>
+        <Button requiresOnline disabled={createMutation.isPending} onClick={handleSubmit}>{createMutation.isPending ? 'Creating...' : 'Create Draft Order'}</Button>
       </div>
     </div>
   );

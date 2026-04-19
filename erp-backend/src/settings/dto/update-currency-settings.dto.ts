@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsString, Min } from 'class-validator';
+import { IsISO8601, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdateCurrencySettingsDto {
   @ApiProperty({ example: 'USD' })
@@ -14,4 +14,13 @@ export class UpdateCurrencySettingsDto {
   @IsNumber()
   @Min(0.0001)
   exchangeRate: number;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Tenant updatedAt value from when the settings form loaded. Used to detect stale updates.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  expectedUpdatedAt?: string;
 }

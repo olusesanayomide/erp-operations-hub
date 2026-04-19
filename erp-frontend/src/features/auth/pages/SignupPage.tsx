@@ -256,9 +256,10 @@ export default function SignupPage() {
                   )}
 
                   <motion.div variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.01 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}>
-                    <Button
-                      type="submit"
-                      className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
+	                    <Button
+	                      type="submit"
+	                      requiresOnline
+	                      className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
                       disabled={loading}
                     >
                       {loading ? <LoadingText>Creating workspace...</LoadingText> : 'Create workspace'}

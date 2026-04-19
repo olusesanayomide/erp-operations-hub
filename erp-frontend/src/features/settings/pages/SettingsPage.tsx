@@ -114,7 +114,7 @@ export default function SettingsPage() {
 
           {canManageCurrency ? (
             <div className="flex justify-end">
-              <Button onClick={handleSave} disabled={isLoading || isSaving}>
+              <Button requiresOnline onClick={handleSave} disabled={isLoading || isSaving}>
                 {isSaving ? <LoadingText>Saving...</LoadingText> : 'Save Currency Settings'}
               </Button>
             </div>

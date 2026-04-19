@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
@@ -44,6 +44,21 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(routeState?.authError || '');
+
+  useEffect(() => {
+    if (!routeState?.authError) return;
+
+    navigate(location.pathname, {
+      replace: true,
+      state: routeState.email ? { email: routeState.email } : null,
+    });
+  }, [location.pathname, navigate, routeState?.authError, routeState?.email]);
+
+  const clearErrorOnEdit = () => {
+    if (error) {
+      setError('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,9 +141,12 @@ export default function LoginPage() {
                     <Label htmlFor="email" className="text-[15px] font-semibold text-slate-900">Email</Label>
                     <Input
                       id="email"
-                      type="email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
+	                      type="email"
+	                      value={email}
+	                      onChange={e => {
+	                        clearErrorOnEdit();
+	                        setEmail(e.target.value);
+	                      }}
                       placeholder="you@company.com"
                       className="h-12 rounded-2xl border border-slate-300 bg-white text-slate-950 placeholder:text-slate-500 shadow-[0_8px_24px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.92)] focus-visible:border-[#4f7dff] focus-visible:ring-2 focus-visible:ring-[#4f7dff]/20"
                     />
@@ -139,9 +157,12 @@ export default function LoginPage() {
                     <div className="relative">
                       <Input
                         id="password"
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
+	                        type={showPassword ? 'text' : 'password'}
+	                        value={password}
+	                        onChange={e => {
+	                          clearErrorOnEdit();
+	                          setPassword(e.target.value);
+	                        }}
                         placeholder="........"
                         className="h-12 rounded-2xl border border-slate-300 bg-white pr-12 text-slate-950 placeholder:text-slate-500 shadow-[0_8px_24px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.92)] focus-visible:border-[#4f7dff] focus-visible:ring-2 focus-visible:ring-[#4f7dff]/20"
                       />
@@ -177,9 +198,10 @@ export default function LoginPage() {
                   </motion.div>
 
                   <motion.div variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.01 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}>
-                    <Button
-                      type="submit"
-                      className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
+	                    <Button
+	                      type="submit"
+	                      requiresOnline
+	                      className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
                       disabled={loading}
                     >
                       {loading ? (

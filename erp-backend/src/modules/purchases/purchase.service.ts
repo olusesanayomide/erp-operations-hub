@@ -10,6 +10,7 @@ import {
   PurchaseStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { assertUnchangedSinceLoaded } from '../../common/concurrency';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { PurchaseLifecycleStatus } from './purchase-status.enum';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -268,16 +269,22 @@ export class PurchaseService {
     return purchase;
   }
 
-  async recievePurchase(tenantId: string, userId: string, purchaseId: string) {
+	  async recievePurchase(
+	    tenantId: string,
+	    userId: string,
+	    purchaseId: string,
+	    expectedUpdatedAt?: string,
+	  ) {
     return await this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
         where: { id: purchaseId, tenantId },
         include: { items: true },
       });
-      if (!purchase) {
-        throw new NotFoundException('Purchase order not found');
-      }
-      const currentStatus = purchase.status as PurchaseLifecycleStatus;
+	      if (!purchase) {
+	        throw new NotFoundException('Purchase order not found');
+	      }
+	      assertUnchangedSinceLoaded(purchase.updatedAt, expectedUpdatedAt);
+	      const currentStatus = purchase.status as PurchaseLifecycleStatus;
       if (
         !PURCHASE_STATUS_TRANSITIONS[currentStatus].includes(
           PurchaseLifecycleStatus.RECEIVED,
@@ -349,21 +356,29 @@ export class PurchaseService {
   async updateStatus(
     tenantId: string,
     userId: string,
-    purchaseId: string,
-    status: PurchaseLifecycleStatus,
-  ) {
-    if (status === PurchaseLifecycleStatus.RECEIVED) {
-      return this.recievePurchase(tenantId, userId, purchaseId);
-    }
+	    purchaseId: string,
+	    status: PurchaseLifecycleStatus,
+	    expectedUpdatedAt?: string,
+	  ) {
+	    if (status === PurchaseLifecycleStatus.RECEIVED) {
+	      return this.recievePurchase(
+	        tenantId,
+	        userId,
+	        purchaseId,
+	        expectedUpdatedAt,
+	      );
+	    }
 
     return this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
         where: { id: purchaseId, tenantId },
       });
 
-      if (!purchase) {
-        throw new NotFoundException('Purchase order not found');
-      }
+	      if (!purchase) {
+	        throw new NotFoundException('Purchase order not found');
+	      }
+
+	      assertUnchangedSinceLoaded(purchase.updatedAt, expectedUpdatedAt);
 
       const currentStatus = purchase.status as PurchaseLifecycleStatus;
 

@@ -35,9 +35,9 @@ export default function OrderDetailPage() {
     queryFn: listWarehouses,
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: (status: 'CONFIRMED' | 'PICKED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED') =>
-      updateOrderStatus(id || '', status),
+	  const updateStatusMutation = useMutation({
+	    mutationFn: (status: 'CONFIRMED' | 'PICKED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED') =>
+	      updateOrderStatus(id || '', status, order?.concurrencyStamp),
     onSuccess: (_, status) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['orders', id] });
@@ -77,7 +77,7 @@ export default function OrderDetailPage() {
         <StatusBadge status={order.status} className="text-sm px-3 py-1" />
         {order.status === 'draft' && canPerform('orders.confirm') && (
           <AlertDialog>
-            <AlertDialogTrigger asChild><Button><CheckCircle className="h-4 w-4 mr-2" />Confirm Order</Button></AlertDialogTrigger>
+            <AlertDialogTrigger asChild><Button requiresOnline><CheckCircle className="h-4 w-4 mr-2" />Confirm Order</Button></AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Confirm this order?</AlertDialogTitle>
@@ -93,17 +93,17 @@ export default function OrderDetailPage() {
           </AlertDialog>
         )}
         {order.status === 'confirmed' && canPerform('orders.pick') && (
-          <Button onClick={() => updateStatusMutation.mutate('PICKED')} variant="default"><CheckCircle className="h-4 w-4 mr-2" />Mark Picked</Button>
+          <Button requiresOnline onClick={() => updateStatusMutation.mutate('PICKED')} variant="default"><CheckCircle className="h-4 w-4 mr-2" />Mark Picked</Button>
         )}
         {order.status === 'picked' && canPerform('orders.ship') && (
-          <Button onClick={() => updateStatusMutation.mutate('SHIPPED')} variant="default"><CheckCircle className="h-4 w-4 mr-2" />Mark Shipped</Button>
+          <Button requiresOnline onClick={() => updateStatusMutation.mutate('SHIPPED')} variant="default"><CheckCircle className="h-4 w-4 mr-2" />Mark Shipped</Button>
         )}
         {order.status === 'shipped' && canPerform('orders.deliver') && (
-          <Button onClick={() => updateStatusMutation.mutate('DELIVERED')} variant="default"><CheckCircle className="h-4 w-4 mr-2" />Mark Delivered</Button>
+          <Button requiresOnline onClick={() => updateStatusMutation.mutate('DELIVERED')} variant="default"><CheckCircle className="h-4 w-4 mr-2" />Mark Delivered</Button>
         )}
         {(order.status === 'draft' || order.status === 'confirmed' || order.status === 'picked') && canPerform('orders.cancel') && (
           <AlertDialog>
-            <AlertDialogTrigger asChild><Button variant="destructive"><XCircle className="h-4 w-4 mr-2" />Cancel</Button></AlertDialogTrigger>
+            <AlertDialogTrigger asChild><Button requiresOnline variant="destructive"><XCircle className="h-4 w-4 mr-2" />Cancel</Button></AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Cancel this order?</AlertDialogTitle>

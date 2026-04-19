@@ -9,6 +9,7 @@ import { Button } from '@/shared/ui/button';
 import { getSystemHealth } from '@/shared/lib/erp-api';
 import { motion, useReducedMotion } from 'framer-motion';
 import { DatabaseZap, RotateCw, ServerCrash } from 'lucide-react';
+import { useOnlineStatus } from '@/shared/lib/online-status';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -60,14 +61,16 @@ function AppContentFallback() {
 
 export function AppLayout() {
   const location = useLocation();
+  const isOnline = useOnlineStatus();
   const title = getTitle(location.pathname);
   const healthQuery = useQuery({
     queryKey: ['system-health'],
     queryFn: getSystemHealth,
     refetchInterval: 30000,
     retry: false,
+    enabled: isOnline,
   });
-  const isApiUnreachable = healthQuery.isError;
+  const isApiUnreachable = isOnline && healthQuery.isError;
   const isDatabaseUnavailable = healthQuery.data?.database === 'down';
   const showHealthBanner = isApiUnreachable || isDatabaseUnavailable;
   const healthMessage = isApiUnreachable

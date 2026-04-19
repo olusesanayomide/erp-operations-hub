@@ -11,6 +11,7 @@ import {
   ValidateNested,
   IsEnum,
   IsOptional,
+  IsISO8601,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PurchaseLifecycleStatus } from '../purchase-status.enum';
@@ -65,4 +66,13 @@ export class UpdatePurchaseStatusDto {
   })
   @IsEnum(PurchaseLifecycleStatus)
   status: PurchaseLifecycleStatus;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Purchase updatedAt value from when the user loaded the record. Used to detect stale updates.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  expectedUpdatedAt?: string;
 }

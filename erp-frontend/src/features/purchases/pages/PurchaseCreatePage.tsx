@@ -189,7 +189,7 @@ export default function PurchaseCreatePage() {
 
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={() => navigate('/purchases')}>Cancel</Button>
-        <Button disabled={createMutation.isPending} onClick={handleSubmit}>{createMutation.isPending ? 'Creating...' : 'Create Draft PO'}</Button>
+        <Button requiresOnline disabled={createMutation.isPending} onClick={handleSubmit}>{createMutation.isPending ? 'Creating...' : 'Create Draft PO'}</Button>
       </div>
     </div>
   );

@@ -16,6 +16,10 @@ import { commitProductImport, createProduct, listPaginatedRawProducts, normalize
 import { useSettings } from '@/app/providers/SettingsContext';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
+import {
+  validateNonNegativeInteger,
+  validatePositiveMoneyAmount,
+} from '@/shared/lib/number-validation';
 
 type ProductImportMode = 'create' | 'upsert';
 
@@ -137,6 +141,35 @@ export default function ProductsPage() {
     link.download = 'products-import-template.csv';
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function handleCreateProduct() {
+    if (!form.name.trim() || !form.sku.trim()) {
+      toast.error('Name and SKU are required');
+      return;
+    }
+
+    const price = validatePositiveMoneyAmount(form.price, 'Price');
+    if (!price.ok) {
+      toast.error(price.message);
+      return;
+    }
+
+    const minStock = validateNonNegativeInteger(form.minStock, 'Minimum stock');
+    if (!minStock.ok) {
+      toast.error(minStock.message);
+      return;
+    }
+
+    createMutation.mutate({
+      name: form.name.trim(),
+      sku: form.sku.trim(),
+      price: price.value,
+      minStock: minStock.value,
+      category: form.category.trim(),
+      unit: form.unit.trim(),
+      description: form.description.trim(),
+    });
   }
 
   return (
@@ -314,6 +347,7 @@ export default function ProductsPage() {
                     <Button
                       type="button"
                       variant="outline"
+                      requiresOnline
                       disabled={!importCsv || previewImportMutation.isPending}
                       onClick={() => previewImportMutation.mutate({ csv: importCsv, mode: importMode })}
                     >
@@ -321,6 +355,7 @@ export default function ProductsPage() {
                     </Button>
                     <Button
                       type="button"
+                      requiresOnline
                       disabled={!preview || preview.totals.valid === 0 || commitImportMutation.isPending}
                       onClick={() => commitImportMutation.mutate({ csv: importCsv, mode: importMode })}
                     >
@@ -333,7 +368,7 @@ export default function ProductsPage() {
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-2" />Add Product</Button>
+                <Button requiresOnline><Plus className="h-4 w-4 mr-2" />Add Product</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>New Product</DialogTitle></DialogHeader>
@@ -341,32 +376,19 @@ export default function ProductsPage() {
                   <div className="space-y-2"><Label>Name</Label><Input placeholder="Product name" value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} /></div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>SKU</Label><Input placeholder="SKU-000" value={form.sku} onChange={(e) => setForm((current) => ({ ...current, sku: e.target.value }))} /></div>
-                    <div className="space-y-2"><Label>Price</Label><Input type="number" placeholder="0.00" value={form.price} onChange={(e) => setForm((current) => ({ ...current, price: e.target.value }))} /></div>
+                    <div className="space-y-2"><Label>Price</Label><Input type="number" min="0.01" step="0.01" placeholder="0.00" value={form.price} onChange={(e) => setForm((current) => ({ ...current, price: e.target.value }))} /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Min Stock</Label><Input type="number" min="0" placeholder="10" value={form.minStock} onChange={(e) => setForm((current) => ({ ...current, minStock: e.target.value }))} /></div>
+                    <div className="space-y-2"><Label>Min Stock</Label><Input type="number" min="0" step="1" placeholder="10" value={form.minStock} onChange={(e) => setForm((current) => ({ ...current, minStock: e.target.value }))} /></div>
                     <div className="space-y-2"><Label>Category</Label><Input placeholder="Category" value={form.category} onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))} /></div>
                   </div>
                   <div className="space-y-2"><Label>Unit</Label><Input placeholder="e.g. piece, box, kg" value={form.unit} onChange={(e) => setForm((current) => ({ ...current, unit: e.target.value }))} /></div>
                   <div className="space-y-2"><Label>Description</Label><Input placeholder="Short product description" value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} /></div>
                   <Button
                     className="w-full"
+                    requiresOnline
                     disabled={createMutation.isPending}
-                    onClick={() => {
-                      if (!form.name || !form.sku || !form.price) {
-                        toast.error('Name, SKU, and price are required');
-                        return;
-                      }
-                      createMutation.mutate({
-                        name: form.name,
-                        sku: form.sku,
-                        price: Number(form.price),
-                        minStock: Number(form.minStock || 0),
-                        category: form.category,
-                        unit: form.unit,
-                        description: form.description,
-                      });
-                    }}
+                    onClick={handleCreateProduct}
                   >
                     {createMutation.isPending ? 'Creating...' : 'Create Product'}
                   </Button>

@@ -41,8 +41,8 @@ export default function PurchaseDetailPage() {
     queryFn: listWarehouses,
   });
 
-  const receiveMutation = useMutation({
-    mutationFn: () => receivePurchase(id || ''),
+	  const receiveMutation = useMutation({
+	    mutationFn: () => receivePurchase(id || '', purchase?.concurrencyStamp),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
       queryClient.invalidateQueries({ queryKey: ['purchases', id] });
@@ -52,9 +52,9 @@ export default function PurchaseDetailPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: (status: 'CONFIRMED' | 'SHIPPED' | 'CANCELLED') =>
-      updatePurchaseStatus(id || '', status),
+	  const updateStatusMutation = useMutation({
+	    mutationFn: (status: 'CONFIRMED' | 'SHIPPED' | 'CANCELLED') =>
+	      updatePurchaseStatus(id || '', status, purchase?.concurrencyStamp),
     onSuccess: (_, status) => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
       queryClient.invalidateQueries({ queryKey: ['purchases', id] });
@@ -77,13 +77,13 @@ export default function PurchaseDetailPage() {
       <PageHeader title={purchase.purchaseNumber}>
         <StatusBadge status={purchase.status} className="text-sm px-3 py-1" />
         {purchase.status === 'draft' && canPerform('purchases.confirm') && (
-          <Button onClick={() => updateStatusMutation.mutate('CONFIRMED')}>
+          <Button requiresOnline onClick={() => updateStatusMutation.mutate('CONFIRMED')}>
             <CheckCircle className="h-4 w-4 mr-2" />
             Confirm PO
           </Button>
         )}
         {purchase.status === 'confirmed' && canPerform('purchases.confirm') && (
-          <Button variant="outline" onClick={() => updateStatusMutation.mutate('SHIPPED')}>
+          <Button requiresOnline variant="outline" onClick={() => updateStatusMutation.mutate('SHIPPED')}>
             <Send className="h-4 w-4 mr-2" />
             Mark Shipped
           </Button>
@@ -92,6 +92,7 @@ export default function PurchaseDetailPage() {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
+                requiresOnline
                 className="bg-success hover:bg-success/90"
                 disabled={purchase.status === 'draft'}
               >

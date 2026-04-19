@@ -418,10 +418,11 @@ export default function CustomersPage() {
                     >
                       Cancel
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!importCsv || previewImportMutation.isPending}
+	                    <Button
+	                      type="button"
+	                      variant="outline"
+	                      requiresOnline
+	                      disabled={!importCsv || previewImportMutation.isPending}
                       onClick={() =>
                         previewImportMutation.mutate({
                           csv: importCsv,
@@ -433,9 +434,10 @@ export default function CustomersPage() {
                         ? 'Reviewing...'
                         : 'Preview Import'}
                     </Button>
-                    <Button
-                      type="button"
-                      disabled={
+	                    <Button
+	                      type="button"
+	                      requiresOnline
+	                      disabled={
                         !preview ||
                         preview.totals.valid === 0 ||
                         commitImportMutation.isPending
@@ -458,7 +460,7 @@ export default function CustomersPage() {
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+	                <Button requiresOnline>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Customer
                 </Button>
@@ -512,9 +514,10 @@ export default function CustomersPage() {
                       }
                     />
                   </div>
-                  <Button
-                    className="w-full"
-                    disabled={createMutation.isPending}
+	                  <Button
+	                    className="w-full"
+	                    requiresOnline
+	                    disabled={createMutation.isPending}
                     onClick={() => {
                       if (!form.name || !form.email) {
                         toast.error('Name and email are required');

@@ -121,6 +121,7 @@ export function AppHeader({ title }: { title: string }) {
               <Button
                 variant="ghost"
                 size="sm"
+                requiresOnline
                 className="h-8 px-2 text-xs"
                 disabled={unreadCount === 0 || markAllAsReadMutation.isPending}
                 onClick={() => markAllAsReadMutation.mutate()}

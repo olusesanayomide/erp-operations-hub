@@ -1,0 +1,7 @@
+ALTER TABLE "User"
+ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+UPDATE "User"
+SET "updatedAt" = "createdAt"
+WHERE "createdAt" IS NOT NULL;
+

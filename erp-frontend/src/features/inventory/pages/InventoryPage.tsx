@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
+import { ReferenceDataWarning } from '@/shared/components/ReferenceDataWarning';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -13,6 +14,7 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { Search, Boxes, ArrowDownRight, ArrowUpRight, ArrowRightLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { listInventorySummary, listProducts, listWarehouses, stockIn, stockOut, transferStock } from '@/shared/lib/erp-api';
+import { validatePositiveInteger } from '@/shared/lib/number-validation';
 
 function StockDialog({
   type,
@@ -44,7 +46,7 @@ function StockDialog({
   const isReady =
     Boolean(stockForm.productId) &&
     Boolean(stockForm.warehouseId) &&
-    Number(stockForm.quantity) > 0;
+    validatePositiveInteger(stockForm.quantity, 'Quantity').ok;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -70,13 +72,14 @@ function StockDialog({
             <Input
               type="number"
               min="1"
+              step="1"
               inputMode="numeric"
               placeholder="0"
               value={stockForm.quantity}
               onChange={(e) => setStockForm((current) => ({ ...current, quantity: e.target.value }))}
             />
           </div>
-          <Button className="w-full" type="submit" disabled={!isReady || isSubmitting}>
+          <Button className="w-full" type="submit" requiresOnline disabled={!isReady || isSubmitting}>
             {isSubmitting ? 'Saving...' : type === 'in' ? 'Record Stock In' : 'Record Stock Out'}
           </Button>
         </form>
@@ -123,7 +126,7 @@ function TransferDialog({
     Boolean(transferForm.sourceWarehouseId) &&
     Boolean(transferForm.destinationWarehouseId) &&
     transferForm.sourceWarehouseId !== transferForm.destinationWarehouseId &&
-    Number(transferForm.quantity) > 0 &&
+    validatePositiveInteger(transferForm.quantity, 'Quantity').ok &&
     Boolean(transferForm.note.trim());
 
   return (
@@ -159,6 +162,7 @@ function TransferDialog({
             <Input
               type="number"
               min="1"
+              step="1"
               inputMode="numeric"
               placeholder="0"
               value={transferForm.quantity}
@@ -176,7 +180,7 @@ function TransferDialog({
           {transferForm.sourceWarehouseId && transferForm.sourceWarehouseId === transferForm.destinationWarehouseId && (
             <p className="text-sm text-destructive">Source and destination warehouses must be different.</p>
           )}
-          <Button className="w-full" type="submit" disabled={!isReady || isSubmitting}>
+          <Button className="w-full" type="submit" requiresOnline disabled={!isReady || isSubmitting}>
             {isSubmitting ? 'Saving...' : 'Transfer Stock'}
           </Button>
         </form>
@@ -209,18 +213,16 @@ export default function InventoryPage() {
     queryFn: listInventorySummary,
   });
 
-  const { data: products = [], isLoading: isProductsLoading, isError: isProductsError, error: productsError, refetch: refetchProducts } = useQuery({
+  const { data: products = [], isError: isProductsError } = useQuery({
     queryKey: ['products', 'normalized'],
     queryFn: listProducts,
   });
 
-  const { data: warehouses = [], isLoading: isWarehousesLoading, isError: isWarehousesError, error: warehousesError, refetch: refetchWarehouses } = useQuery({
+  const { data: warehouses = [], isError: isWarehousesError } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
   });
-  const isLoading = isInventoryLoading || isProductsLoading || isWarehousesLoading;
-  const isError = isInventoryError || isProductsError || isWarehousesError;
-  const loadError = (inventoryError || productsError || warehousesError) as Error | null;
+  const isReferenceDataError = isProductsError || isWarehousesError;
 
   const stockInMutation = useMutation({
     mutationFn: stockIn,
@@ -329,15 +331,21 @@ export default function InventoryPage() {
       return;
     }
 
-    if (!form.productId || !form.warehouseId || Number(form.quantity) <= 0) {
-      toast.error('Product, warehouse, and quantity are required');
+    if (!form.productId || !form.warehouseId) {
+      toast.error('Product and warehouse are required');
+      return;
+    }
+
+    const quantity = validatePositiveInteger(form.quantity, 'Quantity');
+    if (!quantity.ok) {
+      toast.error(quantity.message);
       return;
     }
 
     const payload = {
       productId: form.productId,
       warehouseId: form.warehouseId,
-      quantity: Number(form.quantity),
+      quantity: quantity.value,
     };
 
     if (type === 'in') {
@@ -359,8 +367,8 @@ export default function InventoryPage() {
       return;
     }
 
-    if (!form.productId || !form.sourceWarehouseId || !form.destinationWarehouseId || Number(form.quantity) <= 0) {
-      toast.error('Product, source warehouse, destination warehouse, and quantity are required');
+    if (!form.productId || !form.sourceWarehouseId || !form.destinationWarehouseId) {
+      toast.error('Product, source warehouse, and destination warehouse are required');
       return;
     }
 
@@ -374,11 +382,17 @@ export default function InventoryPage() {
       return;
     }
 
+    const quantity = validatePositiveInteger(form.quantity, 'Quantity');
+    if (!quantity.ok) {
+      toast.error(quantity.message);
+      return;
+    }
+
     transferMutation.mutate({
       productId: form.productId,
       sourceWarehouseId: form.sourceWarehouseId,
       destinationWarehouseId: form.destinationWarehouseId,
-      quantity: Number(form.quantity),
+      quantity: quantity.value,
       note: form.note.trim(),
     });
   };
@@ -387,17 +401,17 @@ export default function InventoryPage() {
     <div className="animate-fade-in">
       <PageHeader title="Inventory" description={`${inventory.length} records across ${warehouses.length} warehouses`}>
         {canPerform('inventory.stock-in') && (
-          <Button variant="outline" onClick={() => setStockInOpen(true)}>
+          <Button variant="outline" requiresOnline onClick={() => setStockInOpen(true)}>
             <ArrowDownRight className="h-4 w-4 mr-2" />Stock In
           </Button>
         )}
         {canPerform('inventory.stock-out') && (
-          <Button variant="outline" onClick={() => setStockOutOpen(true)}>
+          <Button variant="outline" requiresOnline onClick={() => setStockOutOpen(true)}>
             <ArrowUpRight className="h-4 w-4 mr-2" />Stock Out
           </Button>
         )}
         {canPerform('inventory.transfer') && (
-          <Button variant="outline" onClick={() => setTransferOpen(true)}>
+          <Button variant="outline" requiresOnline onClick={() => setTransferOpen(true)}>
             <ArrowRightLeft className="h-4 w-4 mr-2" />Transfer Stock
           </Button>
         )}
@@ -468,13 +482,15 @@ export default function InventoryPage() {
         </Select>
       </div>
 
-      <p className="mb-4 text-sm text-muted-foreground">
-        Available stock can be sold immediately. Reserved stock is committed to confirmed or picked orders.
-      </p>
+	      <p className="mb-4 text-sm text-muted-foreground">
+	        Available stock can be sold immediately. Reserved stock is committed to confirmed or picked orders.
+	      </p>
 
-      <div className="erp-card overflow-hidden">
-        {isLoading ? (
-          <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>
+      {isReferenceDataError && <ReferenceDataWarning />}
+	
+	      <div className="erp-card overflow-hidden">
+	        {isInventoryLoading ? (
+	          <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -491,9 +507,9 @@ export default function InventoryPage() {
               <tbody>
                 {filtered.map((item) => (
                   <tr key={item.id} className="erp-table-row">
-                    <td className="p-3 text-sm font-medium">{item.product?.name}</td>
-                    <td className="p-3 text-sm text-muted-foreground font-mono">{item.product?.sku}</td>
-                    <td className="p-3 text-sm">{item.warehouse?.name}</td>
+	                    <td className="p-3 text-sm font-medium">{item.product?.name ?? 'Unknown product'}</td>
+	                    <td className="p-3 text-sm text-muted-foreground font-mono">{item.product?.sku ?? 'Unknown SKU'}</td>
+	                    <td className="p-3 text-sm">{item.warehouse?.name ?? 'Unknown warehouse'}</td>
                     <td className={`p-3 text-sm text-right font-semibold ${item.stockStatus === 'low-stock' ? 'text-warning' : item.stockStatus === 'out-of-stock' ? 'text-destructive' : ''}`}>
                       {item.quantity}
                     </td>
@@ -507,14 +523,14 @@ export default function InventoryPage() {
             </table>
           </div>
         )}
-        {isError && (
-          <ErrorState
-            title="Unable to load inventory"
-            description={loadError?.message || 'Inventory and related reference data could not be loaded right now.'}
-            action={<RetryButton onClick={() => { void refetchInventory(); void refetchProducts(); void refetchWarehouses(); }} />}
-          />
-        )}
-        {!isLoading && !isError && filtered.length === 0 && <EmptyState icon={Boxes} title="No inventory found" description="Adjust your filters" />}
+	        {isInventoryError && (
+	          <ErrorState
+	            title="Unable to load inventory"
+	            description={(inventoryError as Error)?.message || 'Inventory could not be loaded right now.'}
+	            action={<RetryButton onClick={() => void refetchInventory()} />}
+	          />
+	        )}
+	        {!isInventoryLoading && !isInventoryError && filtered.length === 0 && <EmptyState icon={Boxes} title="No inventory found" description="Adjust your filters" />}
       </div>
     </div>
   );

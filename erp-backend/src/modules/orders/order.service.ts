@@ -10,6 +10,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { assertUnchangedSinceLoaded } from '../../common/concurrency';
 import {
   createPaginatedResult,
   getPaginationOptions,
@@ -364,18 +365,21 @@ export class OrdersService {
   async updateStatus(
     tenantId: string,
     userId: string,
-    orderId: string,
-    status: OrderLifecycleStatus,
-  ) {
+	    orderId: string,
+	    status: OrderLifecycleStatus,
+	    expectedUpdatedAt?: string,
+	  ) {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, tenantId },
         include: { items: true },
       });
 
-      if (!order) {
-        throw new BadRequestException('Order not found');
-      }
+	      if (!order) {
+	        throw new BadRequestException('Order not found');
+	      }
+
+	      assertUnchangedSinceLoaded(order.updatedAt, expectedUpdatedAt);
 
       const currentStatus = order.status as OrderLifecycleStatus;
 
@@ -447,10 +451,18 @@ export class OrdersService {
         }
       }
 
-      const updatedOrder = await tx.order.update({
-        where: { id: orderId },
-        data: { status: ORDER_STATUS_DB_MAP[status] },
-      });
+	      const updatedOrder = await tx.order.update({
+	        where: { id: orderId },
+	        data: { status: ORDER_STATUS_DB_MAP[status] },
+	        include: {
+	          items: {
+	            include: {
+	              product: true,
+	            },
+	          },
+	          customer: true,
+	        },
+	      });
 
       await this.notificationsService.createForTenant({
         client: tx,

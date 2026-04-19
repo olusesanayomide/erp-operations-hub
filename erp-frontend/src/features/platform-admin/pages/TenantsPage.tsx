@@ -100,8 +100,15 @@ export default function TenantsPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: ({ tenantId, status }: { tenantId: string; status: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED' }) =>
-      updateTenantStatus(tenantId, status),
+    mutationFn: ({
+      tenantId,
+      status,
+      expectedUpdatedAt,
+    }: {
+      tenantId: string;
+      status: 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+      expectedUpdatedAt?: string;
+    }) => updateTenantStatus(tenantId, status, expectedUpdatedAt),
     onSuccess: (tenant) => {
       queryClient.setQueryData<PlatformTenant[]>(['platform-tenants'], (current) =>
         current?.map((item) => (item.id === tenant.id ? tenant : item)) ?? [tenant],
@@ -196,7 +203,7 @@ export default function TenantsPage() {
                             }}
                           >
                             <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" className={action.tone}>
+                              <Button requiresOnline variant="outline" size="sm" className={action.tone}>
                                 <Icon className="mr-1.5 h-4 w-4" />
                                 {action.label}
                               </Button>
@@ -213,10 +220,11 @@ export default function TenantsPage() {
                                 <AlertDialogAction
                                   disabled={mutation.isPending}
                                   onClick={() =>
-                                    mutation.mutate({
-                                      tenantId: tenant.id,
-                                      status: action.nextStatus,
-                                    })
+	                                    mutation.mutate({
+	                                      tenantId: tenant.id,
+	                                      status: action.nextStatus,
+	                                      expectedUpdatedAt: tenant.concurrencyStamp,
+	                                    })
                                   }
                                 >
                                   {mutation.isPending ? 'Saving...' : action.label}

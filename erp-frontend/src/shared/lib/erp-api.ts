@@ -42,6 +42,7 @@ type BackendUserListItem = {
   roles: string[];
   isPlatformAdmin: boolean;
   createdAt: string;
+  updatedAt?: string;
 };
 
 type BackendTenantListItem = {
@@ -58,6 +59,8 @@ type BackendCurrencySettings = {
   currencyCode: string;
   locale: string;
   exchangeRate: number;
+  updatedAt?: string;
+  expectedUpdatedAt?: string;
 };
 
 type BackendNotification = {
@@ -609,6 +612,7 @@ export function normalizeOrder(raw: BackendOrder): Order {
     notes: "",
     createdAt: formatDate(raw.createdAt),
     updatedAt: formatDate(raw.updatedAt),
+    concurrencyStamp: raw.updatedAt,
     confirmedAt: statusRank >= 1 ? formatDate(raw.updatedAt) : undefined,
     pickedAt: statusRank >= 2 ? formatDate(raw.updatedAt) : undefined,
     shippedAt: statusRank >= 3 ? formatDate(raw.updatedAt) : undefined,
@@ -636,6 +640,7 @@ export function normalizePurchase(raw: BackendPurchase): Purchase {
     notes: "",
     createdAt: formatDate(raw.createdAt),
     updatedAt: formatDate(raw.updatedAt),
+    concurrencyStamp: raw.updatedAt,
     receivedAt: raw.receivedAt ? formatDate(raw.receivedAt) : undefined,
     supplier: raw.supplier ? normalizeSupplier(raw.supplier) : undefined,
     warehouse: raw.warehouse ? normalizeWarehouse(raw.warehouse) : undefined,
@@ -692,12 +697,18 @@ export async function listUsers() {
     },
     isPlatformAdmin: item.isPlatformAdmin,
     createdAt: formatDate(item.createdAt),
+    updatedAt: item.updatedAt ? formatDate(item.updatedAt) : undefined,
+    concurrencyStamp: item.updatedAt,
   })) satisfies User[];
 }
 
 export async function updateUser(
   userId: string,
-  payload: { name?: string; role?: "ADMIN" | "MANAGER" | "STAFF" },
+  payload: {
+    name?: string;
+    role?: "ADMIN" | "MANAGER" | "STAFF";
+    expectedUpdatedAt?: string;
+  },
 ) {
   const item = await apiRequest<BackendUserListItem>(`/auth/users/${userId}`, {
     method: "PATCH",
@@ -717,6 +728,8 @@ export async function updateUser(
     },
     isPlatformAdmin: item.isPlatformAdmin,
     createdAt: formatDate(item.createdAt),
+    updatedAt: item.updatedAt ? formatDate(item.updatedAt) : undefined,
+    concurrencyStamp: item.updatedAt,
   } satisfies User;
 }
 
@@ -815,6 +828,7 @@ export async function listTenants() {
         }).status,
         createdAt: formatDate(item.createdAt),
         updatedAt: formatDate(item.updatedAt),
+        concurrencyStamp: item.updatedAt,
         userCount: item.userCount,
       }) satisfies PlatformTenant,
   );
@@ -823,10 +837,11 @@ export async function listTenants() {
 export async function updateTenantStatus(
   tenantId: string,
   status: "ACTIVE" | "SUSPENDED" | "ARCHIVED",
+  expectedUpdatedAt?: string,
 ) {
   const item = await apiRequest<BackendTenantListItem>(`/auth/tenants/${tenantId}/status`, {
     method: "PATCH",
-    body: { status },
+    body: { status, expectedUpdatedAt },
   });
 
   return {
@@ -841,6 +856,7 @@ export async function updateTenantStatus(
     }).status,
     createdAt: formatDate(item.createdAt),
     updatedAt: formatDate(item.updatedAt),
+    concurrencyStamp: item.updatedAt,
     userCount: item.userCount,
   } satisfies PlatformTenant;
 }
@@ -1113,10 +1129,11 @@ export async function createOrder(payload: {
 export async function updateOrderStatus(
   id: string,
   status: "CONFIRMED" | "PICKED" | "SHIPPED" | "DELIVERED" | "CANCELLED",
+  expectedUpdatedAt?: string,
 ) {
   const item = await apiRequest<BackendOrder>(`/orders/${id}/status`, {
     method: "PATCH",
-    body: { status },
+    body: { status, expectedUpdatedAt },
   });
   return normalizeOrder(item);
 }
@@ -1165,19 +1182,21 @@ export async function createPurchase(payload: {
   });
 }
 
-export async function receivePurchase(id: string) {
+export async function receivePurchase(id: string, expectedUpdatedAt?: string) {
   await apiRequest(`/purchases/${id}/receive`, {
     method: "PATCH",
+    body: { expectedUpdatedAt },
   });
 }
 
 export async function updatePurchaseStatus(
   id: string,
   status: "CONFIRMED" | "SHIPPED" | "RECEIVED" | "CANCELLED",
+  expectedUpdatedAt?: string,
 ) {
   const item = await apiRequest<BackendPurchase>(`/purchases/${id}/status`, {
     method: "PATCH",
-    body: { status },
+    body: { status, expectedUpdatedAt },
   });
 
   return normalizePurchase(item);

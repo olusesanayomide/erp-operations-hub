@@ -15,6 +15,7 @@ export interface PlatformTenant {
   status: TenantStatus;
   createdAt: string;
   updatedAt: string;
+  concurrencyStamp: string;
   userCount: number;
 }
 
@@ -27,6 +28,8 @@ export interface User {
   isPlatformAdmin: boolean;
   avatar?: string;
   createdAt: string;
+  updatedAt?: string;
+  concurrencyStamp?: string;
 }
 
 export type NotificationEntityType = 'order' | 'purchase' | 'system';
@@ -117,6 +120,7 @@ export interface Order {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  concurrencyStamp: string;
   confirmedAt?: string;
   pickedAt?: string;
   shippedAt?: string;
@@ -147,6 +151,7 @@ export interface Purchase {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  concurrencyStamp: string;
   confirmedAt?: string;
   receivedAt?: string;
   supplier?: Supplier;

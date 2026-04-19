@@ -49,7 +49,7 @@ export default function SuppliersPage() {
       <PageHeader title="Suppliers" description={`${pagination.total} suppliers`}>
         {canPerform('suppliers.create') && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Add Supplier</Button></DialogTrigger>
+            <DialogTrigger asChild><Button requiresOnline><Plus className="h-4 w-4 mr-2" />Add Supplier</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>New Supplier</DialogTitle></DialogHeader>
               <div className="space-y-4 py-2">
@@ -57,7 +57,7 @@ export default function SuppliersPage() {
                 <div className="space-y-2"><Label>Email</Label><Input type="email" placeholder="email@supplier.com" value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} /></div>
                 <div className="space-y-2"><Label>Phone</Label><Input placeholder="+1 555-0000" value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} /></div>
                 <div className="space-y-2"><Label>Address</Label><Input placeholder="Address" value={form.address} onChange={(e) => setForm((current) => ({ ...current, address: e.target.value }))} /></div>
-                <Button className="w-full" disabled={createMutation.isPending} onClick={() => {
+                <Button className="w-full" requiresOnline disabled={createMutation.isPending} onClick={() => {
                   if (!form.name) {
                     toast.error('Supplier name is required');
                     return;
