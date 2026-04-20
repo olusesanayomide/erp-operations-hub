@@ -900,7 +900,9 @@ export async function updateCurrencySettings(payload: BackendCurrencySettings) {
 }
 
 export async function getDashboardSummary() {
-  return apiRequest<BackendDashboardSummary>("/dashboard/summary");
+  return apiRequest<BackendDashboardSummary>("/dashboard/summary", {
+    timeoutMs: 60000,
+  });
 }
 
 export async function listProducts() {

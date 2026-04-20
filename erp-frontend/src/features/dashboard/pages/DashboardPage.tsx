@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useSettings } from '@/app/providers/SettingsContext';
 import { KPICard } from '@/shared/components/KPICard';
+import { ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -109,6 +110,7 @@ export default function DashboardPage() {
   const dashboardQuery = useQuery({
     queryKey: ['dashboard', 'summary'],
     queryFn: getDashboardSummary,
+    retry: 1,
   });
 
   const summary = dashboardQuery.data;
@@ -135,6 +137,20 @@ export default function DashboardPage() {
 
   if (dashboardQuery.isLoading && !summary) {
     return <DashboardSkeleton />;
+  }
+
+  if (dashboardQuery.isError && !summary) {
+    return (
+      <ErrorState
+        title="Dashboard data could not be loaded"
+        description={
+          dashboardQuery.error instanceof Error
+            ? dashboardQuery.error.message
+            : 'The dashboard summary request failed. Please try again.'
+        }
+        action={<RetryButton onClick={() => dashboardQuery.refetch()} />}
+      />
+    );
   }
 
   return (

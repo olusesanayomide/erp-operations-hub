@@ -28,6 +28,15 @@ function toCount(value: bigint | number | string | null | undefined) {
   return Number(value);
 }
 
+type DashboardHeadlineCounts = {
+  productCount: bigint;
+  customerCount: bigint;
+  supplierCount: bigint;
+  warehouseCount: bigint;
+  activeOrderCount: bigint;
+  draftPurchaseCount: bigint;
+};
+
 function getPreviousPeriodWindow() {
   const currentEnd = new Date();
   const currentStart = new Date(currentEnd);
@@ -108,25 +117,34 @@ export class DashboardService {
     previousStart: Date,
     previousEnd: Date,
   ) {
-    const [
-      productCount,
-      customerCount,
-      supplierCount,
-      warehouseCount,
-      activeOrderCount,
-      draftPurchaseCount,
-    ] = await Promise.all([
-      this.prisma.product.count({ where: { tenantId } }),
-      this.prisma.customer.count({ where: { tenantId } }),
-      this.prisma.supplier.count({ where: { tenantId } }),
-      this.prisma.warehouse.count({ where: { tenantId } }),
-      this.prisma.order.count({
-        where: { tenantId, status: { in: ACTIVE_ORDER_STATUSES } },
-      }),
-      this.prisma.purchase.count({
-        where: { tenantId, status: PurchaseStatus.DRAFT },
-      }),
-    ]);
+    const headlineCounts = await this.prisma.$queryRaw<
+      DashboardHeadlineCounts[]
+    >`
+      SELECT
+        (SELECT COUNT(*)::bigint FROM "Product" WHERE "tenantId" = ${tenantId}) AS "productCount",
+        (SELECT COUNT(*)::bigint FROM "Customer" WHERE "tenantId" = ${tenantId}) AS "customerCount",
+        (SELECT COUNT(*)::bigint FROM "Supplier" WHERE "tenantId" = ${tenantId}) AS "supplierCount",
+        (SELECT COUNT(*)::bigint FROM "Warehouse" WHERE "tenantId" = ${tenantId}) AS "warehouseCount",
+        (
+          SELECT COUNT(*)::bigint
+          FROM "Order"
+          WHERE "tenantId" = ${tenantId}
+            AND "status" IN (${OrderStatus.DRAFT}::"OrderStatus", ${OrderStatus.CONFIRMED}::"OrderStatus", ${OrderStatus.PICKED}::"OrderStatus", ${OrderStatus.SHIPPED}::"OrderStatus")
+        ) AS "activeOrderCount",
+        (
+          SELECT COUNT(*)::bigint
+          FROM "Purchase"
+          WHERE "tenantId" = ${tenantId}
+            AND "status" = ${PurchaseStatus.DRAFT}::"PurchaseStatus"
+        ) AS "draftPurchaseCount"
+    `;
+
+    const productCount = toCount(headlineCounts[0]?.productCount);
+    const customerCount = toCount(headlineCounts[0]?.customerCount);
+    const supplierCount = toCount(headlineCounts[0]?.supplierCount);
+    const warehouseCount = toCount(headlineCounts[0]?.warehouseCount);
+    const activeOrderCount = toCount(headlineCounts[0]?.activeOrderCount);
+    const draftPurchaseCount = toCount(headlineCounts[0]?.draftPurchaseCount);
 
     const [inventoryTotals, lowStockCountResult, lowStockItems] =
       await Promise.all([
