@@ -244,10 +244,10 @@ export class AuthService {
       tenantId: user.tenantId,
       tenantName: user.tenant.name,
       roles: user.roles.map((role) => role.name),
-	      isPlatformAdmin: user.isPlatformAdmin,
-	      createdAt: user.createdAt,
-	      updatedAt: user.updatedAt,
-	    }));
+      isPlatformAdmin: user.isPlatformAdmin,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    }));
   }
 
   async updateUser(
@@ -262,11 +262,11 @@ export class AuthService {
       include: { roles: true, tenant: true },
     });
 
-	    if (!targetUser) {
-	      throw new BadRequestException('User not found.');
-	    }
+    if (!targetUser) {
+      throw new BadRequestException('User not found.');
+    }
 
-	    assertUnchangedSinceLoaded(targetUser.updatedAt, dto.expectedUpdatedAt);
+    assertUnchangedSinceLoaded(targetUser.updatedAt, dto.expectedUpdatedAt);
 
     if (!dto.name && !dto.role) {
       throw new BadRequestException('Provide at least one field to update.');
@@ -321,10 +321,10 @@ export class AuthService {
       tenantId: updatedUser.tenantId,
       tenantName: updatedUser.tenant.name,
       roles: updatedUser.roles.map((role) => role.name),
-	      isPlatformAdmin: updatedUser.isPlatformAdmin,
-	      createdAt: updatedUser.createdAt,
-	      updatedAt: updatedUser.updatedAt,
-	    };
+      isPlatformAdmin: updatedUser.isPlatformAdmin,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
+    };
   }
 
   async listTenants(currentUser: UserPayload) {
@@ -376,14 +376,11 @@ export class AuthService {
       },
     });
 
-	    if (!existingTenant) {
-	      throw new BadRequestException('Tenant was not found.');
-	    }
+    if (!existingTenant) {
+      throw new BadRequestException('Tenant was not found.');
+    }
 
-	    assertUnchangedSinceLoaded(
-	      existingTenant.updatedAt,
-	      dto.expectedUpdatedAt,
-	    );
+    assertUnchangedSinceLoaded(existingTenant.updatedAt, dto.expectedUpdatedAt);
 
     if (existingTenant.status === dto.status) {
       return {

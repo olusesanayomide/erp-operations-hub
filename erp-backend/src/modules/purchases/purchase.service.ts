@@ -269,22 +269,22 @@ export class PurchaseService {
     return purchase;
   }
 
-	  async recievePurchase(
-	    tenantId: string,
-	    userId: string,
-	    purchaseId: string,
-	    expectedUpdatedAt?: string,
-	  ) {
+  async recievePurchase(
+    tenantId: string,
+    userId: string,
+    purchaseId: string,
+    expectedUpdatedAt?: string,
+  ) {
     return await this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
         where: { id: purchaseId, tenantId },
         include: { items: true },
       });
-	      if (!purchase) {
-	        throw new NotFoundException('Purchase order not found');
-	      }
-	      assertUnchangedSinceLoaded(purchase.updatedAt, expectedUpdatedAt);
-	      const currentStatus = purchase.status as PurchaseLifecycleStatus;
+      if (!purchase) {
+        throw new NotFoundException('Purchase order not found');
+      }
+      assertUnchangedSinceLoaded(purchase.updatedAt, expectedUpdatedAt);
+      const currentStatus = purchase.status as PurchaseLifecycleStatus;
       if (
         !PURCHASE_STATUS_TRANSITIONS[currentStatus].includes(
           PurchaseLifecycleStatus.RECEIVED,
@@ -301,39 +301,54 @@ export class PurchaseService {
           receivedAt: new Date(),
         },
       });
-      const movementPromises = purchase.items.map((item) => {
-        return tx.stockMovement.create({
-          data: {
-            tenantId,
-            productId: item.productId,
-            warehouseId: purchase.warehouseId,
-            quantity: item.quantity,
-            type: 'IN',
-            reference: `Purchase Order ${purchase.purchaseOrder}`,
-          },
-        });
+
+      await tx.stockMovement.createMany({
+        data: purchase.items.map((item) => ({
+          tenantId,
+          productId: item.productId,
+          warehouseId: purchase.warehouseId,
+          quantity: item.quantity,
+          type: 'IN',
+          reference: `Purchase Order ${purchase.purchaseOrder}`,
+        })),
       });
-      const inventoryUpserts = purchase.items.map((item) => {
-        return tx.inventoryItem.upsert({
-          where: {
-            tenantId_productId_warehouseId: {
-              tenantId,
-              productId: item.productId,
-              warehouseId: purchase.warehouseId,
+
+      const receivedQuantityByProduct = purchase.items.reduce(
+        (quantities, item) => {
+          quantities.set(
+            item.productId,
+            (quantities.get(item.productId) ?? 0) + item.quantity,
+          );
+          return quantities;
+        },
+        new Map<string, number>(),
+      );
+
+      const inventoryUpserts = Array.from(receivedQuantityByProduct).map(
+        ([productId, quantity]) => {
+          return tx.inventoryItem.upsert({
+            where: {
+              tenantId_productId_warehouseId: {
+                tenantId,
+                productId,
+                warehouseId: purchase.warehouseId,
+              },
             },
-          },
-          update: {
-            quantity: { increment: item.quantity },
-          },
-          create: {
-            tenantId,
-            productId: item.productId,
-            warehouseId: purchase.warehouseId,
-            quantity: item.quantity,
-          },
-        });
-      });
-      await Promise.all([...movementPromises, ...inventoryUpserts]);
+            update: {
+              quantity: { increment: quantity },
+            },
+            create: {
+              tenantId,
+              productId,
+              warehouseId: purchase.warehouseId,
+              quantity,
+              reservedQuantity: 0,
+            },
+          });
+        },
+      );
+
+      await Promise.all(inventoryUpserts);
 
       await this.notificationsService.createForTenant({
         client: tx,
@@ -356,29 +371,29 @@ export class PurchaseService {
   async updateStatus(
     tenantId: string,
     userId: string,
-	    purchaseId: string,
-	    status: PurchaseLifecycleStatus,
-	    expectedUpdatedAt?: string,
-	  ) {
-	    if (status === PurchaseLifecycleStatus.RECEIVED) {
-	      return this.recievePurchase(
-	        tenantId,
-	        userId,
-	        purchaseId,
-	        expectedUpdatedAt,
-	      );
-	    }
+    purchaseId: string,
+    status: PurchaseLifecycleStatus,
+    expectedUpdatedAt?: string,
+  ) {
+    if (status === PurchaseLifecycleStatus.RECEIVED) {
+      return this.recievePurchase(
+        tenantId,
+        userId,
+        purchaseId,
+        expectedUpdatedAt,
+      );
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
         where: { id: purchaseId, tenantId },
       });
 
-	      if (!purchase) {
-	        throw new NotFoundException('Purchase order not found');
-	      }
+      if (!purchase) {
+        throw new NotFoundException('Purchase order not found');
+      }
 
-	      assertUnchangedSinceLoaded(purchase.updatedAt, expectedUpdatedAt);
+      assertUnchangedSinceLoaded(purchase.updatedAt, expectedUpdatedAt);
 
       const currentStatus = purchase.status as PurchaseLifecycleStatus;
 

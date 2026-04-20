@@ -24,7 +24,8 @@ export class ProductDto {
   price: number;
 
   @ApiProperty({
-    description: 'Minimum stock level before the product is considered low stock',
+    description:
+      'Minimum stock level before the product is considered low stock',
     required: false,
     default: 10,
   })
@@ -73,7 +74,8 @@ export class UpdateProductDto {
   price?: number;
 
   @ApiProperty({
-    description: 'Minimum stock level before the product is considered low stock',
+    description:
+      'Minimum stock level before the product is considered low stock',
     required: false,
   })
   @IsOptional()

@@ -18,7 +18,10 @@ const MAX_PAGE_SIZE = 100;
 
 export function hasListQuery(query: ListQuery) {
   return Boolean(
-    query.page || query.pageSize || query.search?.trim() || query.status?.trim(),
+    query.page ||
+    query.pageSize ||
+    query.search?.trim() ||
+    query.status?.trim(),
   );
 }
 

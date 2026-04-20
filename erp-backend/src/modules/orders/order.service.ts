@@ -58,6 +58,33 @@ export class OrdersService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  private aggregateStockBuckets(
+    items: Array<{ productId: string; warehouseId: string; quantity: number }>,
+  ) {
+    const buckets = new Map<
+      string,
+      { productId: string; warehouseId: string; quantity: number }
+    >();
+
+    for (const item of items) {
+      const key = `${item.productId}:${item.warehouseId}`;
+      const existing = buckets.get(key);
+
+      if (existing) {
+        existing.quantity += item.quantity;
+        continue;
+      }
+
+      buckets.set(key, {
+        productId: item.productId,
+        warehouseId: item.warehouseId,
+        quantity: item.quantity,
+      });
+    }
+
+    return Array.from(buckets.values());
+  }
+
   private async reserveOrderItemStock(
     tx: Prisma.TransactionClient,
     tenantId: string,
@@ -365,21 +392,21 @@ export class OrdersService {
   async updateStatus(
     tenantId: string,
     userId: string,
-	    orderId: string,
-	    status: OrderLifecycleStatus,
-	    expectedUpdatedAt?: string,
-	  ) {
+    orderId: string,
+    status: OrderLifecycleStatus,
+    expectedUpdatedAt?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, tenantId },
         include: { items: true },
       });
 
-	      if (!order) {
-	        throw new BadRequestException('Order not found');
-	      }
+      if (!order) {
+        throw new BadRequestException('Order not found');
+      }
 
-	      assertUnchangedSinceLoaded(order.updatedAt, expectedUpdatedAt);
+      assertUnchangedSinceLoaded(order.updatedAt, expectedUpdatedAt);
 
       const currentStatus = order.status as OrderLifecycleStatus;
 
@@ -408,7 +435,7 @@ export class OrdersService {
         currentStatus === OrderLifecycleStatus.DRAFT &&
         status === OrderLifecycleStatus.CONFIRMED
       ) {
-        for (const item of order.items) {
+        for (const item of this.aggregateStockBuckets(order.items)) {
           await this.reserveOrderItemStock(
             tx,
             tenantId,
@@ -423,7 +450,7 @@ export class OrdersService {
         currentStatus === OrderLifecycleStatus.PICKED &&
         status === OrderLifecycleStatus.SHIPPED
       ) {
-        for (const item of order.items) {
+        for (const item of this.aggregateStockBuckets(order.items)) {
           await this.consumeReservedOrderItemStock(
             tx,
             tenantId,
@@ -440,7 +467,7 @@ export class OrdersService {
         (currentStatus === OrderLifecycleStatus.CONFIRMED ||
           currentStatus === OrderLifecycleStatus.PICKED)
       ) {
-        for (const item of order.items) {
+        for (const item of this.aggregateStockBuckets(order.items)) {
           await this.releaseOrderItemStock(
             tx,
             tenantId,
@@ -451,18 +478,18 @@ export class OrdersService {
         }
       }
 
-	      const updatedOrder = await tx.order.update({
-	        where: { id: orderId },
-	        data: { status: ORDER_STATUS_DB_MAP[status] },
-	        include: {
-	          items: {
-	            include: {
-	              product: true,
-	            },
-	          },
-	          customer: true,
-	        },
-	      });
+      const updatedOrder = await tx.order.update({
+        where: { id: orderId },
+        data: { status: ORDER_STATUS_DB_MAP[status] },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          customer: true,
+        },
+      });
 
       await this.notificationsService.createForTenant({
         client: tx,

@@ -135,19 +135,22 @@ export class InventoryService {
 
     await this.validateProductAndWarehouse(tenantId, productId, warehouseId);
 
-    const inventory = await this.prisma.inventoryItem.findUnique({
-      where: {
-        tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
-      },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const inventoryUpdate = await tx.inventoryItem.updateMany({
+        where: {
+          tenantId,
+          productId,
+          warehouseId,
+          quantity: { gte: quantity },
+        },
+        data: { quantity: { decrement: quantity } },
+      });
 
-    if (!inventory)
-      throw new BadRequestException('Inventory item does not exist');
-    if (inventory.quantity < quantity)
-      throw new BadRequestException('Insufficient stock');
+      if (inventoryUpdate.count === 0) {
+        throw new BadRequestException('Insufficient stock');
+      }
 
-    return this.prisma.$transaction([
-      this.prisma.stockMovement.create({
+      const movement = await tx.stockMovement.create({
         data: {
           tenantId,
           productId,
@@ -156,14 +159,16 @@ export class InventoryService {
           type: StockMovementType.OUT,
           reference: 'STOCK_OUT',
         },
-      }),
-      this.prisma.inventoryItem.update({
+      });
+
+      const inventory = await tx.inventoryItem.findUnique({
         where: {
           tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
         },
-        data: { quantity: { decrement: quantity } },
-      }),
-    ]);
+      });
+
+      return [movement, inventory];
+    });
   }
 
   async transferStock(

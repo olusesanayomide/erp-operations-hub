@@ -41,9 +41,21 @@ export class ProductService {
         this.prisma.product.findMany({
           where,
           include: {
-            inventoryItems: true,
-            orderItems: true,
-            stockMovements: true,
+            inventoryItems: {
+              select: {
+                id: true,
+                productId: true,
+                warehouseId: true,
+                quantity: true,
+                reservedQuantity: true,
+              },
+            },
+            _count: {
+              select: {
+                orderItems: true,
+                stockMovements: true,
+              },
+            },
           },
           orderBy: { createdAt: 'desc' },
           skip: options.skip,
@@ -58,9 +70,21 @@ export class ProductService {
     return this.prisma.product.findMany({
       where: { tenantId: user.tenantId },
       include: {
-        inventoryItems: true,
-        orderItems: true,
-        stockMovements: true,
+        inventoryItems: {
+          select: {
+            id: true,
+            productId: true,
+            warehouseId: true,
+            quantity: true,
+            reservedQuantity: true,
+          },
+        },
+        _count: {
+          select: {
+            orderItems: true,
+            stockMovements: true,
+          },
+        },
       },
     });
   }

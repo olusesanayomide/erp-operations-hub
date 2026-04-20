@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { OrderStatus, Prisma, PurchaseStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 
@@ -19,6 +19,11 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 };
 
 function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
+  if (value == null) return 0;
+  return Number(value);
+}
+
+function toCount(value: bigint | number | string | null | undefined) {
   if (value == null) return 0;
   return Number(value);
 }
@@ -49,13 +54,24 @@ function calculateTrend(current: number, previous: number) {
   return Math.round(((current - previous) / Math.abs(previous)) * 100);
 }
 
-function createTrend(current: number, previous: number, label = 'vs previous 30d') {
+function createTrend(
+  current: number,
+  previous: number,
+  label = 'vs previous 30d',
+) {
   return {
     value: calculateTrend(current, previous),
     label,
     current,
     previous,
   };
+}
+
+function isDatabaseUnavailableError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P1001'
+  );
 }
 
 @Injectable()
@@ -66,6 +82,32 @@ export class DashboardService {
     const { currentStart, currentEnd, previousStart, previousEnd } =
       getPreviousPeriodWindow();
 
+    try {
+      return await this.buildSummary(
+        tenantId,
+        currentStart,
+        currentEnd,
+        previousStart,
+        previousEnd,
+      );
+    } catch (error) {
+      if (isDatabaseUnavailableError(error)) {
+        throw new ServiceUnavailableException(
+          'The database is currently unreachable. Please try again in a moment.',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  private async buildSummary(
+    tenantId: string,
+    currentStart: Date,
+    currentEnd: Date,
+    previousStart: Date,
+    previousEnd: Date,
+  ) {
     const [
       productCount,
       customerCount,
@@ -73,25 +115,6 @@ export class DashboardService {
       warehouseCount,
       activeOrderCount,
       draftPurchaseCount,
-      inventoryItems,
-      orderStatusGroups,
-      recentOrders,
-      recentOrdersForTrend,
-      recentPurchasesForTrend,
-      currentProductsCreated,
-      previousProductsCreated,
-      currentCustomersCreated,
-      previousCustomersCreated,
-      currentSuppliersCreated,
-      previousSuppliersCreated,
-      currentWarehousesCreated,
-      previousWarehousesCreated,
-      currentActiveOrdersCreated,
-      previousActiveOrdersCreated,
-      currentDraftPurchasesCreated,
-      previousDraftPurchasesCreated,
-      currentInventoryMovements,
-      previousInventoryMovements,
     ] = await Promise.all([
       this.prisma.product.count({ where: { tenantId } }),
       this.prisma.customer.count({ where: { tenantId } }),
@@ -103,58 +126,105 @@ export class DashboardService {
       this.prisma.purchase.count({
         where: { tenantId, status: PurchaseStatus.DRAFT },
       }),
-      this.prisma.inventoryItem.findMany({
-        where: { tenantId },
-        include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              sku: true,
-              minStock: true,
+    ]);
+
+    const [inventoryTotals, lowStockCountResult, lowStockItems] =
+      await Promise.all([
+        this.prisma.inventoryItem.aggregate({
+          where: { tenantId },
+          _sum: {
+            quantity: true,
+            reservedQuantity: true,
+          },
+        }),
+        this.prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS "count"
+        FROM "InventoryItem" inventory
+        INNER JOIN "Product" product ON product."id" = inventory."productId"
+        WHERE inventory."tenantId" = ${tenantId}
+          AND inventory."quantity" <= product."minStock"
+      `,
+        this.prisma.$queryRaw<
+          Array<{
+            id: string;
+            productId: string;
+            warehouseId: string;
+            productName: string | null;
+            productSku: string | null;
+            warehouseName: string | null;
+            quantity: number;
+            reservedQuantity: number;
+            minStock: number;
+          }>
+        >`
+        SELECT
+          inventory."id",
+          inventory."productId",
+          inventory."warehouseId",
+          product."name" AS "productName",
+          product."sku" AS "productSku",
+          warehouse."name" AS "warehouseName",
+          inventory."quantity",
+          inventory."reservedQuantity",
+          product."minStock"
+        FROM "InventoryItem" inventory
+        INNER JOIN "Product" product ON product."id" = inventory."productId"
+        INNER JOIN "Warehouse" warehouse ON warehouse."id" = inventory."warehouseId"
+        WHERE inventory."tenantId" = ${tenantId}
+          AND inventory."quantity" <= product."minStock"
+        ORDER BY inventory."quantity" ASC, product."name" ASC
+        LIMIT 5
+      `,
+      ]);
+
+    const [orderStatusGroups, recentOrders, recentOrdersForTrend] =
+      await Promise.all([
+        this.prisma.order.groupBy({
+          by: ['status'],
+          where: { tenantId },
+          _count: { _all: true },
+        }),
+        this.prisma.order.findMany({
+          where: { tenantId },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            status: true,
+            customerId: true,
+            totalAmount: true,
+            createdAt: true,
+            updatedAt: true,
+            customer: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
-          warehouse: {
-            select: {
-              id: true,
-              name: true,
-            },
+        }),
+        this.prisma.order.findMany({
+          where: { tenantId },
+          orderBy: { createdAt: 'desc' },
+          take: 6,
+          select: {
+            createdAt: true,
+            totalAmount: true,
           },
-        },
-      }),
-      this.prisma.order.groupBy({
-        by: ['status'],
-        where: { tenantId },
-        _count: { _all: true },
-      }),
-      this.prisma.order.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          status: true,
-          customerId: true,
-          totalAmount: true,
-          createdAt: true,
-          updatedAt: true,
-          customer: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-      }),
-      this.prisma.order.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
-        take: 6,
-        select: {
-          createdAt: true,
-          totalAmount: true,
-        },
-      }),
+        }),
+      ]);
+
+    const [
+      recentPurchasesForTrend,
+      currentProductsCreated,
+      previousProductsCreated,
+      currentCustomersCreated,
+      previousCustomersCreated,
+      currentSuppliersCreated,
+      previousSuppliersCreated,
+      currentWarehousesCreated,
+      previousWarehousesCreated,
+    ] = await Promise.all([
       this.prisma.purchase.findMany({
         where: { tenantId },
         orderBy: { createdAt: 'desc' },
@@ -188,6 +258,16 @@ export class DashboardService {
       this.prisma.warehouse.count({
         where: { tenantId, createdAt: { gte: previousStart, lt: previousEnd } },
       }),
+    ]);
+
+    const [
+      currentActiveOrdersCreated,
+      previousActiveOrdersCreated,
+      currentDraftPurchasesCreated,
+      previousDraftPurchasesCreated,
+      currentInventoryMovementGroups,
+      previousInventoryMovementGroups,
+    ] = await Promise.all([
       this.prisma.order.count({
         where: {
           tenantId,
@@ -216,56 +296,44 @@ export class DashboardService {
           createdAt: { gte: previousStart, lt: previousEnd },
         },
       }),
-      this.prisma.stockMovement.findMany({
+      this.prisma.stockMovement.groupBy({
+        by: ['type'],
         where: { tenantId, createdAt: { gte: currentStart, lt: currentEnd } },
-        select: {
-          quantity: true,
-          type: true,
-        },
+        _sum: { quantity: true },
       }),
-      this.prisma.stockMovement.findMany({
+      this.prisma.stockMovement.groupBy({
+        by: ['type'],
         where: { tenantId, createdAt: { gte: previousStart, lt: previousEnd } },
-        select: {
-          quantity: true,
-          type: true,
-        },
+        _sum: { quantity: true },
       }),
     ]);
 
-    const availableQuantity = inventoryItems.reduce(
-      (sum, item) => sum + (item.quantity || 0),
-      0,
-    );
-    const reservedQuantity = inventoryItems.reduce(
-      (sum, item) => sum + (item.reservedQuantity || 0),
-      0,
-    );
+    const availableQuantity = inventoryTotals._sum.quantity ?? 0;
+    const reservedQuantity = inventoryTotals._sum.reservedQuantity ?? 0;
+    const lowStockCount = toCount(lowStockCountResult[0]?.count);
+    const formattedLowStockItems = lowStockItems.map((item) => {
+      const minStock = item.minStock ?? 10;
+      const status =
+        item.quantity > minStock
+          ? 'in-stock'
+          : item.quantity > 0
+            ? 'low-stock'
+            : 'out-of-stock';
 
-    const lowStockItems = inventoryItems
-      .filter((item) => item.quantity <= (item.product?.minStock ?? 10))
-      .map((item) => {
-        const minStock = item.product?.minStock ?? 10;
-        const status =
-          item.quantity > minStock
-            ? 'in-stock'
-            : item.quantity > 0
-              ? 'low-stock'
-              : 'out-of-stock';
-
-        return {
-          id: item.id,
-          productId: item.productId,
-          warehouseId: item.warehouseId,
-          productName: item.product?.name ?? 'Unknown product',
-          productSku: item.product?.sku ?? '',
-          warehouseName: item.warehouse?.name ?? 'Unknown warehouse',
-          quantity: item.quantity || 0,
-          reservedQuantity: item.reservedQuantity || 0,
-          onHandQuantity: (item.quantity || 0) + (item.reservedQuantity || 0),
-          minStock,
-          status,
-        };
-      });
+      return {
+        id: item.id,
+        productId: item.productId,
+        warehouseId: item.warehouseId,
+        productName: item.productName ?? 'Unknown product',
+        productSku: item.productSku ?? '',
+        warehouseName: item.warehouseName ?? 'Unknown warehouse',
+        quantity: item.quantity || 0,
+        reservedQuantity: item.reservedQuantity || 0,
+        onHandQuantity: (item.quantity || 0) + (item.reservedQuantity || 0),
+        minStock,
+        status,
+      };
+    });
 
     const orderCountsByStatus = new Map(
       orderStatusGroups.map((group) => [group.status, group._count._all]),
@@ -290,19 +358,20 @@ export class DashboardService {
     ];
 
     const getNetInventoryMovement = (
-      movements: typeof currentInventoryMovements,
+      groups: typeof currentInventoryMovementGroups,
     ) =>
-      movements.reduce((sum, movement) => {
-        if (movement.type === 'IN') return sum + movement.quantity;
-        if (movement.type === 'OUT') return sum - movement.quantity;
-        return sum + movement.quantity;
+      groups.reduce((sum, group) => {
+        const quantity = group._sum.quantity ?? 0;
+        if (group.type === 'IN') return sum + quantity;
+        if (group.type === 'OUT') return sum - quantity;
+        return sum + quantity;
       }, 0);
 
     const currentNetInventoryMovement = getNetInventoryMovement(
-      currentInventoryMovements,
+      currentInventoryMovementGroups,
     );
     const previousNetInventoryMovement = getNetInventoryMovement(
-      previousInventoryMovements,
+      previousInventoryMovementGroups,
     );
 
     return {
@@ -315,8 +384,8 @@ export class DashboardService {
       inventory: {
         availableQuantity,
         reservedQuantity,
-        lowStockCount: lowStockItems.length,
-        lowStockItems: lowStockItems.slice(0, 5),
+        lowStockCount,
+        lowStockItems: formattedLowStockItems,
       },
       orders: {
         activeCount: activeOrderCount,
@@ -344,8 +413,14 @@ export class DashboardService {
             ],
       trends: {
         products: createTrend(currentProductsCreated, previousProductsCreated),
-        customers: createTrend(currentCustomersCreated, previousCustomersCreated),
-        suppliers: createTrend(currentSuppliersCreated, previousSuppliersCreated),
+        customers: createTrend(
+          currentCustomersCreated,
+          previousCustomersCreated,
+        ),
+        suppliers: createTrend(
+          currentSuppliersCreated,
+          previousSuppliersCreated,
+        ),
         warehouses: createTrend(
           currentWarehousesCreated,
           previousWarehousesCreated,
