@@ -28,20 +28,6 @@ export class InventoryService {
     return { product, warehouse };
   }
 
-  private async getAvailableStock(
-    tenantId: string,
-    productId: string,
-    warehouseId: string,
-  ) {
-    const inventory = await this.prisma.inventoryItem.findUnique({
-      where: {
-        tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
-      },
-    });
-
-    return inventory?.quantity || 0;
-  }
-
   async getInventory(tenantId: string) {
     const groups = await this.prisma.inventoryItem.findMany({
       where: { tenantId },
@@ -150,7 +136,7 @@ export class InventoryService {
         throw new BadRequestException('Insufficient stock');
       }
 
-      const movement = await tx.stockMovement.create({
+      return tx.stockMovement.create({
         data: {
           tenantId,
           productId,
@@ -160,14 +146,6 @@ export class InventoryService {
           reference: 'STOCK_OUT',
         },
       });
-
-      const inventory = await tx.inventoryItem.findUnique({
-        where: {
-          tenantId_productId_warehouseId: { tenantId, productId, warehouseId },
-        },
-      });
-
-      return [movement, inventory];
     });
   }
 

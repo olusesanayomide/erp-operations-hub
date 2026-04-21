@@ -124,7 +124,7 @@ export class ProductController {
     @Body() dto: ProductDto,
     @GetUser() user: UserPayload,
   ): Promise<Product> {
-    return this.productService.createproduct(dto, user);
+    return this.productService.createProduct(dto, user);
   }
 
   @Put(':id')

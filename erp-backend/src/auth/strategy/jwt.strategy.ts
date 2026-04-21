@@ -90,7 +90,7 @@ export class JwtStrategy
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKeyProvider: (_request, rawJwtToken, done) => {
+      secretOrKeyProvider: (_request, rawJwtToken: string, done) => {
         void this.resolveVerificationKey(rawJwtToken)
           .then((key) => done(null, key))
           .catch((error: unknown) => {

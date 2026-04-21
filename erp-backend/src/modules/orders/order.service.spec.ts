@@ -4,6 +4,7 @@ import { OrderLifecycleStatus } from './order-status.enum';
 
 describe('OrdersService.updateStatus', () => {
   const tenantId = 'tenant-1';
+  const userId = 'user-1';
   const orderId = 'order-1';
 
   let service: OrdersService;
@@ -13,6 +14,7 @@ describe('OrdersService.updateStatus', () => {
     inventoryItem: { updateMany: jest.Mock };
     stockMovement: { create: jest.Mock };
   };
+  let notificationsService: { createForTenant: jest.Mock };
 
   beforeEach(() => {
     prisma = {
@@ -21,6 +23,7 @@ describe('OrdersService.updateStatus', () => {
       inventoryItem: { updateMany: jest.fn() },
       stockMovement: { create: jest.fn() },
     };
+    notificationsService = { createForTenant: jest.fn() };
 
     prisma.$transaction.mockImplementation(async (operation: any) => {
       if (typeof operation === 'function') {
@@ -30,7 +33,7 @@ describe('OrdersService.updateStatus', () => {
       return Promise.all(operation);
     });
 
-    service = new OrdersService(prisma as any);
+    service = new OrdersService(prisma as any, notificationsService as any);
   });
 
   it('confirms draft order and reserves stock atomically', async () => {
@@ -47,6 +50,7 @@ describe('OrdersService.updateStatus', () => {
 
     const result = await service.updateStatus(
       tenantId,
+      userId,
       orderId,
       OrderLifecycleStatus.CONFIRMED,
     );
@@ -68,6 +72,14 @@ describe('OrdersService.updateStatus', () => {
     expect(prisma.order.update).toHaveBeenCalledWith({
       where: { id: orderId },
       data: { status: OrderLifecycleStatus.CONFIRMED },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        customer: true,
+      },
     });
   });
 
@@ -86,6 +98,7 @@ describe('OrdersService.updateStatus', () => {
 
     const result = await service.updateStatus(
       tenantId,
+      userId,
       orderId,
       OrderLifecycleStatus.SHIPPED,
     );
@@ -123,7 +136,12 @@ describe('OrdersService.updateStatus', () => {
     prisma.inventoryItem.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(
-      service.updateStatus(tenantId, orderId, OrderLifecycleStatus.SHIPPED),
+      service.updateStatus(
+        tenantId,
+        userId,
+        orderId,
+        OrderLifecycleStatus.SHIPPED,
+      ),
     ).rejects.toThrow(new BadRequestException('Insufficient reserved stock'));
 
     expect(prisma.order.update).not.toHaveBeenCalled();
@@ -143,6 +161,7 @@ describe('OrdersService.updateStatus', () => {
 
     const result = await service.updateStatus(
       tenantId,
+      userId,
       orderId,
       OrderLifecycleStatus.CANCELLED,
     );
@@ -165,6 +184,7 @@ describe('OrdersService.updateStatus', () => {
 
 describe('OrdersService.createOrder', () => {
   const tenantId = 'tenant-1';
+  const userId = 'user-1';
 
   let service: OrdersService;
   let prisma: {
@@ -174,6 +194,7 @@ describe('OrdersService.createOrder', () => {
     warehouse: { findMany: jest.Mock };
     order: { create: jest.Mock };
   };
+  let notificationsService: { createForTenant: jest.Mock };
 
   beforeEach(() => {
     prisma = {
@@ -183,6 +204,7 @@ describe('OrdersService.createOrder', () => {
       warehouse: { findMany: jest.fn() },
       order: { create: jest.fn() },
     };
+    notificationsService = { createForTenant: jest.fn() };
 
     prisma.$transaction.mockImplementation(async (operation: any) => {
       if (typeof operation === 'function') {
@@ -192,7 +214,7 @@ describe('OrdersService.createOrder', () => {
       return Promise.all(operation);
     });
 
-    service = new OrdersService(prisma as any);
+    service = new OrdersService(prisma as any, notificationsService as any);
   });
 
   it('creates an order with items atomically in a single transaction', async () => {
@@ -222,7 +244,7 @@ describe('OrdersService.createOrder', () => {
       ],
     });
 
-    const result = await service.createOrder(tenantId, {
+    const result = await service.createOrder(tenantId, userId, {
       customerId: 'customer-1',
       items: [
         { productId: 'product-1', warehouseId: 'warehouse-1', quantity: 2 },
@@ -257,7 +279,7 @@ describe('OrdersService.createOrder', () => {
 
   it('rejects order creation when no items are provided', async () => {
     await expect(
-      service.createOrder(tenantId, {
+      service.createOrder(tenantId, userId, {
         customerId: 'customer-1',
         items: [],
       }),

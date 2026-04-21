@@ -18,11 +18,38 @@ import {
   ListQuery,
 } from 'src/common/pagination';
 
+type ProductListItem = Prisma.ProductGetPayload<{
+  include: {
+    inventoryItems: {
+      select: {
+        id: true;
+        productId: true;
+        warehouseId: true;
+        quantity: true;
+        reservedQuantity: true;
+      };
+    };
+    _count: {
+      select: {
+        orderItems: true;
+        stockMovements: true;
+      };
+    };
+  };
+}>;
+
+type ProductListResult =
+  | ProductListItem[]
+  | ReturnType<typeof createPaginatedResult<ProductListItem>>;
+
 @Injectable()
 export class ProductService {
   constructor(private prisma: PrismaService) {}
 
-  async getAll(user: UserPayload, query: ListQuery = {}): Promise<any> {
+  async getAll(
+    user: UserPayload,
+    query: ListQuery = {},
+  ): Promise<ProductListResult> {
     if (hasListQuery(query)) {
       const options = getPaginationOptions(query);
       const where: Prisma.ProductWhereInput = {
@@ -104,7 +131,7 @@ export class ProductService {
     return product;
   }
 
-  async createproduct(
+  async createProduct(
     data: {
       name: string;
       sku: string;

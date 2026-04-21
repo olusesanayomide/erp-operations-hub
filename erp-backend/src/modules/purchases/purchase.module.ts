@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
-import { PurchaseContoller } from './purchase.controller';
+import { PurchaseController } from './purchase.controller';
 import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({
   imports: [NotificationsModule],
-  controllers: [PurchaseContoller],
+  controllers: [PurchaseController],
   providers: [PurchaseService],
   exports: [PurchaseService],
 })

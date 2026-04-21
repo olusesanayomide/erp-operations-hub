@@ -765,6 +765,10 @@ function getAuthRedirectBaseUrl() {
     return window.location.origin;
   }
 
+  if (import.meta.env.PROD) {
+    throw new Error("VITE_SITE_URL must be configured for production password reset links.");
+  }
+
   return "http://localhost:8080";
 }
 

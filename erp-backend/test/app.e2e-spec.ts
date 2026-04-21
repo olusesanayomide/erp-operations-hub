@@ -12,7 +12,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { OrdersController } from '../src/modules/orders/order.controller';
 import { OrdersService } from '../src/modules/orders/order.service';
-import { PurchaseContoller } from '../src/modules/purchases/purchase.controller';
+import { PurchaseController } from '../src/modules/purchases/purchase.controller';
 import { PurchaseService } from '../src/modules/purchases/purchase.service';
 import { Role } from '../src/auth/enums/role.enum';
 import { ROLES_KEY } from '../src/auth/decorator/role.decorator';
@@ -84,13 +84,13 @@ describe('Auth & RBAC (e2e)', () => {
   const purchaseService = {
     findAll: jest.fn().mockResolvedValue([]),
     createPurchase: jest.fn(),
-    recievePurchase: jest.fn(),
+    receivePurchase: jest.fn(),
     getPurchaseDetails: jest.fn(),
   };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      controllers: [OrdersController, PurchaseContoller],
+      controllers: [OrdersController, PurchaseController],
       providers: [
         Reflector,
         { provide: OrdersService, useValue: ordersService },

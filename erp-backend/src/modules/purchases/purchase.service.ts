@@ -19,7 +19,7 @@ import {
   getPaginationOptions,
   hasListQuery,
   ListQuery,
-} from 'src/common/pagination';
+} from '../../common/pagination';
 
 const PURCHASE_STATUS_TRANSITIONS: Record<
   PurchaseLifecycleStatus,
@@ -269,7 +269,7 @@ export class PurchaseService {
     return purchase;
   }
 
-  async recievePurchase(
+  async receivePurchase(
     tenantId: string,
     userId: string,
     purchaseId: string,
@@ -376,7 +376,7 @@ export class PurchaseService {
     expectedUpdatedAt?: string,
   ) {
     if (status === PurchaseLifecycleStatus.RECEIVED) {
-      return this.recievePurchase(
+      return this.receivePurchase(
         tenantId,
         userId,
         purchaseId,

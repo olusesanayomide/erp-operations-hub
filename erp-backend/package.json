@@ -13,6 +13,7 @@
     "prisma:migrate:status": "npm run prisma:direct -- migrate status",
     "prisma:db:push": "npm run prisma:direct -- db push",
     "build": "nest build",
+    "typecheck": "tsc --noEmit",
     "prebuild": "npm run prisma:ensure-client",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "postinstall": "npm run prisma:ensure-client",

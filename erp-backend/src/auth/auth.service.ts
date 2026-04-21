@@ -272,17 +272,14 @@ export class AuthService {
       throw new BadRequestException('Provide at least one field to update.');
     }
 
-    if (
-      dto.role &&
-      currentUser.userId === userId &&
-      dto.role !== targetUser.roles[0]?.name
-    ) {
+    const currentRole = targetUser.roles[0]?.name as Role | undefined;
+
+    if (dto.role && currentUser.userId === userId && dto.role !== currentRole) {
       throw new BadRequestException(
         'You cannot change your own role from the current session.',
       );
     }
 
-    const currentRole = targetUser.roles[0]?.name;
     if (dto.role && dto.role !== currentRole && currentRole === Role.ADMIN) {
       const tenantAdminCount = await this.prisma.user.count({
         where: {
@@ -382,7 +379,9 @@ export class AuthService {
 
     assertUnchangedSinceLoaded(existingTenant.updatedAt, dto.expectedUpdatedAt);
 
-    if (existingTenant.status === dto.status) {
+    const existingTenantStatus = existingTenant.status as TenantStatusValue;
+
+    if (existingTenantStatus === dto.status) {
       return {
         id: existingTenant.id,
         name: existingTenant.name,
@@ -395,7 +394,7 @@ export class AuthService {
     }
 
     if (
-      existingTenant.status === TenantStatusValue.ARCHIVED &&
+      existingTenantStatus === TenantStatusValue.ARCHIVED &&
       dto.status === TenantStatusValue.SUSPENDED
     ) {
       throw new BadRequestException(

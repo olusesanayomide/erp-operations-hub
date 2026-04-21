@@ -7,17 +7,19 @@ function normalizeOrigin(origin: string) {
   return origin.trim().replace(/\/$/, '');
 }
 
-function getAllowedOrigins() {
+function getAllowedOrigins(isProduction: boolean) {
   const configuredOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(normalizeOrigin).filter(Boolean)
     : [];
 
-  const defaultOrigins = [
-    'http://localhost:8080',
-    'http://127.0.0.1:8080',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-  ];
+  const defaultOrigins = isProduction
+    ? []
+    : [
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+      ];
 
   return new Set([...defaultOrigins, ...configuredOrigins]);
 }
@@ -28,10 +30,12 @@ function isLocalhostOrigin(origin: string) {
 
 async function bootstrap() {
   const app: INestApplication = await NestFactory.create(AppModule);
-  const allowedOrigins = getAllowedOrigins();
-  const allowNgrokOrigins = process.env.CORS_ALLOW_NGROK !== 'false';
-  const allowAllOrigins = process.env.CORS_ALLOW_ALL === 'true';
   const isProduction = process.env.NODE_ENV === 'production';
+  const allowedOrigins = getAllowedOrigins(isProduction);
+  const allowNgrokOrigins = isProduction
+    ? process.env.CORS_ALLOW_NGROK === 'true'
+    : process.env.CORS_ALLOW_NGROK !== 'false';
+  const allowAllOrigins = process.env.CORS_ALLOW_ALL === 'true';
 
   // 1. GLOBAL MIDDLEWARE & PIPES (Must come BEFORE listen)
   app.useGlobalPipes(
@@ -43,7 +47,10 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
       if (!origin) {
         callback(null, true);
         return;
@@ -103,4 +110,4 @@ async function bootstrap() {
   console.log('Swagger docs available at /api');
 }
 
-bootstrap();
+void bootstrap();

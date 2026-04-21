@@ -4,24 +4,33 @@ import { PurchaseLifecycleStatus } from './purchase-status.enum';
 
 describe('PurchaseService.createPurchase', () => {
   const tenantId = 'tenant-1';
+  const userId = 'user-1';
 
   let service: PurchaseService;
   let prisma: {
+    $transaction: jest.Mock;
     supplier: { findFirst: jest.Mock };
     warehouse: { findFirst: jest.Mock };
     product: { findMany: jest.Mock };
-    purchase: { create: jest.Mock };
+    purchase: { count: jest.Mock; create: jest.Mock };
   };
+  let notificationsService: { createForTenant: jest.Mock };
 
   beforeEach(() => {
     prisma = {
+      $transaction: jest.fn(),
       supplier: { findFirst: jest.fn() },
       warehouse: { findFirst: jest.fn() },
       product: { findMany: jest.fn() },
-      purchase: { create: jest.fn() },
+      purchase: { count: jest.fn(), create: jest.fn() },
     };
+    notificationsService = { createForTenant: jest.fn() };
 
-    service = new PurchaseService(prisma as any);
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      operation(prisma as any),
+    );
+
+    service = new PurchaseService(prisma as any, notificationsService as any);
   });
 
   it('rejects purchase creation when any product is outside tenant scope', async () => {
@@ -30,7 +39,7 @@ describe('PurchaseService.createPurchase', () => {
     prisma.product.findMany.mockResolvedValue([{ id: 'p-1' }]);
 
     await expect(
-      service.createPurchase(tenantId, {
+      service.createPurchase(tenantId, userId, {
         purchaseOrder: 'PO-001',
         supplierId: 's-1',
         warehouseId: 'w-1',
@@ -54,7 +63,7 @@ describe('PurchaseService.createPurchase', () => {
     prisma.product.findMany.mockResolvedValue([{ id: 'p-1' }, { id: 'p-2' }]);
     prisma.purchase.create.mockResolvedValue({ id: 'purchase-1' });
 
-    const result = await service.createPurchase(tenantId, {
+    const result = await service.createPurchase(tenantId, userId, {
       purchaseOrder: 'PO-002',
       supplierId: 's-1',
       warehouseId: 'w-1',
@@ -81,23 +90,26 @@ describe('PurchaseService.createPurchase', () => {
 
 describe('PurchaseService.updateStatus', () => {
   const tenantId = 'tenant-1';
+  const userId = 'user-1';
   const purchaseId = 'purchase-1';
 
   let service: PurchaseService;
   let prisma: {
     $transaction: jest.Mock;
     purchase: { findFirst: jest.Mock; update: jest.Mock };
-    stockMovement: { create: jest.Mock };
+    stockMovement: { createMany: jest.Mock };
     inventoryItem: { upsert: jest.Mock };
   };
+  let notificationsService: { createForTenant: jest.Mock };
 
   beforeEach(() => {
     prisma = {
       $transaction: jest.fn(),
       purchase: { findFirst: jest.fn(), update: jest.fn() },
-      stockMovement: { create: jest.fn() },
+      stockMovement: { createMany: jest.fn() },
       inventoryItem: { upsert: jest.fn() },
     };
+    notificationsService = { createForTenant: jest.fn() };
 
     prisma.$transaction.mockImplementation(async (operation: any) => {
       if (typeof operation === 'function') {
@@ -107,7 +119,7 @@ describe('PurchaseService.updateStatus', () => {
       return Promise.all(operation);
     });
 
-    service = new PurchaseService(prisma as any);
+    service = new PurchaseService(prisma as any, notificationsService as any);
   });
 
   it('blocks draft purchases from jumping straight to received', async () => {
@@ -117,11 +129,106 @@ describe('PurchaseService.updateStatus', () => {
       items: [],
     });
 
-    await expect(service.recievePurchase(tenantId, purchaseId)).rejects.toThrow(
+    await expect(
+      service.receivePurchase(tenantId, userId, purchaseId),
+    ).rejects.toThrow(
       new BadRequestException(
         `Invalid status transition from ${PurchaseLifecycleStatus.DRAFT} to ${PurchaseLifecycleStatus.RECEIVED}`,
       ),
     );
+  });
+
+  it('receives purchases with batched stock movements and aggregated inventory upserts', async () => {
+    prisma.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseLifecycleStatus.CONFIRMED,
+      purchaseOrder: 'PO-001',
+      warehouseId: 'warehouse-1',
+      updatedAt: new Date('2026-04-21T10:00:00.000Z'),
+      items: [
+        { productId: 'p-1', quantity: 2 },
+        { productId: 'p-1', quantity: 3 },
+        { productId: 'p-2', quantity: 4 },
+      ],
+    });
+    prisma.purchase.update.mockResolvedValue({});
+    prisma.stockMovement.createMany.mockResolvedValue({ count: 3 });
+    prisma.inventoryItem.upsert.mockResolvedValue({});
+    notificationsService.createForTenant.mockResolvedValue({});
+
+    const result = await service.receivePurchase(tenantId, userId, purchaseId);
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Purchase order received and stock updated',
+    });
+    expect(prisma.stockMovement.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          tenantId,
+          productId: 'p-1',
+          warehouseId: 'warehouse-1',
+          quantity: 2,
+          type: 'IN',
+          reference: 'Purchase Order PO-001',
+        },
+        {
+          tenantId,
+          productId: 'p-1',
+          warehouseId: 'warehouse-1',
+          quantity: 3,
+          type: 'IN',
+          reference: 'Purchase Order PO-001',
+        },
+        {
+          tenantId,
+          productId: 'p-2',
+          warehouseId: 'warehouse-1',
+          quantity: 4,
+          type: 'IN',
+          reference: 'Purchase Order PO-001',
+        },
+      ],
+    });
+    expect(prisma.inventoryItem.upsert).toHaveBeenCalledTimes(2);
+    expect(prisma.inventoryItem.upsert).toHaveBeenCalledWith({
+      where: {
+        tenantId_productId_warehouseId: {
+          tenantId,
+          productId: 'p-1',
+          warehouseId: 'warehouse-1',
+        },
+      },
+      update: {
+        quantity: { increment: 5 },
+      },
+      create: {
+        tenantId,
+        productId: 'p-1',
+        warehouseId: 'warehouse-1',
+        quantity: 5,
+        reservedQuantity: 0,
+      },
+    });
+    expect(prisma.inventoryItem.upsert).toHaveBeenCalledWith({
+      where: {
+        tenantId_productId_warehouseId: {
+          tenantId,
+          productId: 'p-2',
+          warehouseId: 'warehouse-1',
+        },
+      },
+      update: {
+        quantity: { increment: 4 },
+      },
+      create: {
+        tenantId,
+        productId: 'p-2',
+        warehouseId: 'warehouse-1',
+        quantity: 4,
+        reservedQuantity: 0,
+      },
+    });
   });
 
   it('allows confirmed purchases to move to shipped', async () => {
@@ -136,11 +243,14 @@ describe('PurchaseService.updateStatus', () => {
 
     const result = await service.updateStatus(
       tenantId,
+      userId,
       purchaseId,
       PurchaseLifecycleStatus.SHIPPED,
     );
 
-    expect(result.status).toBe(PurchaseLifecycleStatus.SHIPPED);
+    expect((result as { status: PurchaseLifecycleStatus }).status).toBe(
+      PurchaseLifecycleStatus.SHIPPED,
+    );
     expect(prisma.purchase.update).toHaveBeenCalledWith({
       where: { id: purchaseId },
       data: { status: PurchaseLifecycleStatus.SHIPPED },

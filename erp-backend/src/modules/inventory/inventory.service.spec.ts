@@ -1,6 +1,86 @@
 import { BadRequestException } from '@nestjs/common';
 import { StockMovementType } from '@prisma/client';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { InventoryService } from './inventory.service';
+
+describe('InventoryService stockOut', () => {
+  let service: InventoryService;
+  const tenantId = 'tenant-1';
+  let prisma: {
+    product: { findFirst: jest.Mock };
+    warehouse: { findFirst: jest.Mock };
+    inventoryItem: { updateMany: jest.Mock };
+    stockMovement: { create: jest.Mock };
+    $transaction: jest.Mock;
+  };
+
+  beforeEach(() => {
+    prisma = {
+      product: { findFirst: jest.fn() },
+      warehouse: { findFirst: jest.fn() },
+      inventoryItem: { updateMany: jest.fn() },
+      stockMovement: { create: jest.fn() },
+      $transaction: jest.fn(),
+    };
+
+    prisma.$transaction.mockImplementation((operation: unknown) => {
+      if (typeof operation === 'function') {
+        return (operation as (client: typeof prisma) => unknown)(prisma);
+      }
+
+      return Promise.all(operation as Promise<unknown>[]);
+    });
+
+    service = new InventoryService(prisma as unknown as PrismaService);
+  });
+
+  it('deducts stock with an atomic quantity guard', async () => {
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
+    prisma.warehouse.findFirst.mockResolvedValue({ id: 'w1' });
+    prisma.inventoryItem.updateMany.mockResolvedValue({ count: 1 });
+    prisma.stockMovement.create.mockResolvedValue({
+      id: 'movement-1',
+      type: StockMovementType.OUT,
+    });
+
+    const result = await service.stockOut(tenantId, 'p1', 'w1', 4);
+
+    expect(result).toEqual({ id: 'movement-1', type: StockMovementType.OUT });
+    expect(prisma.inventoryItem.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId,
+        productId: 'p1',
+        warehouseId: 'w1',
+        quantity: { gte: 4 },
+      },
+      data: {
+        quantity: { decrement: 4 },
+      },
+    });
+    expect(prisma.stockMovement.create).toHaveBeenCalledWith({
+      data: {
+        tenantId,
+        productId: 'p1',
+        warehouseId: 'w1',
+        quantity: -4,
+        type: StockMovementType.OUT,
+        reference: 'STOCK_OUT',
+      },
+    });
+  });
+
+  it('rejects without creating a movement when stock is missing or insufficient', async () => {
+    prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
+    prisma.warehouse.findFirst.mockResolvedValue({ id: 'w1' });
+    prisma.inventoryItem.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.stockOut(tenantId, 'p1', 'w1', 4)).rejects.toThrow(
+      new BadRequestException('Insufficient stock'),
+    );
+
+    expect(prisma.stockMovement.create).not.toHaveBeenCalled();
+  });
+});
 
 describe('InventoryService transferStock', () => {
   let service: InventoryService;

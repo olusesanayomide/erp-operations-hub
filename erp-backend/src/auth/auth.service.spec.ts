@@ -49,6 +49,7 @@ describe('AuthService.updateUser', () => {
       {
         userId: 'admin-1',
         tenantId: 'tenant-1',
+        email: 'admin@example.com',
         roles: [Role.ADMIN],
         isPlatformAdmin: false,
       },
@@ -96,6 +97,7 @@ describe('AuthService.updateUser', () => {
         {
           userId: 'admin-1',
           tenantId: 'tenant-1',
+          email: 'admin@example.com',
           roles: [Role.ADMIN],
           isPlatformAdmin: false,
         },
@@ -129,6 +131,7 @@ describe('AuthService.updateUser', () => {
         {
           userId: 'admin-1',
           tenantId: 'tenant-1',
+          email: 'admin@example.com',
           roles: [Role.ADMIN],
           isPlatformAdmin: false,
         },

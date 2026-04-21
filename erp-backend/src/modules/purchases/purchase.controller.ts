@@ -30,7 +30,7 @@ import type { ListQuery } from 'src/common/pagination';
 @UseGuards(JwtGuard, RolesGuard)
 @ApiTags('Purchase')
 @Controller('purchases')
-export class PurchaseContoller {
+export class PurchaseController {
   constructor(private readonly purchaseService: PurchaseService) {}
 
   @Get()
@@ -45,7 +45,7 @@ export class PurchaseContoller {
     description: 'Purchase orders retrieved successfully.',
   })
   async findAll(@GetUser() user: UserPayload, @Query() query: ListQuery) {
-    return await this.purchaseService.findAll(user.tenantId, query);
+    return this.purchaseService.findAll(user.tenantId, query);
   }
 
   @Post()
@@ -58,11 +58,7 @@ export class PurchaseContoller {
   @ApiResponse({ status: 201, description: 'Purchase Order created.' })
   @ApiResponse({ status: 404, description: 'Supplier or Product not found.' })
   async create(@Body() dto: CreatePurchaseDto, @GetUser() user: UserPayload) {
-    return await this.purchaseService.createPurchase(
-      user.tenantId,
-      user.userId,
-      dto,
-    );
+    return this.purchaseService.createPurchase(user.tenantId, user.userId, dto);
   }
 
   @Patch(':id/receive')
@@ -85,7 +81,7 @@ export class PurchaseContoller {
     @Body() dto: Partial<UpdatePurchaseStatusDto>,
     @GetUser() user: UserPayload,
   ) {
-    return await this.purchaseService.recievePurchase(
+    return this.purchaseService.receivePurchase(
       user.tenantId,
       user.userId,
       id,
@@ -113,7 +109,7 @@ export class PurchaseContoller {
     @Body() dto: UpdatePurchaseStatusDto,
     @GetUser() user: UserPayload,
   ) {
-    return await this.purchaseService.updateStatus(
+    return this.purchaseService.updateStatus(
       user.tenantId,
       user.userId,
       id,
@@ -132,6 +128,6 @@ export class PurchaseContoller {
   @ApiResponse({ status: 200, description: 'PO details retrieved.' })
   @ApiResponse({ status: 404, description: 'Purchase Order not found.' })
   async findOne(@Param('id') id: string, @GetUser() user: UserPayload) {
-    return await this.purchaseService.getPurchaseDetails(user.tenantId, id);
+    return this.purchaseService.getPurchaseDetails(user.tenantId, id);
   }
 }

@@ -16,7 +16,7 @@ import {
   getPaginationOptions,
   hasListQuery,
   ListQuery,
-} from 'src/common/pagination';
+} from '../../common/pagination';
 import { OrderLifecycleStatus } from './order-status.enum';
 import { CreateOrderDto } from './dto/order.dto';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -384,7 +384,7 @@ export class OrdersService {
       },
     });
     if (!order) {
-      throw new NotFoundException(`Order wiht ID ${id} not found`);
+      throw new NotFoundException(`Order with ID ${id} not found`);
     }
     return order;
   }
