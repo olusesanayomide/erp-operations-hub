@@ -5,6 +5,8 @@ This workspace is organized as two apps:
 - `erp-frontend/`: Vite + React client
 - `erp-backend/`: NestJS + Prisma API
 
+Project coding standards live in [CODING_STANDARDS.md](CODING_STANDARDS.md). Use that document as the baseline for code reviews, new features, tests, and dependency/module decisions.
+
 Git setup:
 
 - The workspace root is now the single active git repository.

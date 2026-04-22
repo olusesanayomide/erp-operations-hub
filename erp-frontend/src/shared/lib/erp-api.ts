@@ -189,6 +189,30 @@ type BackendWarehouse = {
   };
 };
 
+type BackendWarehouseInventoryItem = {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  quantity: number;
+  reservedQuantity?: number;
+  product?: {
+    id: string;
+    name: string;
+    sku: string;
+    minStock?: number | null;
+  };
+};
+
+type WarehouseInventoryTotals = {
+  availableQuantity: number;
+  reservedQuantity: number;
+  onHandQuantity: number;
+};
+
+type WarehouseInventoryResponse = PaginatedResponse<InventoryItem> & {
+  totals: WarehouseInventoryTotals;
+};
+
 type BackendCustomer = {
   id: string;
   name: string;
@@ -520,8 +544,43 @@ export function normalizeWarehouse(raw: BackendWarehouse): Warehouse {
     name: raw.name,
     location: raw.location || "Unspecified location",
     description: raw.description || "",
-    itemCount: raw.inventoryItems?.length ?? raw._count?.inventoryItems ?? 0,
+    itemCount: raw._count?.inventoryItems ?? raw.inventoryItems?.length ?? 0,
     createdAt: formatDate(raw.createdAt),
+  };
+}
+
+function normalizeInventoryProduct(
+  raw: NonNullable<BackendWarehouseInventoryItem["product"]>,
+): Product {
+  return {
+    id: raw.id,
+    name: raw.name,
+    sku: raw.sku,
+    description: "",
+    basePrice: 0,
+    category: "General",
+    unit: "unit",
+    minStock: raw.minStock ?? 10,
+    createdAt: "",
+    updatedAt: "",
+  };
+}
+
+function normalizeWarehouseInventoryItem(
+  raw: BackendWarehouseInventoryItem,
+): InventoryItem {
+  const reservedQuantity = raw.reservedQuantity ?? 0;
+  const product = raw.product ? normalizeInventoryProduct(raw.product) : undefined;
+
+  return {
+    id: raw.id,
+    productId: raw.productId,
+    warehouseId: raw.warehouseId,
+    quantity: raw.quantity,
+    reservedQuantity,
+    onHandQuantity: raw.quantity + reservedQuantity,
+    minStock: raw.product?.minStock ?? 10,
+    product,
   };
 }
 
@@ -1072,16 +1131,22 @@ export async function getWarehouseById(id: string) {
   const item = await apiRequest<BackendWarehouse>(`/warehouses/${id}`);
   return {
     warehouse: normalizeWarehouse(item),
-    inventory: (item.inventoryItems || []).map((inventoryItem) => ({
-      id: inventoryItem.id,
-      productId: inventoryItem.productId,
-      warehouseId: inventoryItem.warehouseId,
-      quantity: inventoryItem.quantity,
-      reservedQuantity: inventoryItem.reservedQuantity || 0,
-      onHandQuantity: inventoryItem.quantity + (inventoryItem.reservedQuantity || 0),
-      minStock: inventoryItem.product?.minStock ?? 10,
-      product: inventoryItem.product ? normalizeProduct(inventoryItem.product) : undefined,
-    })),
+  };
+}
+
+export async function getWarehouseInventory(
+  id: string,
+  params: ListPageParams = {},
+): Promise<WarehouseInventoryResponse> {
+  const response = await apiRequest<
+    PaginatedResponse<BackendWarehouseInventoryItem> & {
+      totals: WarehouseInventoryTotals;
+    }
+  >(`/warehouses/${id}/inventory${buildListQuery(params)}`);
+
+  return {
+    ...mapPaginatedResponse(response, normalizeWarehouseInventoryItem),
+    totals: response.totals,
   };
 }
 

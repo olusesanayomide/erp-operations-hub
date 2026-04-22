@@ -60,6 +60,23 @@ export class WarehousesController {
     return this.warehousesService.findAll(user, query);
   }
 
+  @Get(':id/inventory')
+  @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
+  @ApiOperation({
+    summary: 'Get warehouse inventory',
+    description:
+      'Returns a paginated inventory list for a warehouse with lightweight product fields.',
+  })
+  @ApiResponse({ status: 200, description: 'Warehouse inventory returned.' })
+  @ApiResponse({ status: 404, description: 'Warehouse not found.' })
+  findInventory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetUser() user: UserPayload,
+    @Query() query: ListQuery,
+  ) {
+    return this.warehousesService.findInventory(id, user, query);
+  }
+
   @Get(':id')
   @Roles(Role.ADMIN, Role.MANAGER, Role.STAFF)
   @ApiOperation({

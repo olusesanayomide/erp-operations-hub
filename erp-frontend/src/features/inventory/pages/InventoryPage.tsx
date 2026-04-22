@@ -9,12 +9,14 @@ import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
 import { Textarea } from '@/shared/ui/textarea';
-import { getStockStatus } from '@/shared/types/erp';
+import { getStockStatus, type InventoryItem } from '@/shared/types/erp';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Search, Boxes, ArrowDownRight, ArrowUpRight, ArrowRightLeft } from 'lucide-react';
+import { Search, Boxes, ArrowDownRight, ArrowUpRight, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { listInventorySummary, listProducts, listWarehouses, stockIn, stockOut, transferStock } from '@/shared/lib/erp-api';
 import { validatePositiveInteger } from '@/shared/lib/number-validation';
+
+const EMPTY_INVENTORY: InventoryItem[] = [];
 
 function StockDialog({
   type,
@@ -208,10 +210,20 @@ export default function InventoryPage() {
     note: '',
   });
 
-  const { data: inventory = [], isLoading: isInventoryLoading, isError: isInventoryError, error: inventoryError, refetch: refetchInventory } = useQuery({
+  const {
+    data: inventoryData,
+    isLoading: isInventoryLoading,
+    isError: isInventoryError,
+    error: inventoryError,
+    refetch: refetchInventory,
+  } = useQuery({
     queryKey: ['inventory'],
     queryFn: listInventorySummary,
   });
+  const inventory = inventoryData ?? EMPTY_INVENTORY;
+  const hasInventoryRows = inventory.length > 0;
+  const shouldShowInventoryErrorState = isInventoryError && !hasInventoryRows;
+  const shouldShowInventoryRefreshWarning = isInventoryError && hasInventoryRows;
 
   const { data: products = [], isError: isProductsError } = useQuery({
     queryKey: ['products', 'normalized'],
@@ -487,13 +499,33 @@ export default function InventoryPage() {
 	      </p>
 
       {isReferenceDataError && <ReferenceDataWarning />}
-	
-	      <div className="erp-card overflow-hidden">
-	        {isInventoryLoading ? (
-	          <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>
+      {shouldShowInventoryRefreshWarning && (
+        <div className="mb-4 flex flex-col gap-3 rounded-md border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">Inventory may be out of date</p>
+              <p className="text-muted-foreground">
+                {(inventoryError as Error)?.message || 'The latest inventory refresh failed. Showing the last loaded records.'}
+              </p>
+            </div>
+          </div>
+          <RetryButton onClick={() => void refetchInventory()} label="Refresh" />
+        </div>
+      )}
+		
+		      <div className="erp-card overflow-hidden">
+		        {isInventoryLoading ? (
+		          <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>
+	        ) : shouldShowInventoryErrorState ? (
+          <ErrorState
+            title="Unable to load inventory"
+            description={(inventoryError as Error)?.message || 'Inventory could not be loaded right now.'}
+            action={<RetryButton onClick={() => void refetchInventory()} />}
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+	          <div className="overflow-x-auto">
+	            <table className="w-full">
               <thead><tr className="erp-table-header">
                 <th className="text-left p-3">Product</th>
                 <th className="text-left p-3">SKU</th>
@@ -523,15 +555,8 @@ export default function InventoryPage() {
             </table>
           </div>
         )}
-	        {isInventoryError && (
-	          <ErrorState
-	            title="Unable to load inventory"
-	            description={(inventoryError as Error)?.message || 'Inventory could not be loaded right now.'}
-	            action={<RetryButton onClick={() => void refetchInventory()} />}
-	          />
-	        )}
-	        {!isInventoryLoading && !isInventoryError && filtered.length === 0 && <EmptyState icon={Boxes} title="No inventory found" description="Adjust your filters" />}
-      </div>
+		        {!isInventoryLoading && !isInventoryError && filtered.length === 0 && <EmptyState icon={Boxes} title="No inventory found" description="Adjust your filters" />}
+	      </div>
     </div>
   );
 }
