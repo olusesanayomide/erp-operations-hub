@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
-import { ReferenceDataWarning } from '@/shared/components/ReferenceDataWarning';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/ui/dialog';
@@ -10,7 +9,7 @@ import { Label } from '@/shared/ui/label';
 import { useAuth } from '@/app/providers/AuthContext';
 import { Plus, Search, Warehouse, MapPin, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { createWarehouse, listInventorySummary, listWarehouses } from '@/shared/lib/erp-api';
+import { createWarehouse, listWarehouses } from '@/shared/lib/erp-api';
 
 export default function WarehousesPage() {
   const { canPerform } = useAuth();
@@ -30,14 +29,6 @@ export default function WarehousesPage() {
     queryFn: listWarehouses,
   });
 
-  const {
-	    data: inventorySummary = [],
-	    isError: isInventorySummaryError,
-	  } = useQuery({
-    queryKey: ['inventory'],
-    queryFn: listInventorySummary,
-  });
-
   const createMutation = useMutation({
     mutationFn: createWarehouse,
     onSuccess: () => {
@@ -52,7 +43,6 @@ export default function WarehousesPage() {
   const filtered = warehouses.filter(w =>
     w.name.toLowerCase().includes(search.toLowerCase()) || w.location.toLowerCase().includes(search.toLowerCase())
   );
-  const isReferenceDataError = isInventorySummaryError;
 
   return (
     <div className="animate-fade-in">
@@ -88,11 +78,7 @@ export default function WarehousesPage() {
         <Input placeholder="Search warehouses..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
       </div>
 
-      {isReferenceDataError && (
-        <ReferenceDataWarning message="Some inventory totals could not be loaded." />
-      )}
-
-	      {/* Warehouse Cards */}
+		      {/* Warehouse Cards */}
 	      {isWarehousesLoading && <div className="rounded-xl border p-6"><TableSkeleton rows={6} cols={3} /></div>}
 	      {isWarehousesError && (
 	        <ErrorState
@@ -102,11 +88,9 @@ export default function WarehousesPage() {
 	        />
 	      )}
 	      {!isWarehousesLoading && !isWarehousesError && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map(w => {
-          const inv = inventorySummary.filter((item) => item.warehouseId === w.id);
-          const totalQty = inv.reduce((s, i) => s + i.quantity, 0);
-          return (
-            <Link key={w.id} to={`/warehouses/${w.id}`} className="erp-card p-5 hover:shadow-md transition-shadow">
+	        {filtered.map(w => {
+	          return (
+	            <Link key={w.id} to={`/warehouses/${w.id}`} className="erp-card p-5 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-3">
                 <div className="p-2.5 rounded-lg bg-primary/10">
                   <Warehouse className="h-5 w-5 text-primary" />
@@ -117,18 +101,14 @@ export default function WarehousesPage() {
                 <MapPin className="h-3.5 w-3.5" />{w.location}
               </div>
               <div className="flex items-center gap-4 pt-3 border-t">
-                <div className="flex items-center gap-1.5 text-sm">
-                  <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-medium">{inv.length}</span>
-                  <span className="text-muted-foreground">products</span>
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">{totalQty.toLocaleString()}</span>
-                  <span className="text-muted-foreground"> total units</span>
-                </div>
-              </div>
-            </Link>
-          );
+	                <div className="flex items-center gap-1.5 text-sm">
+	                  <Package className="h-3.5 w-3.5 text-muted-foreground" />
+	                  <span className="font-medium">{w.itemCount}</span>
+	                  <span className="text-muted-foreground">products</span>
+	                </div>
+	              </div>
+	            </Link>
+	          );
         })}
       </div>}
 	      {!isWarehousesLoading && !isWarehousesError && filtered.length === 0 && <EmptyState icon={Warehouse} title="No warehouses found" description="Add your first warehouse" />}

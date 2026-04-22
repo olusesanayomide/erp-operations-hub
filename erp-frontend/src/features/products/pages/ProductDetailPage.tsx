@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getStockStatus } from '@/shared/types/erp';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { ArrowLeft, Package } from 'lucide-react';
-import { getProductById, getWarehouseById, listOrders, listPurchases } from '@/shared/lib/erp-api';
+import { getProductById, listOrders, listPurchases, listWarehouses } from '@/shared/lib/erp-api';
 import { useSettings } from '@/app/providers/SettingsContext';
 
 export default function ProductDetailPage() {
@@ -28,20 +28,19 @@ export default function ProductDetailPage() {
     queryFn: listPurchases,
   });
 
-  const inventoryQueries = useQueries({
-    queries: (data?.inventory || []).map((item) => ({
-      queryKey: ['warehouses', item.warehouseId],
-      queryFn: () => getWarehouseById(item.warehouseId),
-    })),
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: listWarehouses,
+    staleTime: 30_000,
   });
 
   const inventory = useMemo(
     () =>
       (data?.inventory || []).map((item) => ({
         ...item,
-        warehouse: inventoryQueries.find((query) => query.data?.warehouse.id === item.warehouseId)?.data?.warehouse,
+        warehouse: warehouses.find((warehouse) => warehouse.id === item.warehouseId),
       })),
-    [data?.inventory, inventoryQueries],
+    [data?.inventory, warehouses],
   );
 
   const product = data?.product;
@@ -105,7 +104,7 @@ export default function ProductDetailPage() {
           <tbody>
             {inventory.map(inv => (
               <tr key={inv.id} className="erp-table-row">
-                <td className="p-3 text-sm font-medium">{inv.warehouse?.name}</td>
+                <td className="p-3 text-sm font-medium">{inv.warehouse?.name ?? 'Unknown warehouse'}</td>
                 <td className="p-3 text-sm text-right font-semibold">{inv.quantity}</td>
                 <td className="p-3 text-sm text-right">{inv.reservedQuantity}</td>
                 <td className="p-3 text-sm text-right font-medium">{inv.onHandQuantity}</td>

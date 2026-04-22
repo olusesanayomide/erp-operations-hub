@@ -10,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/shared/ui/alert-dialog';
-import { getOrderById, getWarehouseById, listCustomers, listWarehouses, updateOrderStatus } from '@/shared/lib/erp-api';
+import { getOrderById, listCustomers, listWarehouses, updateOrderStatus } from '@/shared/lib/erp-api';
 import { useSettings } from '@/app/providers/SettingsContext';
 
 export default function OrderDetailPage() {

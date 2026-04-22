@@ -47,7 +47,7 @@ export class WarehousesService {
           where,
           include: {
             _count: {
-              select: { purchases: true },
+              select: { inventoryItems: true, purchases: true },
             },
           },
           orderBy: { createdAt: 'desc' },
@@ -64,7 +64,7 @@ export class WarehousesService {
       where: { tenantId: user.tenantId },
       include: {
         _count: {
-          select: { purchases: true },
+          select: { inventoryItems: true, purchases: true },
         },
       },
     });
