@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
@@ -32,6 +32,10 @@ const itemVariants = {
   },
 };
 
+const SLOW_SIGNUP_NOTICE_MS = 8000;
+const SIGNUP_EMAIL_EXISTS_MESSAGE =
+  'An account already exists for this email. Please sign in or reset your password.';
+
 function slugify(value: string) {
   return value
     .trim()
@@ -52,6 +56,8 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [duplicateSignupEmail, setDuplicateSignupEmail] = useState('');
+  const [showSlowSignupNotice, setShowSlowSignupNotice] = useState(false);
   const [slugEdited, setSlugEdited] = useState(false);
 
   const slugPreview = useMemo(
@@ -59,9 +65,23 @@ export default function SignupPage() {
     [companyName, slug, slugEdited],
   );
 
+  useEffect(() => {
+    if (!loading) {
+      setShowSlowSignupNotice(false);
+      return;
+    }
+
+    const noticeTimer = window.setTimeout(() => {
+      setShowSlowSignupNotice(true);
+    }, SLOW_SIGNUP_NOTICE_MS);
+
+    return () => window.clearTimeout(noticeTimer);
+  }, [loading]);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
+    setDuplicateSignupEmail('');
 
     if (!companyName.trim() || !adminName.trim() || !adminEmail.trim() || !adminPassword.trim()) {
       setError('Company name, admin name, email, and password are required.');
@@ -85,6 +105,7 @@ export default function SignupPage() {
     }
 
     setLoading(true);
+    setShowSlowSignupNotice(false);
 
     try {
       await signupTenant({
@@ -101,6 +122,15 @@ export default function SignupPage() {
         state: { email: adminEmail.trim() },
       });
     } catch (signupError) {
+      if (
+        signupError instanceof ApiError &&
+        signupError.message === SIGNUP_EMAIL_EXISTS_MESSAGE
+      ) {
+        setDuplicateSignupEmail(adminEmail.trim());
+        setError(SIGNUP_EMAIL_EXISTS_MESSAGE);
+        return;
+      }
+
       setError(
         signupError instanceof ApiError
           ? signupError.message
@@ -245,7 +275,33 @@ export default function SignupPage() {
                     </div>
                   </motion.div>
 
-                  {error && (
+                  {error && duplicateSignupEmail && (
+                    <motion.div
+                      initial={prefersReducedMotion ? false : { opacity: 0, y: -6 }}
+                      animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+                      className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"
+                    >
+                      <p>{error}</p>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <Link
+                          to="/login"
+                          state={{ email: duplicateSignupEmail }}
+                          className="inline-flex min-h-10 items-center justify-center rounded-full bg-amber-900 px-4 font-semibold text-white transition-colors hover:bg-amber-800"
+                        >
+                          Sign in with this email
+                        </Link>
+                        <Link
+                          to="/forgot-password"
+                          state={{ email: duplicateSignupEmail }}
+                          className="inline-flex min-h-10 items-center justify-center rounded-full border border-amber-300 px-4 font-semibold text-amber-950 transition-colors hover:bg-amber-100"
+                        >
+                          Reset password
+                        </Link>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {error && !duplicateSignupEmail && (
                     <motion.p
                       initial={prefersReducedMotion ? false : { opacity: 0, y: -6 }}
                       animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
@@ -255,14 +311,30 @@ export default function SignupPage() {
                     </motion.p>
                   )}
 
+                  {showSlowSignupNotice && !error && (
+                    <motion.p
+                      initial={prefersReducedMotion ? false : { opacity: 0, y: -6 }}
+                      animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+                      className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900"
+                    >
+                      Still creating your workspace. On slower or unstable networks this can take a little longer because we are setting up both your company and first admin account. Please keep this page open.
+                    </motion.p>
+                  )}
+
                   <motion.div variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.01 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}>
-	                    <Button
-	                      type="submit"
-	                      requiresOnline
-	                      className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
+                    <Button
+                      type="submit"
+                      requiresOnline
+                      className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
                       disabled={loading}
                     >
-                      {loading ? <LoadingText>Creating workspace...</LoadingText> : 'Create workspace'}
+                      {loading ? (
+                        <LoadingText>
+                          {showSlowSignupNotice ? 'Still creating workspace...' : 'Creating workspace...'}
+                        </LoadingText>
+                      ) : (
+                        'Create workspace'
+                      )}
                     </Button>
                   </motion.div>
                 </form>

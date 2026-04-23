@@ -8,6 +8,9 @@ import type {
   StockMovement,
   Supplier,
   PlatformTenant,
+  TenantInvite,
+  TenantInviteDetails,
+  TenantInviteStatus,
   TenantSummary,
   User,
   UserRole,
@@ -53,6 +56,25 @@ type BackendTenantListItem = {
   createdAt: string;
   updatedAt: string;
   userCount: number;
+};
+
+type BackendTenantInvite = {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  inviteLink?: string;
+};
+
+type BackendTenantInviteDetails = {
+  tenantName: string;
+  email: string;
+  name?: string | null;
+  role: string;
+  expiresAt: string;
 };
 
 type BackendCurrencySettings = {
@@ -364,6 +386,10 @@ type DashboardTrend = {
   previous: number;
 };
 
+const TENANT_SIGNUP_TIMEOUT_MS = 90000;
+const TENANT_SIGNUP_TIMEOUT_MESSAGE =
+  "Workspace setup is taking longer than expected. If your connection is unstable, please wait a moment and try signing in before submitting again.";
+
 export type ListPageParams = {
   page?: number;
   pageSize?: number;
@@ -440,6 +466,39 @@ function normalizeRole(role?: string | null): UserRole {
     return normalized;
   }
   return "staff";
+}
+
+function normalizeInviteStatus(status?: string | null): TenantInviteStatus {
+  const normalized = status?.toLowerCase();
+  if (normalized === "accepted" || normalized === "revoked") {
+    return normalized;
+  }
+  return "pending";
+}
+
+function normalizeTenantInvite(raw: BackendTenantInvite): TenantInvite {
+  return {
+    id: raw.id,
+    email: raw.email,
+    name: raw.name || undefined,
+    role: normalizeRole(raw.role),
+    status: normalizeInviteStatus(raw.status),
+    expiresAt: formatDate(raw.expiresAt),
+    createdAt: formatDate(raw.createdAt),
+    inviteLink: raw.inviteLink,
+  };
+}
+
+function normalizeTenantInviteDetails(
+  raw: BackendTenantInviteDetails,
+): TenantInviteDetails {
+  return {
+    tenantName: raw.tenantName,
+    email: raw.email,
+    name: raw.name || undefined,
+    role: normalizeRole(raw.role),
+    expiresAt: formatDate(raw.expiresAt),
+  };
 }
 
 function normalizeNotificationType(
@@ -792,6 +851,55 @@ export async function updateUser(
   } satisfies User;
 }
 
+export async function createTenantInvite(payload: {
+  email: string;
+  role: "ADMIN" | "MANAGER" | "STAFF";
+  name?: string;
+}) {
+  const item = await apiRequest<BackendTenantInvite>("/auth/invites", {
+    method: "POST",
+    body: payload,
+  });
+  return normalizeTenantInvite(item);
+}
+
+export async function listTenantInvites() {
+  const items = await apiRequest<BackendTenantInvite[]>("/auth/invites");
+  return items.map(normalizeTenantInvite);
+}
+
+export async function revokeTenantInvite(inviteId: string) {
+  const item = await apiRequest<BackendTenantInvite>(`/auth/invites/${inviteId}/revoke`, {
+    method: "PATCH",
+  });
+  return normalizeTenantInvite(item);
+}
+
+export async function getTenantInvite(token: string) {
+  const item = await apiRequest<BackendTenantInviteDetails>(
+    `/auth/invites/${encodeURIComponent(token)}`,
+    { accessToken: null },
+  );
+  return normalizeTenantInviteDetails(item);
+}
+
+export async function acceptTenantInvite(
+  token: string,
+  payload: {
+    name: string;
+    password: string;
+  },
+) {
+  return apiRequest(`/auth/invites/${encodeURIComponent(token)}/accept`, {
+    method: "POST",
+    accessToken: null,
+    body: payload,
+    timeoutMessage:
+      "Joining this workspace is taking longer than expected. Please keep this page open and try signing in before submitting again.",
+    timeoutMs: TENANT_SIGNUP_TIMEOUT_MS,
+  });
+}
+
 export async function loginWithSupabase(email: string, password: string) {
   if (!supabase) {
     throw new Error("Supabase auth is not configured.");
@@ -872,6 +980,8 @@ export async function signupTenant(payload: {
   return apiRequest("/auth/signup-tenant", {
     method: "POST",
     body: payload,
+    timeoutMessage: TENANT_SIGNUP_TIMEOUT_MESSAGE,
+    timeoutMs: TENANT_SIGNUP_TIMEOUT_MS,
   });
 }
 

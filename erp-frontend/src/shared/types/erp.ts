@@ -32,6 +32,27 @@ export interface User {
   concurrencyStamp?: string;
 }
 
+export type TenantInviteStatus = 'pending' | 'accepted' | 'revoked';
+
+export interface TenantInvite {
+  id: string;
+  email: string;
+  name?: string;
+  role: UserRole;
+  status: TenantInviteStatus;
+  expiresAt: string;
+  createdAt: string;
+  inviteLink?: string;
+}
+
+export interface TenantInviteDetails {
+  tenantName: string;
+  email: string;
+  name?: string;
+  role: UserRole;
+  expiresAt: string;
+}
+
 export type NotificationEntityType = 'order' | 'purchase' | 'system';
 
 export interface NotificationItem {

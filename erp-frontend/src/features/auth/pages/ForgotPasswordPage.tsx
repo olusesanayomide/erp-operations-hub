@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
@@ -9,9 +9,19 @@ import { sendPasswordResetEmail } from '@/shared/lib/erp-api';
 import { toast } from 'sonner';
 import { LoadingText } from '@/shared/components/LoadingMotion';
 
+function getEmailFromLocationState(state: unknown) {
+  if (!state || typeof state !== 'object' || !('email' in state)) {
+    return '';
+  }
+
+  const email = (state as { email?: unknown }).email;
+  return typeof email === 'string' ? email : '';
+}
+
 export default function ForgotPasswordPage() {
   const prefersReducedMotion = useReducedMotion();
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const [email, setEmail] = useState(() => getEmailFromLocationState(location.state));
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');

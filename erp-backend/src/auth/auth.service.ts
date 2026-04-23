@@ -5,8 +5,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
+import { AcceptTenantInviteDto } from './dto/accept-tenant-invite.dto';
+import { CreateTenantInviteDto } from './dto/create-tenant-invite.dto';
 import {
   TenantStatusValue,
   UpdateTenantStatusDto,
@@ -15,6 +18,13 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { assertUnchangedSinceLoaded } from '../common/concurrency';
 import { Role } from './enums/role.enum';
 import { UserPayload } from './decorator/get-user.decorator';
+
+export const SIGNUP_EMAIL_EXISTS_MESSAGE =
+  'An account already exists for this email. Please sign in or reset your password.';
+const INVITE_EXPIRY_DAYS = 7;
+const INVITE_STATUS_PENDING = 'PENDING';
+const INVITE_STATUS_ACCEPTED = 'ACCEPTED';
+const INVITE_STATUS_REVOKED = 'REVOKED';
 
 @Injectable()
 export class AuthService {
@@ -80,9 +90,8 @@ export class AuthService {
     });
 
     if (!response.ok) {
-      const text = await response.text();
       throw new BadRequestException(
-        `Failed to create Supabase auth user: ${text || response.statusText}`,
+        'Unable to create authentication account right now.',
       );
     }
 
@@ -96,6 +105,281 @@ export class AuthService {
       method: 'DELETE',
       headers,
     });
+  }
+
+  private normalizeEmail(email: string) {
+    return email.trim().toLowerCase();
+  }
+
+  private createInviteToken() {
+    return randomBytes(32).toString('base64url');
+  }
+
+  private hashInviteToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private getFrontendBaseUrl() {
+    const configuredUrl =
+      this.config.get<string>('FRONTEND_SITE_URL') ||
+      this.config.get<string>('SITE_URL') ||
+      this.config.get<string>('PUBLIC_APP_URL') ||
+      this.config.get<string>('CORS_ORIGINS')?.split(',')[0];
+
+    return (configuredUrl || 'http://localhost:8080').trim().replace(/\/$/, '');
+  }
+
+  private createInviteLink(token: string) {
+    return `${this.getFrontendBaseUrl()}/join/${encodeURIComponent(token)}`;
+  }
+
+  private assertTenantAdmin(user: UserPayload) {
+    if (!user.roles.includes(Role.ADMIN)) {
+      throw new ForbiddenException('Admin access is required.');
+    }
+  }
+
+  private assertInviteCanBeAccepted(invite: {
+    status: string;
+    expiresAt: Date;
+  }) {
+    if (invite.status === INVITE_STATUS_ACCEPTED) {
+      throw new BadRequestException('This invite has already been accepted.');
+    }
+
+    if (invite.status === INVITE_STATUS_REVOKED) {
+      throw new BadRequestException('This invite has been revoked.');
+    }
+
+    if (invite.expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException('This invite has expired.');
+    }
+  }
+
+  private serializeInvite(invite: {
+    id: string;
+    email: string;
+    name?: string | null;
+    role: string;
+    status: string;
+    expiresAt: Date;
+    createdAt: Date;
+  }) {
+    return {
+      id: invite.id,
+      email: invite.email,
+      name: invite.name,
+      role: invite.role,
+      status: invite.status,
+      expiresAt: invite.expiresAt,
+      createdAt: invite.createdAt,
+    };
+  }
+
+  async createTenantInvite(user: UserPayload, dto: CreateTenantInviteDto) {
+    this.assertTenantAdmin(user);
+
+    const email = this.normalizeEmail(dto.email);
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException(
+        'A user with this email already exists. Ask them to sign in instead.',
+      );
+    }
+
+    const existingPendingInvite = await this.prisma.tenantInvite.findFirst({
+      where: {
+        tenantId: user.tenantId,
+        email,
+        status: INVITE_STATUS_PENDING,
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true },
+    });
+
+    if (existingPendingInvite) {
+      throw new BadRequestException(
+        'A pending invite already exists for this email.',
+      );
+    }
+
+    const token = this.createInviteToken();
+    const tokenHash = this.hashInviteToken(token);
+    const expiresAt = new Date(
+      Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const invite = await this.prisma.tenantInvite.create({
+      data: {
+        tenantId: user.tenantId,
+        email,
+        name: dto.name?.trim() || null,
+        role: dto.role,
+        tokenHash,
+        expiresAt,
+        createdByUserId: user.userId,
+      },
+    });
+
+    return {
+      ...this.serializeInvite(invite),
+      inviteLink: this.createInviteLink(token),
+    };
+  }
+
+  async listTenantInvites(user: UserPayload) {
+    this.assertTenantAdmin(user);
+
+    const invites = await this.prisma.tenantInvite.findMany({
+      where: {
+        tenantId: user.tenantId,
+        status: INVITE_STATUS_PENDING,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return invites.map((invite) => this.serializeInvite(invite));
+  }
+
+  async revokeTenantInvite(user: UserPayload, inviteId: string) {
+    this.assertTenantAdmin(user);
+
+    const invite = await this.prisma.tenantInvite.findFirst({
+      where: {
+        id: inviteId,
+        tenantId: user.tenantId,
+        status: INVITE_STATUS_PENDING,
+      },
+    });
+
+    if (!invite) {
+      throw new BadRequestException('Pending invite was not found.');
+    }
+
+    const revokedInvite = await this.prisma.tenantInvite.update({
+      where: { id: invite.id },
+      data: {
+        status: INVITE_STATUS_REVOKED,
+        revokedAt: new Date(),
+      },
+    });
+
+    return this.serializeInvite(revokedInvite);
+  }
+
+  async getTenantInvite(token: string) {
+    const invite = await this.prisma.tenantInvite.findUnique({
+      where: { tokenHash: this.hashInviteToken(token) },
+      include: { tenant: true },
+    });
+
+    if (!invite) {
+      throw new BadRequestException('Invite link is invalid.');
+    }
+
+    this.assertInviteCanBeAccepted(invite);
+
+    return {
+      tenantName: invite.tenant.name,
+      email: invite.email,
+      name: invite.name,
+      role: invite.role,
+      expiresAt: invite.expiresAt,
+    };
+  }
+
+  async acceptTenantInvite(token: string, dto: AcceptTenantInviteDto) {
+    const invite = await this.prisma.tenantInvite.findUnique({
+      where: { tokenHash: this.hashInviteToken(token) },
+      include: { tenant: true },
+    });
+
+    if (!invite) {
+      throw new BadRequestException('Invite link is invalid.');
+    }
+
+    this.assertInviteCanBeAccepted(invite);
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: invite.email },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException(
+        'A user with this email already exists. Please sign in instead.',
+      );
+    }
+
+    const name = dto.name.trim();
+    let supabaseUserId: string | null = null;
+
+    try {
+      supabaseUserId = await this.createSupabaseAuthUser(
+        invite.email,
+        dto.password,
+        name,
+        invite.tenantId,
+      );
+
+      const user = await this.prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            id: supabaseUserId as string,
+            tenantId: invite.tenantId,
+            email: invite.email,
+            name,
+            roles: {
+              connectOrCreate: {
+                where: { name: invite.role },
+                create: { name: invite.role },
+              },
+            },
+          },
+          include: {
+            roles: true,
+            tenant: true,
+          },
+        });
+
+        await tx.tenantInvite.update({
+          where: { id: invite.id },
+          data: {
+            status: INVITE_STATUS_ACCEPTED,
+            acceptedAt: new Date(),
+          },
+        });
+
+        return createdUser;
+      });
+
+      return {
+        tenant: {
+          id: user.tenant.id,
+          name: user.tenant.name,
+          slug: user.tenant.slug,
+          status: user.tenant.status,
+        },
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          roles: user.roles.map((role) => role.name),
+          isPlatformAdmin: user.isPlatformAdmin,
+        },
+      };
+    } catch (error) {
+      if (supabaseUserId) {
+        await this.deleteSupabaseAuthUser(supabaseUserId);
+      }
+
+      throw error;
+    }
   }
 
   async signupTenant(dto: SignupTenantDto) {
@@ -115,7 +399,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('A user with this email already exists.');
+      throw new BadRequestException(SIGNUP_EMAIL_EXISTS_MESSAGE);
     }
 
     const tenant = await this.prisma.tenant.create({

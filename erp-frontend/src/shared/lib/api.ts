@@ -83,6 +83,7 @@ async function resolveAuthToken() {
 type RequestInitWithJson = RequestInit & {
   accessToken?: string | null;
   body?: BodyInit | object | null;
+  timeoutMessage?: string;
   timeoutMs?: number;
 };
 
@@ -105,6 +106,7 @@ function isTimeoutError(error: unknown) {
 function createTimeoutSignal(
   externalSignal: AbortSignal | null | undefined,
   timeoutMs: number,
+  timeoutMessage: string,
 ) {
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
@@ -118,7 +120,7 @@ function createTimeoutSignal(
   } else {
     externalSignal?.addEventListener("abort", abortFromExternalSignal, { once: true });
     timeoutId = window.setTimeout(() => {
-      controller.abort(new DOMException(API_TIMEOUT_MESSAGE, "TimeoutError"));
+      controller.abort(new DOMException(timeoutMessage, "TimeoutError"));
     }, timeoutMs);
   }
 
@@ -131,6 +133,12 @@ function createTimeoutSignal(
       externalSignal?.removeEventListener("abort", abortFromExternalSignal);
     },
   };
+}
+
+function getTimeoutMessage(reason: unknown) {
+  return reason instanceof Error && reason.message
+    ? reason.message
+    : API_TIMEOUT_MESSAGE;
 }
 
 function notifyAuthApiError(detail: AuthApiErrorEventDetail) {
@@ -163,8 +171,15 @@ export async function apiRequest<T>(
 
   let response: Response;
   const timeoutMs = init.timeoutMs ?? DEFAULT_API_TIMEOUT_MS;
-  const { accessToken: _accessToken, timeoutMs: _timeoutMs, signal: externalSignal, ...fetchInit } = init;
-  const timeout = createTimeoutSignal(externalSignal, timeoutMs);
+  const timeoutMessage = init.timeoutMessage ?? API_TIMEOUT_MESSAGE;
+  const {
+    accessToken: _accessToken,
+    timeoutMessage: _timeoutMessage,
+    timeoutMs: _timeoutMs,
+    signal: externalSignal,
+    ...fetchInit
+  } = init;
+  const timeout = createTimeoutSignal(externalSignal, timeoutMs, timeoutMessage);
 
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
@@ -180,13 +195,13 @@ export async function apiRequest<T>(
     const abortReason = timeout.signal.reason;
 
     if (isTimeoutError(error) || isTimeoutError(abortReason)) {
-      throw new ApiError(API_TIMEOUT_MESSAGE, 0);
+      throw new ApiError(getTimeoutMessage(abortReason), 0);
     }
 
     if (isAbortError(error) || timeout.signal.aborted) {
       const reason = timeout.signal.reason;
       throw new ApiError(
-        isTimeoutError(reason) ? API_TIMEOUT_MESSAGE : API_CANCELLED_MESSAGE,
+        isTimeoutError(reason) ? getTimeoutMessage(reason) : API_CANCELLED_MESSAGE,
         0,
       );
     }

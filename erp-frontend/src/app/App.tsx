@@ -15,6 +15,7 @@ import {
   DashboardPage,
   ForgotPasswordPage,
   InventoryPage,
+  JoinTenantPage,
   LandingPage,
   LoginPage,
   NotFound,
@@ -166,6 +167,7 @@ const App = () => (
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
+                <Route path="/join/:token" element={<JoinTenantPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
                 <Route element={<ProtectedRoute><SettingsProvider><AppLayout /></SettingsProvider></ProtectedRoute>}>

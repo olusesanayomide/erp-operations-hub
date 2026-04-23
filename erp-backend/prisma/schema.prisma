@@ -21,6 +21,12 @@ enum TenantStatus {
   ARCHIVED
 }
 
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
 enum NotificationType {
   ORDER_CREATED
   ORDER_STATUS_CHANGED
@@ -57,6 +63,7 @@ model Tenant {
   purchases         Purchase[]
   notifications     Notification[]
   userNotifications UserNotification[]
+  invites           TenantInvite[]
 }
 
 model Role {
@@ -77,8 +84,32 @@ model User {
   tenant               Tenant             @relation(fields: [tenantId], references: [id])
   createdNotifications Notification[]     @relation("NotificationActor")
   userNotifications    UserNotification[]
+  createdInvites        TenantInvite[]     @relation("InviteCreator")
 
   @@index([tenantId])
+}
+
+model TenantInvite {
+  id              String       @id @default(uuid())
+  tenantId        String
+  email           String
+  name            String?
+  role            UserRole
+  tokenHash       String       @unique
+  status          InviteStatus @default(PENDING)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdByUserId String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  createdBy User   @relation("InviteCreator", fields: [createdByUserId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, status, expiresAt])
+  @@index([email])
 }
 
 model Notification {
