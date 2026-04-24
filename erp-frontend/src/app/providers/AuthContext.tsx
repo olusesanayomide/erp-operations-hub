@@ -9,6 +9,10 @@ import {
   type AuthApiErrorEventDetail,
 } from '@/shared/lib/api';
 import {
+  AUTH_LOGIN_PROFILE_TIMEOUT_MESSAGE,
+  AUTH_LOGIN_PROFILE_TIMEOUT_MS,
+  AUTH_RESTORE_TIMEOUT_MESSAGE,
+  AUTH_RESTORE_TIMEOUT_MS,
   clearCurrentUserRequest,
   getCurrentUser,
   loginWithSupabase,
@@ -33,11 +37,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const AUTH_PROFILE_TIMEOUT_MS = 120000;
-const AUTH_RESTORE_TIMEOUT_MESSAGE =
-  'We could not verify your session. Please sign in again.';
-const AUTH_LOGIN_TIMEOUT_MESSAGE =
-  'Signed in, but we could not load your ERP profile. Please check that the backend is running and try again.';
 const AUTH_EXPIRED_MESSAGE =
   'Your session has expired or is no longer valid. Please sign in again.';
 
@@ -96,17 +95,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authTransitionRef.current = null;
     };
 
-    const resolveCurrentUserWithTimeout = (accessToken: string, timeoutMessage: string) =>
-      Promise.race([
-        getCurrentUser(accessToken),
-        new Promise<never>((_, reject) => {
-          window.setTimeout(
-            () => reject(new Error(timeoutMessage)),
-            AUTH_PROFILE_TIMEOUT_MS,
-          );
-        }),
-      ]);
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -141,10 +129,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      void resolveCurrentUserWithTimeout(
-        session.access_token,
-        isBlockingAuthTransition ? AUTH_LOGIN_TIMEOUT_MESSAGE : AUTH_RESTORE_TIMEOUT_MESSAGE,
-      )
+      void getCurrentUser(session.access_token, {
+        timeoutMs: isBlockingAuthTransition
+          ? AUTH_LOGIN_PROFILE_TIMEOUT_MS
+          : AUTH_RESTORE_TIMEOUT_MS,
+        timeoutMessage: isBlockingAuthTransition
+          ? AUTH_LOGIN_PROFILE_TIMEOUT_MESSAGE
+          : AUTH_RESTORE_TIMEOUT_MESSAGE,
+      })
         .then((nextUser) => {
           if (!mounted) return;
           setStoredUser(nextUser);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { ReferenceDataWarning } from '@/shared/components/ReferenceDataWarning';
@@ -209,6 +209,9 @@ export default function InventoryPage() {
     quantity: '1',
     note: '',
   });
+  const stockInToastRef = useRef<string | number | null>(null);
+  const stockOutToastRef = useRef<string | number | null>(null);
+  const transferToastRef = useRef<string | number | null>(null);
 
   const {
     data: inventoryData,
@@ -409,6 +412,54 @@ export default function InventoryPage() {
     });
   };
 
+  useEffect(() => {
+    if (stockInMutation.isPending) {
+      if (!stockInToastRef.current) {
+        stockInToastRef.current = toast.loading('Recording stock in...', {
+          description: 'This dialog will close and inventory totals will refresh automatically.',
+        });
+      }
+      return;
+    }
+
+    if (stockInToastRef.current) {
+      toast.dismiss(stockInToastRef.current);
+      stockInToastRef.current = null;
+    }
+  }, [stockInMutation.isPending]);
+
+  useEffect(() => {
+    if (stockOutMutation.isPending) {
+      if (!stockOutToastRef.current) {
+        stockOutToastRef.current = toast.loading('Recording stock out...', {
+          description: 'This dialog will close and inventory totals will refresh automatically.',
+        });
+      }
+      return;
+    }
+
+    if (stockOutToastRef.current) {
+      toast.dismiss(stockOutToastRef.current);
+      stockOutToastRef.current = null;
+    }
+  }, [stockOutMutation.isPending]);
+
+  useEffect(() => {
+    if (transferMutation.isPending) {
+      if (!transferToastRef.current) {
+        transferToastRef.current = toast.loading('Transferring stock...', {
+          description: 'This dialog will close and inventory totals will refresh automatically.',
+        });
+      }
+      return;
+    }
+
+    if (transferToastRef.current) {
+      toast.dismiss(transferToastRef.current);
+      transferToastRef.current = null;
+    }
+  }, [transferMutation.isPending]);
+
   return (
     <div className="animate-fade-in">
       <PageHeader title="Inventory" description={`${inventory.length} records across ${warehouses.length} warehouses`}>
@@ -560,4 +611,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-

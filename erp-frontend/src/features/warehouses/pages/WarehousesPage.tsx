@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
@@ -17,6 +17,7 @@ export default function WarehousesPage() {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: '', location: '', description: '' });
+  const createToastRef = useRef<string | number | null>(null);
 
   const {
     data: warehouses = [],
@@ -44,6 +45,37 @@ export default function WarehousesPage() {
     w.name.toLowerCase().includes(search.toLowerCase()) || w.location.toLowerCase().includes(search.toLowerCase())
   );
 
+  function handleCreateWarehouse(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!form.name.trim()) {
+      toast.error('Warehouse name is required');
+      return;
+    }
+
+    createMutation.mutate({
+      name: form.name.trim(),
+      location: form.location.trim(),
+      description: form.description.trim(),
+    });
+  }
+
+  useEffect(() => {
+    if (createMutation.isPending) {
+      if (!createToastRef.current) {
+        createToastRef.current = toast.loading('Creating warehouse...', {
+          description: 'This dialog will close and the warehouse list will refresh automatically.',
+        });
+      }
+      return;
+    }
+
+    if (createToastRef.current) {
+      toast.dismiss(createToastRef.current);
+      createToastRef.current = null;
+    }
+  }, [createMutation.isPending]);
+
   return (
     <div className="animate-fade-in">
       <PageHeader title="Warehouses" description={`${warehouses.length} warehouses`}>
@@ -52,22 +84,12 @@ export default function WarehousesPage() {
             <DialogTrigger asChild><Button requiresOnline><Plus className="h-4 w-4 mr-2" />Add Warehouse</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>New Warehouse</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-2">
+              <form className="space-y-4 py-2" onSubmit={handleCreateWarehouse}>
                 <div className="space-y-2"><Label>Name</Label><Input placeholder="Warehouse name" value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} /></div>
                 <div className="space-y-2"><Label>Location</Label><Input placeholder="City, State" value={form.location} onChange={(e) => setForm((current) => ({ ...current, location: e.target.value }))} /></div>
                 <div className="space-y-2"><Label>Description</Label><Input placeholder="Description" value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} /></div>
-                <Button className="w-full" requiresOnline disabled={createMutation.isPending} onClick={() => {
-                  if (!form.name) {
-                    toast.error('Warehouse name is required');
-                    return;
-                  }
-                  createMutation.mutate({
-                    name: form.name,
-                    location: form.location,
-                    description: form.description,
-                  });
-                }}>{createMutation.isPending ? 'Creating...' : 'Create Warehouse'}</Button>
-              </div>
+                <Button className="w-full" type="submit" requiresOnline disabled={createMutation.isPending}>{createMutation.isPending ? 'Creating...' : 'Create Warehouse'}</Button>
+              </form>
             </DialogContent>
           </Dialog>
         )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Shield, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -51,6 +51,8 @@ export default function UsersPage() {
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<UserRole>('staff');
   const [createdInvite, setCreatedInvite] = useState<TenantInvite | null>(null);
+  const inviteToastRef = useRef<string | number | null>(null);
+  const updateToastRef = useRef<string | number | null>(null);
 
   const {
     data: users = [],
@@ -175,7 +177,9 @@ export default function UsersPage() {
     setEditingUserId(null);
   };
 
-  const handleSave = () => {
+  const handleSave = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     if (!editingUser) {
       return;
     }
@@ -193,7 +197,9 @@ export default function UsersPage() {
     });
   };
 
-  const handleInvite = () => {
+  const handleInvite = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
     if (!inviteEmail.trim()) {
       toast.error('Email is required');
       return;
@@ -214,6 +220,38 @@ export default function UsersPage() {
       toast.error('Unable to copy invite link. Select and copy it manually.');
     }
   };
+
+  useEffect(() => {
+    if (inviteMutation.isPending) {
+      if (!inviteToastRef.current) {
+        inviteToastRef.current = toast.loading('Creating invite...', {
+          description: 'The invite link will appear here automatically when it is ready.',
+        });
+      }
+      return;
+    }
+
+    if (inviteToastRef.current) {
+      toast.dismiss(inviteToastRef.current);
+      inviteToastRef.current = null;
+    }
+  }, [inviteMutation.isPending]);
+
+  useEffect(() => {
+    if (updateMutation.isPending) {
+      if (!updateToastRef.current) {
+        updateToastRef.current = toast.loading('Saving user changes...', {
+          description: 'This dialog will close and the user list will refresh automatically.',
+        });
+      }
+      return;
+    }
+
+    if (updateToastRef.current) {
+      toast.dismiss(updateToastRef.current);
+      updateToastRef.current = null;
+    }
+  }, [updateMutation.isPending]);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -374,7 +412,7 @@ export default function UsersPage() {
                   Create a secure invite link for a team member to join this tenant.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-2">
+              <form className="space-y-4 py-2" onSubmit={handleInvite}>
                 <div className="space-y-2">
                   <Label htmlFor="invite-email">Email</Label>
                   <Input
@@ -430,16 +468,17 @@ export default function UsersPage() {
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="outline"
+                    type="button"
                     onClick={() => closeInviteDialog(false)}
                     disabled={inviteMutation.isPending}
                   >
                     Close
                   </Button>
-                  <Button requiresOnline onClick={handleInvite} disabled={inviteMutation.isPending}>
+                  <Button requiresOnline type="submit" disabled={inviteMutation.isPending}>
                     {inviteMutation.isPending ? 'Creating...' : 'Create Invite'}
                   </Button>
                 </div>
-              </div>
+              </form>
             </DialogContent>
           </Dialog>
 
@@ -452,7 +491,7 @@ export default function UsersPage() {
                 </DialogDescription>
               </DialogHeader>
               {editingUser && (
-                <div className="space-y-4 py-2">
+                <form className="space-y-4 py-2" onSubmit={handleSave}>
                   <div className="space-y-2">
                     <Label htmlFor="user-name">Name</Label>
                     <Input
@@ -487,16 +526,17 @@ export default function UsersPage() {
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="outline"
+                      type="button"
                       onClick={() => setEditingUserId(null)}
                       disabled={updateMutation.isPending}
                     >
                       Cancel
                     </Button>
-                    <Button requiresOnline onClick={handleSave} disabled={updateMutation.isPending}>
+                    <Button requiresOnline type="submit" disabled={updateMutation.isPending}>
                       {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
-                </div>
+                </form>
               )}
             </DialogContent>
           </Dialog>

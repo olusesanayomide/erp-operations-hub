@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
+import { AUTH_SLOW_OPERATION_NOTICE_MS } from '@/shared/lib/erp-api';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
@@ -44,6 +45,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(routeState?.authError || '');
+  const [showSlowLoginNotice, setShowSlowLoginNotice] = useState(false);
 
   useEffect(() => {
     if (!routeState?.authError) return;
@@ -53,6 +55,19 @@ export default function LoginPage() {
       state: routeState.email ? { email: routeState.email } : null,
     });
   }, [location.pathname, navigate, routeState?.authError, routeState?.email]);
+
+  useEffect(() => {
+    if (!loading) {
+      setShowSlowLoginNotice(false);
+      return;
+    }
+
+    const noticeTimer = window.setTimeout(() => {
+      setShowSlowLoginNotice(true);
+    }, AUTH_SLOW_OPERATION_NOTICE_MS);
+
+    return () => window.clearTimeout(noticeTimer);
+  }, [loading]);
 
   const clearErrorOnEdit = () => {
     if (error) {
@@ -69,6 +84,7 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setShowSlowLoginNotice(false);
     const result = await login(email, password);
 
     if (result.success) {
@@ -187,6 +203,16 @@ export default function LoginPage() {
                     </motion.p>
                   )}
 
+                  {showSlowLoginNotice && !error && (
+                    <motion.p
+                      initial={prefersReducedMotion ? false : { opacity: 0, y: -6 }}
+                      animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+                      className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900"
+                    >
+                      Still signing you in. On slower or unstable networks this can take a little longer while we reconnect your ERP workspace. Please keep this page open.
+                    </motion.p>
+                  )}
+
                   <motion.div variants={itemVariants} className="flex items-center justify-between gap-4">
                     <div className="flex min-h-11 items-center gap-3">
                       <Checkbox id="remember" />
@@ -206,7 +232,7 @@ export default function LoginPage() {
                     >
                       {loading ? (
                         <LoadingText>
-                          {authStatusMessage || 'Signing you in...'}
+                          {showSlowLoginNotice ? 'Still signing you in...' : authStatusMessage || 'Signing you in...'}
                         </LoadingText>
                       ) : (
                         'Sign in'

@@ -386,7 +386,15 @@ type DashboardTrend = {
   previous: number;
 };
 
-const TENANT_SIGNUP_TIMEOUT_MS = 90000;
+export const AUTH_SLOW_OPERATION_NOTICE_MS = 8000;
+export const AUTH_LOGIN_PROFILE_TIMEOUT_MS = 90000;
+export const AUTH_LOGIN_PROFILE_TIMEOUT_MESSAGE =
+  "Signed in, but we could not load your ERP profile. Please check that the backend is running and try again.";
+export const AUTH_RESTORE_TIMEOUT_MS = 120000;
+export const AUTH_RESTORE_TIMEOUT_MESSAGE =
+  "We could not verify your session. Please sign in again.";
+
+const TENANT_SIGNUP_TIMEOUT_MS = AUTH_LOGIN_PROFILE_TIMEOUT_MS;
 const TENANT_SIGNUP_TIMEOUT_MESSAGE =
   "Workspace setup is taking longer than expected. If your connection is unstable, please wait a moment and try signing in before submitting again.";
 
@@ -782,10 +790,18 @@ export function normalizeMovement(raw: BackendStockMovement): StockMovement {
   };
 }
 
-export async function getCurrentUser(accessToken?: string | null) {
+export async function getCurrentUser(
+  accessToken?: string | null,
+  init?: {
+    timeoutMs?: number;
+    timeoutMessage?: string;
+  },
+) {
   if (!currentUserRequest) {
     currentUserRequest = apiRequest<BackendAuthUser>("/auth/me", {
       accessToken,
+      timeoutMs: init?.timeoutMs,
+      timeoutMessage: init?.timeoutMessage,
     })
       .then(normalizeAuthUser)
       .finally(() => {

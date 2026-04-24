@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
@@ -21,6 +21,7 @@ export default function SuppliersPage() {
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', address: '' });
+  const createToastRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -44,6 +45,38 @@ export default function SuppliersPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  function handleCreateSupplier(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!form.name.trim()) {
+      toast.error('Supplier name is required');
+      return;
+    }
+
+    createMutation.mutate({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      address: form.address.trim(),
+    });
+  }
+
+  useEffect(() => {
+    if (createMutation.isPending) {
+      if (!createToastRef.current) {
+        createToastRef.current = toast.loading('Creating supplier...', {
+          description: 'This dialog will close and the supplier list will refresh automatically.',
+        });
+      }
+      return;
+    }
+
+    if (createToastRef.current) {
+      toast.dismiss(createToastRef.current);
+      createToastRef.current = null;
+    }
+  }, [createMutation.isPending]);
+
   return (
     <div className="animate-fade-in">
       <PageHeader title="Suppliers" description={`${pagination.total} suppliers`}>
@@ -52,19 +85,13 @@ export default function SuppliersPage() {
             <DialogTrigger asChild><Button requiresOnline><Plus className="h-4 w-4 mr-2" />Add Supplier</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>New Supplier</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-2">
+              <form className="space-y-4 py-2" onSubmit={handleCreateSupplier}>
                 <div className="space-y-2"><Label>Name</Label><Input placeholder="Supplier name" value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} /></div>
                 <div className="space-y-2"><Label>Email</Label><Input type="email" placeholder="email@supplier.com" value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} /></div>
                 <div className="space-y-2"><Label>Phone</Label><Input placeholder="+1 555-0000" value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} /></div>
                 <div className="space-y-2"><Label>Address</Label><Input placeholder="Address" value={form.address} onChange={(e) => setForm((current) => ({ ...current, address: e.target.value }))} /></div>
-                <Button className="w-full" requiresOnline disabled={createMutation.isPending} onClick={() => {
-                  if (!form.name) {
-                    toast.error('Supplier name is required');
-                    return;
-                  }
-                  createMutation.mutate(form);
-                }}>{createMutation.isPending ? 'Creating...' : 'Create Supplier'}</Button>
-              </div>
+                <Button className="w-full" type="submit" requiresOnline disabled={createMutation.isPending}>{createMutation.isPending ? 'Creating...' : 'Create Supplier'}</Button>
+              </form>
             </DialogContent>
           </Dialog>
         )}

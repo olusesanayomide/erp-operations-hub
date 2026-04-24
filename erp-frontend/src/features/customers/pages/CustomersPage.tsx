@@ -51,6 +51,7 @@ export default function CustomersPage() {
   const [importCsv, setImportCsv] = useState('');
   const [preview, setPreview] = useState<CustomerImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const createToastRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -97,6 +98,38 @@ export default function CustomersPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  function handleCreateCustomer(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!form.name.trim() || !form.email.trim()) {
+      toast.error('Name and email are required');
+      return;
+    }
+
+    createMutation.mutate({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      address: form.address.trim(),
+    });
+  }
+
+  useEffect(() => {
+    if (createMutation.isPending) {
+      if (!createToastRef.current) {
+        createToastRef.current = toast.loading('Creating customer...', {
+          description: 'This dialog will close and the customer list will refresh automatically.',
+        });
+      }
+      return;
+    }
+
+    if (createToastRef.current) {
+      toast.dismiss(createToastRef.current);
+      createToastRef.current = null;
+    }
+  }, [createMutation.isPending]);
 
   function resetImportDialog() {
     setImportMode('upsert');
@@ -469,7 +502,7 @@ export default function CustomersPage() {
                 <DialogHeader>
                   <DialogTitle>New Customer</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-2">
+                <form className="space-y-4 py-2" onSubmit={handleCreateCustomer}>
                   <div className="space-y-2">
                     <Label>Name</Label>
                     <Input
@@ -516,19 +549,13 @@ export default function CustomersPage() {
                   </div>
 	                  <Button
 	                    className="w-full"
+                      type="submit"
 	                    requiresOnline
 	                    disabled={createMutation.isPending}
-                    onClick={() => {
-                      if (!form.name || !form.email) {
-                        toast.error('Name and email are required');
-                        return;
-                      }
-                      createMutation.mutate(form);
-                    }}
                   >
                     {createMutation.isPending ? 'Creating...' : 'Create Customer'}
                   </Button>
-                </div>
+                </form>
               </DialogContent>
             </Dialog>
           </>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/shared/components/PageComponents';
@@ -42,6 +42,7 @@ export default function PurchaseCreatePage() {
   const [supplierId, setSupplierId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [items, setItems] = useState<DraftItem[]>([{ productId: '', quantity: '1', unitPrice: '' }]);
+  const createToastRef = useRef<string | number | null>(null);
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ['suppliers'],
@@ -112,6 +113,22 @@ export default function PurchaseCreatePage() {
       })),
     });
   };
+
+  useEffect(() => {
+    if (createMutation.isPending) {
+      if (!createToastRef.current) {
+        createToastRef.current = toast.loading('Creating purchase order...', {
+          description: 'You will be returned to the purchase list automatically when it is ready.',
+        });
+      }
+      return;
+    }
+
+    if (createToastRef.current) {
+      toast.dismiss(createToastRef.current);
+      createToastRef.current = null;
+    }
+  }, [createMutation.isPending]);
 
   return (
     <div className="animate-fade-in space-y-6 max-w-3xl">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, FolderArchive, PauseCircle, PlayCircle, ShieldAlert } from 'lucide-react';
-import { PageHeader, TableSkeleton } from '@/shared/components/PageComponents';
+import { PageHeader, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
 import {
@@ -94,6 +94,7 @@ export default function TenantsPage() {
     isLoading,
     isError,
     error,
+    refetch,
   } = useQuery({
     queryKey: ['platform-tenants'],
     queryFn: listTenants,
@@ -128,7 +129,9 @@ export default function TenantsPage() {
       <PageHeader
         title="Tenant Administration"
         description="Manage tenant lifecycle and keep platform-level access under control."
-      />
+      >
+        <RetryButton onClick={() => void refetch()} label="Refresh" />
+      </PageHeader>
 
       <div className="erp-card overflow-hidden">
         {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={5} /></div>}
@@ -140,6 +143,9 @@ export default function TenantsPage() {
             <p className="text-sm text-muted-foreground">
               {(error as Error).message || 'The tenant directory could not be loaded.'}
             </p>
+            <div className="mt-4 flex justify-center">
+              <RetryButton onClick={() => void refetch()} />
+            </div>
           </div>
         )}
 

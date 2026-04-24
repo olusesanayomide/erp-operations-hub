@@ -48,6 +48,7 @@ export default function ProductsPage() {
   const [importCsv, setImportCsv] = useState('');
   const [preview, setPreview] = useState<ProductImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const createToastRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -143,7 +144,9 @@ export default function ProductsPage() {
     URL.revokeObjectURL(url);
   }
 
-  function handleCreateProduct() {
+  function handleCreateProduct(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
     if (!form.name.trim() || !form.sku.trim()) {
       toast.error('Name and SKU are required');
       return;
@@ -171,6 +174,22 @@ export default function ProductsPage() {
       description: form.description.trim(),
     });
   }
+
+  useEffect(() => {
+    if (createMutation.isPending) {
+      if (!createToastRef.current) {
+        createToastRef.current = toast.loading('Creating product...', {
+          description: 'This dialog will close and the product list will refresh automatically.',
+        });
+      }
+      return;
+    }
+
+    if (createToastRef.current) {
+      toast.dismiss(createToastRef.current);
+      createToastRef.current = null;
+    }
+  }, [createMutation.isPending]);
 
   return (
     <div className="animate-fade-in">
@@ -372,7 +391,7 @@ export default function ProductsPage() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>New Product</DialogTitle></DialogHeader>
-                <div className="space-y-4 py-2">
+                <form className="space-y-4 py-2" onSubmit={handleCreateProduct}>
                   <div className="space-y-2"><Label>Name</Label><Input placeholder="Product name" value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} /></div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>SKU</Label><Input placeholder="SKU-000" value={form.sku} onChange={(e) => setForm((current) => ({ ...current, sku: e.target.value }))} /></div>
@@ -386,13 +405,13 @@ export default function ProductsPage() {
                   <div className="space-y-2"><Label>Description</Label><Input placeholder="Short product description" value={form.description} onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))} /></div>
                   <Button
                     className="w-full"
+                    type="submit"
                     requiresOnline
                     disabled={createMutation.isPending}
-                    onClick={handleCreateProduct}
                   >
                     {createMutation.isPending ? 'Creating...' : 'Create Product'}
                   </Button>
-                </div>
+                </form>
               </DialogContent>
             </Dialog>
           </>
