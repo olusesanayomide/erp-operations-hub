@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
@@ -61,6 +61,7 @@ function AppContentFallback() {
 
 export function AppLayout() {
   const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isOnline = useOnlineStatus();
   const title = getTitle(location.pathname);
   const healthQuery = useQuery({
@@ -80,10 +81,10 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      <AppSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AppHeader title={title} />
-        <main className="flex-1 overflow-auto p-6 bg-background">
+      <AppSidebar mobileOpen={mobileNavOpen} onMobileOpenChange={setMobileNavOpen} />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <AppHeader title={title} onMenuClick={() => setMobileNavOpen(true)} />
+        <main className="flex-1 overflow-auto bg-background p-4 xs:p-5 lg:p-6">
           {showHealthBanner && (
             <Alert className="mb-5 border-warning/30 bg-warning/10 text-slate-950 [&>svg]:text-warning">
               {isApiUnreachable ? (
@@ -103,7 +104,7 @@ export function AppLayout() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-fit border-warning/30 bg-white/70 text-slate-900 hover:bg-white"
+                  className="w-full border-warning/30 bg-white/70 text-slate-900 hover:bg-white xs:w-fit"
                   onClick={() => void healthQuery.refetch()}
                   disabled={healthQuery.isFetching}
                 >

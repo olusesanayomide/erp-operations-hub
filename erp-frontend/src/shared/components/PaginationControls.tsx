@@ -22,14 +22,15 @@ export function PaginationControls({
 
   return (
     <div className="flex flex-col gap-3 border-t px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-      <span>
+      <span className="text-xs xs:text-sm">
         Showing {firstItem}-{lastItem} of {total}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex w-full items-center gap-2 xs:w-auto xs:justify-end">
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="flex-1 xs:flex-none"
           disabled={page <= 1 || isFetching}
           onClick={() => onPageChange(page - 1)}
         >
@@ -42,6 +43,7 @@ export function PaginationControls({
           type="button"
           variant="outline"
           size="sm"
+          className="flex-1 xs:flex-none"
           disabled={page >= totalPages || isFetching}
           onClick={() => onPageChange(page + 1)}
         >

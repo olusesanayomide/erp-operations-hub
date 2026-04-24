@@ -3,6 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthContext';
 import { preloadRoute } from '@/app/routeModules';
 import { cn } from '@/shared/lib/utils';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { Sheet, SheetContent } from '@/shared/ui/sheet';
 import {
   LayoutDashboard, Package, Boxes, ShoppingCart, Truck,
   Users, Factory, Warehouse, Settings, ChevronLeft, LogOut, UserCircle, Building2, ChevronDown
@@ -45,11 +47,18 @@ const navGroups = [
   },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({
+  mobileOpen,
+  onMobileOpenChange,
+}: {
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+}) {
   const [collapsed, setCollapsed] = useState(false);
   const [closedGroups, setClosedGroups] = useState<string[]>([]);
   const { user, logout } = useAuth();
   const location = useLocation();
+  const isMobile = useIsMobile();
   const groups = user?.isPlatformAdmin
     ? navGroups.map((group) =>
         group.label === 'Admin'
@@ -73,27 +82,31 @@ export function AppSidebar() {
     );
   };
 
-  return (
+  const navContent = (
     <aside className={cn(
-      'flex flex-col h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300 shrink-0',
-      collapsed ? 'w-16' : 'w-60'
+      'flex h-full flex-col bg-sidebar text-sidebar-foreground md:h-screen',
+      isMobile ? 'w-full' : 'border-r border-sidebar-border transition-all duration-300 shrink-0',
+      !isMobile && (collapsed ? 'w-16' : 'w-60')
     )}>
       {/* Logo */}
-      <div className="flex items-center h-14 px-4 border-b border-sidebar-border">
+      <div className="flex h-14 items-center border-b border-sidebar-border px-4">
         {!collapsed && (
           <span className="text-lg font-bold text-sidebar-primary-foreground tracking-tight">
             Manifest
           </span>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className={cn(
-            'p-1.5 rounded-md hover:bg-sidebar-accent transition-colors',
-            collapsed ? 'mx-auto' : 'ml-auto'
-          )}
-        >
-          <ChevronLeft className={cn('h-4 w-4 transition-transform', collapsed && 'rotate-180')} />
-        </button>
+        {!isMobile && (
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className={cn(
+              'p-1.5 rounded-md hover:bg-sidebar-accent transition-colors',
+              collapsed ? 'mx-auto' : 'ml-auto'
+            )}
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          >
+            <ChevronLeft className={cn('h-4 w-4 transition-transform', collapsed && 'rotate-180')} />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -124,6 +137,11 @@ export function AppSidebar() {
                       <NavLink
                         key={item.path}
                         to={item.path}
+                        onClick={() => {
+                          if (isMobile) {
+                            onMobileOpenChange(false);
+                          }
+                        }}
                         onMouseEnter={() => handleIntent(item.path)}
                         onFocus={() => handleIntent(item.path)}
                         onTouchStart={() => handleIntent(item.path)}
@@ -162,7 +180,16 @@ export function AppSidebar() {
               </div>
             )}
             {!collapsed && (
-              <button onClick={logout} className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-muted hover:text-sidebar-accent-foreground transition-colors" title="Logout">
+              <button
+                onClick={() => {
+                  if (isMobile) {
+                    onMobileOpenChange(false);
+                  }
+                  logout();
+                }}
+                className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-muted hover:text-sidebar-accent-foreground transition-colors"
+                title="Logout"
+              >
                 <LogOut className="h-4 w-4" />
               </button>
             )}
@@ -171,5 +198,17 @@ export function AppSidebar() {
       )}
     </aside>
   );
+
+  if (isMobile) {
+    return (
+      <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
+        <SheetContent side="left" className="border-r border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:right-3 [&>button]:top-3">
+          {navContent}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return navContent;
 }
 

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, CheckCheck } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, CheckCheck, Menu } from 'lucide-react';
 import { RoleBadge } from '@/shared/components/StatusBadge';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -38,7 +38,7 @@ function getNotificationHref(notification: NotificationItem) {
   return null;
 }
 
-export function AppHeader({ title }: { title: string }) {
+export function AppHeader({ title, onMenuClick }: { title: string; onMenuClick: () => void }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -92,14 +92,26 @@ export function AppHeader({ title }: { title: string }) {
   };
 
   return (
-    <header className="h-14 border-b bg-card flex items-center justify-between px-6 shrink-0">
-      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-card px-4 xs:px-5 lg:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={onMenuClick}
+          aria-label="Open navigation"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <h2 className="truncate text-base font-semibold tracking-tight xs:text-lg">{title}</h2>
+      </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 xs:gap-3">
         <Popover>
           <PopoverTrigger asChild>
             <button
-              className="relative p-2 rounded-lg hover:bg-muted transition-colors"
+              className="relative rounded-lg p-2 transition-colors hover:bg-muted"
               aria-label="Notifications"
             >
               <Bell className="h-4.5 w-4.5 text-muted-foreground" />
@@ -110,7 +122,7 @@ export function AppHeader({ title }: { title: string }) {
               )}
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-[360px] p-0">
+          <PopoverContent align="end" className="w-[calc(100vw-2rem)] max-w-[360px] p-0">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div>
                 <p className="text-sm font-semibold">Notifications</p>
@@ -177,12 +189,12 @@ export function AppHeader({ title }: { title: string }) {
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted transition-colors">
+              <button className="flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-muted">
                 <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold">
                   {user.name.split(' ').map(n => n[0]).join('')}
                 </div>
-                <span className="text-sm font-medium hidden lg:inline">{user.name}</span>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground hidden lg:inline" />
+                <span className="hidden max-w-[10rem] truncate text-sm font-medium md:inline">{user.name}</span>
+                <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground md:inline" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">

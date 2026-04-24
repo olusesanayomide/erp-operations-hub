@@ -155,7 +155,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 xs:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         <KPICard title="Total Products" value={summary?.counts.products ?? 0} icon={Package} trend={summary?.trends.products} description={summary?.trends.products?.label ?? 'catalog'} />
         <KPICard title="Available Inventory" value={(summary?.inventory.availableQuantity ?? 0).toLocaleString()} icon={Boxes} trend={summary?.trends.availableInventory} description={summary?.trends.availableInventory?.label ?? 'sellable'} />
         <KPICard title="Reserved Inventory" value={(summary?.inventory.reservedQuantity ?? 0).toLocaleString()} icon={Boxes} description="committed" />
@@ -167,7 +167,7 @@ export default function DashboardPage() {
         <KPICard title="Warehouses" value={summary?.counts.warehouses ?? 0} icon={Warehouse} trend={summary?.trends.warehouses} description={summary?.trends.warehouses?.label ?? 'locations'} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="erp-card p-5 lg:col-span-2">
           <h3 className="erp-section-title">Order vs Purchase Value</h3>
           <ResponsiveContainer width="100%" height={240}>
@@ -222,7 +222,7 @@ export default function DashboardPage() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
-          <div className="flex flex-wrap gap-3 mt-2 justify-center">
+          <div className="mt-2 flex flex-wrap justify-center gap-3">
             {ordersByStatus.map((status, i) => (
               <div key={status.name} className="flex items-center gap-1.5 text-xs">
                 <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i] }} />
@@ -236,7 +236,7 @@ export default function DashboardPage() {
       {quickActions.length > 0 && (
         <div className="erp-card p-5">
           <h3 className="erp-section-title">Quick Actions</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 gap-3 xs:grid-cols-2 sm:grid-cols-4">
             {quickActions.map((action) => (
               <Link key={action.label} to={action.path}>
                 <Button variant="outline" className="w-full h-auto py-3 flex-col gap-2 hover:bg-muted/50">
@@ -249,7 +249,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="erp-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-semibold">Low Stock Alerts</h3>
@@ -257,12 +257,12 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-2">
             {lowStockItems.slice(0, 5).map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-lg border border-warning/20 bg-warning/10 p-2.5">
-                <div>
+              <div key={item.id} className="flex flex-col gap-2 rounded-lg border border-warning/20 bg-warning/10 p-3 xs:flex-row xs:items-center xs:justify-between">
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{item.productName}</p>
                   <p className="text-xs text-muted-foreground">{item.warehouseName}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-left xs:text-right">
                   <p className="text-sm font-semibold">{item.quantity} / {item.minStock}</p>
                   <StatusBadge status={item.status as StockStatus} />
                 </div>
@@ -279,12 +279,12 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-2">
             {(summary?.orders.recent ?? []).map((order) => (
-              <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/30 transition-colors">
-                <div>
+              <Link key={order.id} to={`/orders/${order.id}`} className="flex flex-col gap-2 rounded-lg p-3 transition-colors hover:bg-muted/30 xs:flex-row xs:items-center xs:justify-between">
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{order.orderNumber}</p>
                   <p className="text-xs text-muted-foreground">{order.customerName}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-left xs:text-right">
                   <p className="text-sm font-semibold">{formatMoney(order.totalAmount)}</p>
                   <StatusBadge status={order.status as OrderStatus} />
                 </div>

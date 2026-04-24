@@ -208,14 +208,14 @@ export default function ProductsPage() {
               </DialogTrigger>
               <DialogContent className="max-h-[90vh] max-w-6xl overflow-hidden p-0">
                 <div className="flex max-h-[90vh] flex-col">
-                  <DialogHeader className="border-b border-border px-6 py-5">
+                  <DialogHeader className="border-b border-border px-4 py-5 xs:px-6">
                     <DialogTitle>Import products from CSV</DialogTitle>
                     <DialogDescription>
                       Upload a product file, review row-level issues, then confirm the import. SKU is used as the matching key.
                     </DialogDescription>
                   </DialogHeader>
 
-                  <div className="flex-1 overflow-y-auto px-6 py-5">
+                  <div className="flex-1 overflow-y-auto px-4 py-5 xs:px-6">
                     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.2fr)_360px]">
                       <div className="space-y-4">
                     <div className="rounded-xl border border-border bg-muted/30 p-4">
@@ -241,7 +241,7 @@ export default function ProductsPage() {
 
                     <div className="rounded-xl border border-border bg-background p-4">
                       <Label className="text-sm font-medium">Import mode</Label>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <div className="mt-3 grid gap-3 xs:grid-cols-2">
                         <button
                           type="button"
                           className={`rounded-xl border p-4 text-left transition-colors ${importMode === 'upsert' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
@@ -271,7 +271,7 @@ export default function ProductsPage() {
                       <div className="rounded-xl border border-border bg-background p-4 lg:sticky lg:top-0">
                         <p className="text-sm font-medium">Import summary</p>
                         {preview ? (
-                          <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div className="mt-4 grid grid-cols-1 gap-3 xs:grid-cols-2">
                             <div className="rounded-lg border border-border p-3">
                               <p className="text-xs uppercase tracking-wide text-muted-foreground">Rows</p>
                               <p className="mt-1 text-2xl font-semibold">{preview.totals.rows}</p>
@@ -356,7 +356,7 @@ export default function ProductsPage() {
                     )}
                   </div>
 
-                  <DialogFooter className="border-t border-border px-6 py-4">
+                  <DialogFooter className="border-t border-border px-4 py-4 xs:px-6">
                     <Button type="button" variant="ghost" onClick={() => {
                       setImportDialogOpen(false);
                       resetImportDialog();
@@ -393,11 +393,11 @@ export default function ProductsPage() {
                 <DialogHeader><DialogTitle>New Product</DialogTitle></DialogHeader>
                 <form className="space-y-4 py-2" onSubmit={handleCreateProduct}>
                   <div className="space-y-2"><Label>Name</Label><Input placeholder="Product name" value={form.name} onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))} /></div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
                     <div className="space-y-2"><Label>SKU</Label><Input placeholder="SKU-000" value={form.sku} onChange={(e) => setForm((current) => ({ ...current, sku: e.target.value }))} /></div>
                     <div className="space-y-2"><Label>Price</Label><Input type="number" min="0.01" step="0.01" placeholder="0.00" value={form.price} onChange={(e) => setForm((current) => ({ ...current, price: e.target.value }))} /></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 xs:grid-cols-2">
                     <div className="space-y-2"><Label>Min Stock</Label><Input type="number" min="0" step="1" placeholder="10" value={form.minStock} onChange={(e) => setForm((current) => ({ ...current, minStock: e.target.value }))} /></div>
                     <div className="space-y-2"><Label>Category</Label><Input placeholder="Category" value={form.category} onChange={(e) => setForm((current) => ({ ...current, category: e.target.value }))} /></div>
                   </div>
@@ -427,7 +427,7 @@ export default function ProductsPage() {
       {/* Table */}
       <div className="erp-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="min-w-[720px] w-full">
             <thead>
               <tr className="erp-table-header">
                 <th className="text-left p-3">Name</th>

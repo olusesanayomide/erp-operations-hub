@@ -78,7 +78,7 @@ export function RetryButton({
   label?: string;
 }) {
   return (
-    <Button variant="outline" onClick={onClick}>
+    <Button variant="outline" className="w-full xs:w-auto" onClick={onClick}>
       {label}
     </Button>
   );
@@ -122,7 +122,7 @@ export function PageHeader({ title, description, children }: {
         <h1 className="erp-page-title">{title}</h1>
         {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
       </div>
-      {children && <div className="flex items-center gap-2 mt-3 sm:mt-0">{children}</div>}
+      {children && <div className="mt-1 flex w-full flex-wrap items-center gap-2 sm:mt-0 sm:w-auto sm:justify-end">{children}</div>}
     </div>
   );
 }

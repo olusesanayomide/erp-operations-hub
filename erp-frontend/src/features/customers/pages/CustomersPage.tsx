@@ -196,7 +196,7 @@ export default function CustomersPage() {
               </DialogTrigger>
               <DialogContent className="max-h-[90vh] max-w-6xl overflow-hidden p-0">
                 <div className="flex max-h-[90vh] flex-col">
-                  <DialogHeader className="border-b border-border px-6 py-5">
+                  <DialogHeader className="border-b border-border px-4 py-5 xs:px-6">
                     <DialogTitle>Import customers from CSV</DialogTitle>
                     <DialogDescription>
                       Upload a customer file, review row-level issues, then confirm
@@ -204,7 +204,7 @@ export default function CustomersPage() {
                     </DialogDescription>
                   </DialogHeader>
 
-                  <div className="flex-1 overflow-y-auto px-6 py-5">
+                  <div className="flex-1 overflow-y-auto px-4 py-5 xs:px-6">
                     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.2fr)_360px]">
                       <div className="space-y-4">
                         <div className="rounded-xl border border-border bg-muted/30 p-4">
@@ -242,7 +242,7 @@ export default function CustomersPage() {
 
                         <div className="rounded-xl border border-border bg-background p-4">
                           <Label className="text-sm font-medium">Import mode</Label>
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <div className="mt-3 grid gap-3 xs:grid-cols-2">
                             <button
                               type="button"
                               className={`rounded-xl border p-4 text-left transition-colors ${
@@ -286,7 +286,7 @@ export default function CustomersPage() {
                       <div className="rounded-xl border border-border bg-background p-4 lg:sticky lg:top-0">
                         <p className="text-sm font-medium">Import summary</p>
                         {preview ? (
-                          <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div className="mt-4 grid grid-cols-1 gap-3 xs:grid-cols-2">
                             <div className="rounded-lg border border-border p-3">
                               <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                 Rows
@@ -440,7 +440,7 @@ export default function CustomersPage() {
                     )}
                   </div>
 
-                  <DialogFooter className="border-t border-border px-6 py-4">
+                  <DialogFooter className="border-t border-border px-4 py-4 xs:px-6">
                     <Button
                       type="button"
                       variant="ghost"
@@ -574,7 +574,7 @@ export default function CustomersPage() {
 
       <div className="erp-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="min-w-[640px] w-full">
             <thead>
               <tr className="erp-table-header">
                 <th className="text-left p-3">Name</th>
