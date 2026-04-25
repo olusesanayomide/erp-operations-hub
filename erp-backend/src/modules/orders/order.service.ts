@@ -52,6 +52,11 @@ const ORDER_STATUS_DB_MAP: Record<OrderLifecycleStatus, OrderStatus> = {
   [OrderLifecycleStatus.CANCELLED]: OrderStatus.CANCELLED,
 };
 
+const INTERACTIVE_TRANSACTION_OPTIONS = {
+  maxWait: 15000,
+  timeout: 30000,
+} as const;
+
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
@@ -522,6 +527,7 @@ export class OrdersService {
 
         return { updatedOrder, currentStatus };
       },
+      INTERACTIVE_TRANSACTION_OPTIONS,
     );
 
     this.queueTenantNotification({

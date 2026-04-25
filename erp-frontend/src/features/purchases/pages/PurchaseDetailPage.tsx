@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -24,6 +25,8 @@ export default function PurchaseDetailPage() {
   const { canPerform } = useAuth();
   const { formatMoney } = useSettings();
   const queryClient = useQueryClient();
+  const receiveToastRef = useRef<string | number | null>(null);
+  const statusToastRef = useRef<string | number | null>(null);
 
   const { data: purchase, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['purchases', id],
@@ -43,10 +46,12 @@ export default function PurchaseDetailPage() {
 
 	  const receiveMutation = useMutation({
 	    mutationFn: () => receivePurchase(id || '', purchase?.concurrencyStamp),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      queryClient.invalidateQueries({ queryKey: ['purchases', id] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['purchases'] }),
+        queryClient.invalidateQueries({ queryKey: ['purchases', id] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+      ]);
       toast.success('Goods received and inventory updated');
     },
     onError: (error: Error) => toast.error(error.message),
@@ -55,13 +60,49 @@ export default function PurchaseDetailPage() {
 	  const updateStatusMutation = useMutation({
 	    mutationFn: (status: 'CONFIRMED' | 'SHIPPED' | 'CANCELLED') =>
 	      updatePurchaseStatus(id || '', status, purchase?.concurrencyStamp),
-    onSuccess: (_, status) => {
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      queryClient.invalidateQueries({ queryKey: ['purchases', id] });
+    onSuccess: async (_, status) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['purchases'] }),
+        queryClient.invalidateQueries({ queryKey: ['purchases', id] }),
+      ]);
       toast.success(`Purchase order marked ${status.toLowerCase()}`);
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  const isBusy = receiveMutation.isPending || updateStatusMutation.isPending;
+
+  useEffect(() => {
+    if (receiveMutation.isPending) {
+      if (!receiveToastRef.current) {
+        receiveToastRef.current = toast.loading('Receiving goods...', {
+          description: 'Inventory is being updated. Please keep this page open.',
+        });
+      }
+      return;
+    }
+    if (receiveToastRef.current) {
+      toast.dismiss(receiveToastRef.current);
+      receiveToastRef.current = null;
+    }
+  }, [receiveMutation.isPending]);
+
+  useEffect(() => {
+    if (updateStatusMutation.isPending) {
+      if (!statusToastRef.current) {
+        const targetStatus = updateStatusMutation.variables?.toLowerCase();
+        statusToastRef.current = toast.loading(
+          targetStatus ? `Updating to ${targetStatus}...` : 'Updating status...',
+          { description: 'Please keep this page open.' },
+        );
+      }
+      return;
+    }
+    if (statusToastRef.current) {
+      toast.dismiss(statusToastRef.current);
+      statusToastRef.current = null;
+    }
+  }, [updateStatusMutation.isPending, updateStatusMutation.variables]);
 
   if (isLoading) return <DetailPageSkeleton />;
   if (isError) return <ErrorState title="Unable to load purchase" description={(error as Error).message || 'The requested purchase order could not be loaded right now.'} action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/purchases"><Button variant="outline">Back</Button></Link></div>} />;
@@ -77,15 +118,15 @@ export default function PurchaseDetailPage() {
       <PageHeader title={purchase.purchaseNumber}>
         <StatusBadge status={purchase.status} className="text-sm px-3 py-1" />
         {purchase.status === 'draft' && canPerform('purchases.confirm') && (
-          <Button requiresOnline onClick={() => updateStatusMutation.mutate('CONFIRMED')}>
+          <Button requiresOnline disabled={isBusy} onClick={() => updateStatusMutation.mutate('CONFIRMED')}>
             <CheckCircle className="h-4 w-4 mr-2" />
-            Confirm PO
+            {updateStatusMutation.isPending ? 'Confirming...' : 'Confirm PO'}
           </Button>
         )}
         {purchase.status === 'confirmed' && canPerform('purchases.confirm') && (
-          <Button requiresOnline variant="outline" onClick={() => updateStatusMutation.mutate('SHIPPED')}>
+          <Button requiresOnline variant="outline" disabled={isBusy} onClick={() => updateStatusMutation.mutate('SHIPPED')}>
             <Send className="h-4 w-4 mr-2" />
-            Mark Shipped
+            {updateStatusMutation.isPending ? 'Updating...' : 'Mark Shipped'}
           </Button>
         )}
         {purchase.status !== 'received' && purchase.status !== 'cancelled' && canPerform('purchases.receive') && (
@@ -94,10 +135,10 @@ export default function PurchaseDetailPage() {
               <Button
                 requiresOnline
                 className="bg-success hover:bg-success/90"
-                disabled={purchase.status === 'draft'}
+                disabled={purchase.status === 'draft' || isBusy}
               >
                 <PackageCheck className="h-4 w-4 mr-2" />
-                Receive Goods
+                {receiveMutation.isPending ? 'Receiving...' : 'Receive Goods'}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -106,8 +147,13 @@ export default function PurchaseDetailPage() {
                 <AlertDialogDescription>This will add all items to {warehouse?.name} inventory. Stock levels will be updated immediately.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => receiveMutation.mutate()}>Confirm Receipt</AlertDialogAction>
+                <AlertDialogCancel disabled={receiveMutation.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={receiveMutation.isPending}
+                  onClick={() => receiveMutation.mutate()}
+                >
+                  {receiveMutation.isPending ? 'Receiving...' : 'Confirm Receipt'}
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>

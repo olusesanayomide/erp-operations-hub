@@ -40,6 +40,11 @@ const PURCHASE_STATUS_TRANSITIONS: Record<
   [PurchaseLifecycleStatus.CANCELLED]: [],
 };
 
+const INTERACTIVE_TRANSACTION_OPTIONS = {
+  maxWait: 15000,
+  timeout: 30000,
+} as const;
+
 @Injectable()
 export class PurchaseService {
   private readonly logger = new Logger(PurchaseService.name);
@@ -161,7 +166,15 @@ export class PurchaseService {
   async getPurchaseDetails(tenantId: string, id: string) {
     const purchase = await this.prisma.purchase.findFirst({
       where: { id, tenantId },
-      include: { items: true, supplier: true, warehouse: true },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        supplier: true,
+        warehouse: true,
+      },
     });
 
     if (!purchase) {
@@ -217,16 +230,24 @@ export class PurchaseService {
     );
     const manualPurchaseOrder = dto.purchaseOrder?.trim();
 
-    const purchase = await this.prisma.$transaction(async (tx) => {
-      const maxAttempts = manualPurchaseOrder ? 1 : 5;
+    // The retry loop must live OUTSIDE the transaction.
+    // A P2002 conflict inside a Prisma interactive transaction causes Prisma to
+    // automatically roll back and close the tx. Any subsequent operation on that
+    // closed tx throws P2028. By generating the PO number and opening a fresh
+    // transaction on each attempt we avoid that problem entirely.
+    const maxAttempts = manualPurchaseOrder ? 1 : 5;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let purchase: any = undefined;
 
-      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-        const purchaseOrder =
-          manualPurchaseOrder ||
-          (await this.generatePurchaseOrderNumber(tx, tenantId));
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      // Generate PO number before entering the transaction so the tx stays short.
+      const purchaseOrder =
+        manualPurchaseOrder ||
+        (await this.generatePurchaseOrderNumber(this.prisma, tenantId));
 
-        try {
-          return await tx.purchase.create({
+      try {
+        purchase = await this.prisma.$transaction(async (tx) => {
+          return tx.purchase.create({
             data: {
               tenantId,
               purchaseOrder,
@@ -252,28 +273,33 @@ export class PurchaseService {
               warehouse: true,
             },
           });
-        } catch (error) {
-          const isPurchaseOrderConflict =
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2002' &&
-            Array.isArray(error.meta?.target) &&
-            error.meta.target.includes('tenantId') &&
-            error.meta.target.includes('purchaseOrder');
+        });
+        // Successful write — exit the retry loop.
+        break;
+      } catch (error) {
+        const isPurchaseOrderConflict =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          Array.isArray(error.meta?.target) &&
+          error.meta.target.includes('tenantId') &&
+          error.meta.target.includes('purchaseOrder');
 
-          if (!isPurchaseOrderConflict || manualPurchaseOrder) {
-            throw error;
-          }
-
-          if (attempt === maxAttempts - 1) {
-            throw new BadRequestException(
-              'Unable to generate a unique purchase order number. Please try again.',
-            );
-          }
+        if (!isPurchaseOrderConflict || manualPurchaseOrder) {
+          throw error;
         }
-      }
 
+        if (attempt === maxAttempts - 1) {
+          throw new BadRequestException(
+            'Unable to generate a unique purchase order number. Please try again.',
+          );
+        }
+        // Otherwise loop and try again with a new PO number.
+      }
+    }
+
+    if (!purchase) {
       throw new BadRequestException('Purchase order could not be created.');
-    });
+    }
 
     this.queueTenantNotification({
       tenantId,
@@ -383,7 +409,7 @@ export class PurchaseService {
           purchaseId: purchase.id,
         },
       };
-    });
+    }, INTERACTIVE_TRANSACTION_OPTIONS);
 
     this.queueTenantNotification({
       tenantId,
@@ -471,7 +497,7 @@ export class PurchaseService {
         currentStatus,
         purchaseOrder: purchase.purchaseOrder,
       };
-    });
+    }, INTERACTIVE_TRANSACTION_OPTIONS);
 
     this.queueTenantNotification({
       tenantId,

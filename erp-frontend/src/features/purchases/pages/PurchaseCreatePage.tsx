@@ -61,8 +61,8 @@ export default function PurchaseCreatePage() {
 
   const createMutation = useMutation({
     mutationFn: createPurchase,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['purchases'] });
       toast.success('Purchase order created');
       navigate('/purchases');
     },

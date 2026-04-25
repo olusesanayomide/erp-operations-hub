@@ -40,9 +40,11 @@ export default function OrderDetailPage() {
   const updateStatusMutation = useMutation({
     mutationFn: (status: 'CONFIRMED' | 'PICKED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED') =>
       updateOrderStatus(id || '', status, order?.concurrencyStamp),
-    onSuccess: (_, status) => {
-      void queryClient.invalidateQueries({ queryKey: ['orders'] });
-      void queryClient.invalidateQueries({ queryKey: ['orders', id] });
+    onSuccess: async (_, status) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['orders', id] })
+      ]);
       toast.success(`Order ${status.toLowerCase()}`);
     },
     onError: (error: Error) => toast.error(error.message),

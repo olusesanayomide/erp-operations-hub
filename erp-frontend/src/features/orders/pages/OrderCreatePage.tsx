@@ -69,9 +69,11 @@ export default function OrderCreatePage() {
 
   const createMutation = useMutation({
     mutationFn: createOrder,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['orders'] });
-      void queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      ]);
       toast.success('Order created as draft');
       navigate('/orders');
     },
