@@ -1070,13 +1070,13 @@ export async function getUnreadNotificationCount() {
 }
 
 export async function markNotificationAsRead(notificationId: string) {
-  return apiRequest(`/notifications/${notificationId}/read`, {
+  return apiRequest<{ unreadCount: number }>(`/notifications/${notificationId}/read`, {
     method: 'PATCH',
   });
 }
 
 export async function markAllNotificationsAsRead() {
-  return apiRequest('/notifications/read-all', {
+  return apiRequest<{ updatedCount: number; unreadCount: number }>('/notifications/read-all', {
     method: 'PATCH',
   });
 }

@@ -96,7 +96,7 @@ describe('PurchaseService.updateStatus', () => {
   let service: PurchaseService;
   let prisma: {
     $transaction: jest.Mock;
-    purchase: { findFirst: jest.Mock; update: jest.Mock };
+    purchase: { findFirst: jest.Mock; updateMany: jest.Mock };
     stockMovement: { createMany: jest.Mock };
     inventoryItem: { upsert: jest.Mock };
   };
@@ -105,7 +105,7 @@ describe('PurchaseService.updateStatus', () => {
   beforeEach(() => {
     prisma = {
       $transaction: jest.fn(),
-      purchase: { findFirst: jest.fn(), update: jest.fn() },
+      purchase: { findFirst: jest.fn(), updateMany: jest.fn() },
       stockMovement: { createMany: jest.fn() },
       inventoryItem: { upsert: jest.fn() },
     };
@@ -151,7 +151,7 @@ describe('PurchaseService.updateStatus', () => {
         { productId: 'p-2', quantity: 4 },
       ],
     });
-    prisma.purchase.update.mockResolvedValue({});
+    prisma.purchase.updateMany.mockResolvedValue({ count: 1 });
     prisma.stockMovement.createMany.mockResolvedValue({ count: 3 });
     prisma.inventoryItem.upsert.mockResolvedValue({});
     notificationsService.createForTenant.mockResolvedValue({});
@@ -232,14 +232,17 @@ describe('PurchaseService.updateStatus', () => {
   });
 
   it('allows confirmed purchases to move to shipped', async () => {
-    prisma.purchase.findFirst.mockResolvedValue({
-      id: purchaseId,
-      status: PurchaseLifecycleStatus.CONFIRMED,
-    });
-    prisma.purchase.update.mockResolvedValue({
-      id: purchaseId,
-      status: PurchaseLifecycleStatus.SHIPPED,
-    });
+    prisma.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseLifecycleStatus.CONFIRMED,
+        purchaseOrder: 'PO-001',
+      })
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseLifecycleStatus.SHIPPED,
+      });
+    prisma.purchase.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await service.updateStatus(
       tenantId,
@@ -251,9 +254,12 @@ describe('PurchaseService.updateStatus', () => {
     expect((result as { status: PurchaseLifecycleStatus }).status).toBe(
       PurchaseLifecycleStatus.SHIPPED,
     );
-    expect(prisma.purchase.update).toHaveBeenCalledWith({
-      where: { id: purchaseId },
+    expect(prisma.purchase.updateMany).toHaveBeenCalledWith({
+      where: { id: purchaseId, tenantId },
       data: { status: PurchaseLifecycleStatus.SHIPPED },
+    });
+    expect(prisma.purchase.findFirst).toHaveBeenLastCalledWith({
+      where: { id: purchaseId, tenantId },
       include: {
         items: {
           include: {

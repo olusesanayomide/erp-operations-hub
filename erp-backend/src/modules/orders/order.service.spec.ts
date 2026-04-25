@@ -10,7 +10,7 @@ describe('OrdersService.updateStatus', () => {
   let service: OrdersService;
   let prisma: {
     $transaction: jest.Mock;
-    order: { findFirst: jest.Mock; update: jest.Mock };
+    order: { findFirst: jest.Mock; updateMany: jest.Mock };
     inventoryItem: { updateMany: jest.Mock };
     stockMovement: { create: jest.Mock };
   };
@@ -19,7 +19,7 @@ describe('OrdersService.updateStatus', () => {
   beforeEach(() => {
     prisma = {
       $transaction: jest.fn(),
-      order: { findFirst: jest.fn(), update: jest.fn() },
+      order: { findFirst: jest.fn(), updateMany: jest.fn() },
       inventoryItem: { updateMany: jest.fn() },
       stockMovement: { create: jest.fn() },
     };
@@ -37,16 +37,18 @@ describe('OrdersService.updateStatus', () => {
   });
 
   it('confirms draft order and reserves stock atomically', async () => {
-    prisma.order.findFirst.mockResolvedValue({
-      id: orderId,
-      status: OrderLifecycleStatus.DRAFT,
-      items: [{ productId: 'p-1', warehouseId: 'w-1', quantity: 3 }],
-    });
+    prisma.order.findFirst
+      .mockResolvedValueOnce({
+        id: orderId,
+        status: OrderLifecycleStatus.DRAFT,
+        items: [{ productId: 'p-1', warehouseId: 'w-1', quantity: 3 }],
+      })
+      .mockResolvedValueOnce({
+        id: orderId,
+        status: OrderLifecycleStatus.CONFIRMED,
+      });
     prisma.inventoryItem.updateMany.mockResolvedValue({ count: 1 });
-    prisma.order.update.mockResolvedValue({
-      id: orderId,
-      status: OrderLifecycleStatus.CONFIRMED,
-    });
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await service.updateStatus(
       tenantId,
@@ -69,9 +71,12 @@ describe('OrdersService.updateStatus', () => {
       },
     });
     expect(prisma.stockMovement.create).not.toHaveBeenCalled();
-    expect(prisma.order.update).toHaveBeenCalledWith({
-      where: { id: orderId },
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: { id: orderId, tenantId },
       data: { status: OrderLifecycleStatus.CONFIRMED },
+    });
+    expect(prisma.order.findFirst).toHaveBeenLastCalledWith({
+      where: { id: orderId, tenantId },
       include: {
         items: {
           include: {
@@ -84,17 +89,19 @@ describe('OrdersService.updateStatus', () => {
   });
 
   it('ships picked order and consumes reserved stock atomically', async () => {
-    prisma.order.findFirst.mockResolvedValue({
-      id: orderId,
-      status: OrderLifecycleStatus.PICKED,
-      items: [{ productId: 'p-1', warehouseId: 'w-1', quantity: 3 }],
-    });
+    prisma.order.findFirst
+      .mockResolvedValueOnce({
+        id: orderId,
+        status: OrderLifecycleStatus.PICKED,
+        items: [{ productId: 'p-1', warehouseId: 'w-1', quantity: 3 }],
+      })
+      .mockResolvedValueOnce({
+        id: orderId,
+        status: OrderLifecycleStatus.SHIPPED,
+      });
     prisma.inventoryItem.updateMany.mockResolvedValue({ count: 1 });
     prisma.stockMovement.create.mockResolvedValue({});
-    prisma.order.update.mockResolvedValue({
-      id: orderId,
-      status: OrderLifecycleStatus.SHIPPED,
-    });
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await service.updateStatus(
       tenantId,
@@ -144,20 +151,22 @@ describe('OrdersService.updateStatus', () => {
       ),
     ).rejects.toThrow(new BadRequestException('Insufficient reserved stock'));
 
-    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.order.updateMany).not.toHaveBeenCalled();
   });
 
   it('cancels confirmed order and releases reserved stock', async () => {
-    prisma.order.findFirst.mockResolvedValue({
-      id: orderId,
-      status: OrderLifecycleStatus.CONFIRMED,
-      items: [{ productId: 'p-1', warehouseId: 'w-1', quantity: 2 }],
-    });
+    prisma.order.findFirst
+      .mockResolvedValueOnce({
+        id: orderId,
+        status: OrderLifecycleStatus.CONFIRMED,
+        items: [{ productId: 'p-1', warehouseId: 'w-1', quantity: 2 }],
+      })
+      .mockResolvedValueOnce({
+        id: orderId,
+        status: OrderLifecycleStatus.CANCELLED,
+      });
     prisma.inventoryItem.updateMany.mockResolvedValue({ count: 1 });
-    prisma.order.update.mockResolvedValue({
-      id: orderId,
-      status: OrderLifecycleStatus.CANCELLED,
-    });
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await service.updateStatus(
       tenantId,
@@ -217,7 +226,7 @@ describe('OrdersService.createOrder', () => {
     service = new OrdersService(prisma as any, notificationsService as any);
   });
 
-  it('creates an order with items atomically in a single transaction', async () => {
+  it('creates a draft order with nested items without opening an interactive transaction', async () => {
     prisma.customer.findFirst.mockResolvedValue({ id: 'customer-1' });
     prisma.product.findMany.mockResolvedValue([
       { id: 'product-1', price: 12.5 },
@@ -253,6 +262,7 @@ describe('OrdersService.createOrder', () => {
     });
 
     expect(result.id).toBe('order-1');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.order.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId,
@@ -275,6 +285,44 @@ describe('OrdersService.createOrder', () => {
       }),
       include: { items: true },
     });
+    expect(notificationsService.createForTenant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId,
+        createdByUserId: userId,
+        entityId: 'order-1',
+      }),
+    );
+  });
+
+  it('does not wait for notification fan-out before returning the created order', async () => {
+    prisma.customer.findFirst.mockResolvedValue({ id: 'customer-1' });
+    prisma.product.findMany.mockResolvedValue([
+      { id: 'product-1', price: 12.5 },
+    ]);
+    prisma.warehouse.findMany.mockResolvedValue([{ id: 'warehouse-1' }]);
+    prisma.order.create.mockResolvedValue({
+      id: 'order-1',
+      items: [
+        {
+          id: 'item-1',
+          productId: 'product-1',
+          quantity: 2,
+          warehouseId: 'warehouse-1',
+          price: 12.5,
+        },
+      ],
+    });
+    notificationsService.createForTenant.mockReturnValue(new Promise(() => {}));
+
+    const result = await service.createOrder(tenantId, userId, {
+      customerId: 'customer-1',
+      items: [
+        { productId: 'product-1', warehouseId: 'warehouse-1', quantity: 2 },
+      ],
+    });
+
+    expect(result.id).toBe('order-1');
+    expect(notificationsService.createForTenant).toHaveBeenCalled();
   });
 
   it('rejects order creation when no items are provided', async () => {

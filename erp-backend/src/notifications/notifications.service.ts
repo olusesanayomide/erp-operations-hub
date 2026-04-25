@@ -121,12 +121,16 @@ export class NotificationsService {
       throw new NotFoundException('Notification not found.');
     }
 
-    return this.prisma.userNotification.update({
+    const updated = await this.prisma.userNotification.update({
       where: { id: item.id },
       data: {
         readAt: item.readAt ?? new Date(),
       },
     });
+
+    const { unreadCount } = await this.getUnreadCount(tenantId, userId);
+
+    return { ...updated, unreadCount };
   }
 
   async markAllAsRead(tenantId: string, userId: string) {
@@ -142,6 +146,6 @@ export class NotificationsService {
       },
     });
 
-    return { updatedCount: result.count };
+    return { updatedCount: result.count, unreadCount: 0 };
   }
 }

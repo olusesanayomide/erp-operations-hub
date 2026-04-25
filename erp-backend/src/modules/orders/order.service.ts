@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import {
   NotificationEntityType,
@@ -53,10 +54,28 @@ const ORDER_STATUS_DB_MAP: Record<OrderLifecycleStatus, OrderStatus> = {
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private async notifyTenant(
+    input: Parameters<NotificationsService['createForTenant']>[0],
+  ) {
+    try {
+      await this.notificationsService.createForTenant(input);
+    } catch (error) {
+      this.logger.error('Order notification could not be created.', error);
+    }
+  }
+
+  private queueTenantNotification(
+    input: Parameters<NotificationsService['createForTenant']>[0],
+  ) {
+    void this.notifyTenant(input);
+  }
 
   private aggregateStockBuckets(
     items: Array<{ productId: string; warehouseId: string; quantity: number }>,
@@ -178,102 +197,99 @@ export class OrdersService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      if (dto.customerId) {
-        const customer = await tx.customer.findFirst({
-          where: { id: dto.customerId, tenantId },
-        });
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, tenantId },
+      });
 
-        if (!customer) {
-          throw new BadRequestException('Customer not found');
-        }
+      if (!customer) {
+        throw new BadRequestException('Customer not found');
       }
+    }
 
-      const productIds = Array.from(
-        new Set(dto.items.map((item) => item.productId)),
-      );
-      const warehouseIds = Array.from(
-        new Set(dto.items.map((item) => item.warehouseId)),
-      );
+    const productIds = Array.from(
+      new Set(dto.items.map((item) => item.productId)),
+    );
+    const warehouseIds = Array.from(
+      new Set(dto.items.map((item) => item.warehouseId)),
+    );
 
-      const [products, warehouses] = await Promise.all([
-        tx.product.findMany({
-          where: {
-            tenantId,
-            id: { in: productIds },
-          },
-        }),
-        tx.warehouse.findMany({
-          where: {
-            tenantId,
-            id: { in: warehouseIds },
-          },
-        }),
-      ]);
-
-      if (products.length !== productIds.length) {
-        throw new BadRequestException(
-          'One or more products do not exist in the current tenant.',
-        );
-      }
-
-      if (warehouses.length !== warehouseIds.length) {
-        throw new BadRequestException(
-          'One or more warehouses do not exist in the current tenant.',
-        );
-      }
-
-      const productsById = new Map(
-        products.map((product) => [product.id, product]),
-      );
-      const totalAmount = dto.items.reduce((sum, item) => {
-        const product = productsById.get(item.productId);
-        if (!product) {
-          throw new BadRequestException('Product not found');
-        }
-
-        return sum.plus(new Prisma.Decimal(product.price).mul(item.quantity));
-      }, new Prisma.Decimal(0));
-
-      const order = await tx.order.create({
-        data: {
+    const [products, warehouses] = await Promise.all([
+      this.prisma.product.findMany({
+        where: {
           tenantId,
-          customerId: dto.customerId,
-          status: ORDER_STATUS_DB_MAP[OrderLifecycleStatus.DRAFT],
-          totalAmount,
-          items: {
-            create: dto.items.map((item) => {
-              const product = productsById.get(item.productId);
-
-              if (!product) {
-                throw new BadRequestException('Product not found');
-              }
-
-              return {
-                productId: item.productId,
-                warehouseId: item.warehouseId,
-                quantity: item.quantity,
-                price: new Prisma.Decimal(product.price),
-              };
-            }),
-          },
+          id: { in: productIds },
         },
-        include: { items: true },
-      });
+      }),
+      this.prisma.warehouse.findMany({
+        where: {
+          tenantId,
+          id: { in: warehouseIds },
+        },
+      }),
+    ]);
 
-      await this.notificationsService.createForTenant({
-        client: tx,
+    if (products.length !== productIds.length) {
+      throw new BadRequestException(
+        'One or more products do not exist in the current tenant.',
+      );
+    }
+
+    if (warehouses.length !== warehouseIds.length) {
+      throw new BadRequestException(
+        'One or more warehouses do not exist in the current tenant.',
+      );
+    }
+
+    const productsById = new Map(
+      products.map((product) => [product.id, product]),
+    );
+    const totalAmount = dto.items.reduce((sum, item) => {
+      const product = productsById.get(item.productId);
+      if (!product) {
+        throw new BadRequestException('Product not found');
+      }
+
+      return sum.plus(new Prisma.Decimal(product.price).mul(item.quantity));
+    }, new Prisma.Decimal(0));
+
+    const order = await this.prisma.order.create({
+      data: {
         tenantId,
-        createdByUserId: userId,
-        type: NotificationType.ORDER_CREATED,
-        title: 'New order created',
-        message: `Order ${order.id.slice(0, 8).toUpperCase()} was created as a draft.`,
-        entityType: NotificationEntityType.ORDER,
-        entityId: order.id,
-      });
+        customerId: dto.customerId,
+        status: ORDER_STATUS_DB_MAP[OrderLifecycleStatus.DRAFT],
+        totalAmount,
+        items: {
+          create: dto.items.map((item) => {
+            const product = productsById.get(item.productId);
 
-      return order;
+            if (!product) {
+              throw new BadRequestException('Product not found');
+            }
+
+            return {
+              productId: item.productId,
+              warehouseId: item.warehouseId,
+              quantity: item.quantity,
+              price: new Prisma.Decimal(product.price),
+            };
+          }),
+        },
+      },
+      include: { items: true },
     });
+
+    this.queueTenantNotification({
+      tenantId,
+      createdByUserId: userId,
+      type: NotificationType.ORDER_CREATED,
+      title: 'New order created',
+      message: `Order ${order.id.slice(0, 8).toUpperCase()} was created as a draft.`,
+      entityType: NotificationEntityType.ORDER,
+      entityId: order.id,
+    });
+
+    return order;
   }
 
   async addItem(
@@ -396,113 +412,128 @@ export class OrdersService {
     status: OrderLifecycleStatus,
     expectedUpdatedAt?: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.findFirst({
-        where: { id: orderId, tenantId },
-        include: { items: true },
-      });
+    const { updatedOrder, currentStatus } = await this.prisma.$transaction(
+      async (tx) => {
+        const order = await tx.order.findFirst({
+          where: { id: orderId, tenantId },
+          include: { items: true },
+        });
 
-      if (!order) {
-        throw new BadRequestException('Order not found');
-      }
+        if (!order) {
+          throw new BadRequestException('Order not found');
+        }
 
-      assertUnchangedSinceLoaded(order.updatedAt, expectedUpdatedAt);
+        assertUnchangedSinceLoaded(order.updatedAt, expectedUpdatedAt);
 
-      const currentStatus = order.status as OrderLifecycleStatus;
+        const currentStatus = order.status as OrderLifecycleStatus;
 
-      if (currentStatus === status) {
-        throw new BadRequestException('Order is already in that status');
-      }
+        if (currentStatus === status) {
+          throw new BadRequestException('Order is already in that status');
+        }
 
-      const allowedTransitions = ORDER_STATUS_TRANSITIONS[currentStatus];
-      if (!allowedTransitions.includes(status)) {
-        throw new BadRequestException(
-          `Invalid status transition from ${currentStatus} to ${status}`,
-        );
-      }
-
-      if (
-        currentStatus === OrderLifecycleStatus.DRAFT &&
-        status === OrderLifecycleStatus.CONFIRMED &&
-        order.items.length === 0
-      ) {
-        throw new BadRequestException(
-          'Add at least one item before confirming the order',
-        );
-      }
-
-      if (
-        currentStatus === OrderLifecycleStatus.DRAFT &&
-        status === OrderLifecycleStatus.CONFIRMED
-      ) {
-        for (const item of this.aggregateStockBuckets(order.items)) {
-          await this.reserveOrderItemStock(
-            tx,
-            tenantId,
-            item.productId,
-            item.warehouseId,
-            item.quantity,
+        const allowedTransitions = ORDER_STATUS_TRANSITIONS[currentStatus];
+        if (!allowedTransitions.includes(status)) {
+          throw new BadRequestException(
+            `Invalid status transition from ${currentStatus} to ${status}`,
           );
         }
-      }
 
-      if (
-        currentStatus === OrderLifecycleStatus.PICKED &&
-        status === OrderLifecycleStatus.SHIPPED
-      ) {
-        for (const item of this.aggregateStockBuckets(order.items)) {
-          await this.consumeReservedOrderItemStock(
-            tx,
-            tenantId,
-            orderId,
-            item.productId,
-            item.warehouseId,
-            item.quantity,
+        if (
+          currentStatus === OrderLifecycleStatus.DRAFT &&
+          status === OrderLifecycleStatus.CONFIRMED &&
+          order.items.length === 0
+        ) {
+          throw new BadRequestException(
+            'Add at least one item before confirming the order',
           );
         }
-      }
 
-      if (
-        status === OrderLifecycleStatus.CANCELLED &&
-        (currentStatus === OrderLifecycleStatus.CONFIRMED ||
-          currentStatus === OrderLifecycleStatus.PICKED)
-      ) {
-        for (const item of this.aggregateStockBuckets(order.items)) {
-          await this.releaseOrderItemStock(
-            tx,
-            tenantId,
-            item.productId,
-            item.warehouseId,
-            item.quantity,
-          );
+        if (
+          currentStatus === OrderLifecycleStatus.DRAFT &&
+          status === OrderLifecycleStatus.CONFIRMED
+        ) {
+          for (const item of this.aggregateStockBuckets(order.items)) {
+            await this.reserveOrderItemStock(
+              tx,
+              tenantId,
+              item.productId,
+              item.warehouseId,
+              item.quantity,
+            );
+          }
         }
-      }
 
-      const updatedOrder = await tx.order.update({
-        where: { id: orderId },
-        data: { status: ORDER_STATUS_DB_MAP[status] },
-        include: {
-          items: {
-            include: {
-              product: true,
+        if (
+          currentStatus === OrderLifecycleStatus.PICKED &&
+          status === OrderLifecycleStatus.SHIPPED
+        ) {
+          for (const item of this.aggregateStockBuckets(order.items)) {
+            await this.consumeReservedOrderItemStock(
+              tx,
+              tenantId,
+              orderId,
+              item.productId,
+              item.warehouseId,
+              item.quantity,
+            );
+          }
+        }
+
+        if (
+          status === OrderLifecycleStatus.CANCELLED &&
+          (currentStatus === OrderLifecycleStatus.CONFIRMED ||
+            currentStatus === OrderLifecycleStatus.PICKED)
+        ) {
+          for (const item of this.aggregateStockBuckets(order.items)) {
+            await this.releaseOrderItemStock(
+              tx,
+              tenantId,
+              item.productId,
+              item.warehouseId,
+              item.quantity,
+            );
+          }
+        }
+
+        const updateResult = await tx.order.updateMany({
+          where: { id: orderId, tenantId },
+          data: { status: ORDER_STATUS_DB_MAP[status] },
+        });
+
+        if (updateResult.count === 0) {
+          throw new BadRequestException('Order not found');
+        }
+
+        const updatedOrder = await tx.order.findFirst({
+          where: { id: orderId, tenantId },
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
             },
+            customer: true,
           },
-          customer: true,
-        },
-      });
+        });
 
-      await this.notificationsService.createForTenant({
-        client: tx,
-        tenantId,
-        createdByUserId: userId,
-        type: NotificationType.ORDER_STATUS_CHANGED,
-        title: 'Order status updated',
-        message: `Order ${orderId.slice(0, 8).toUpperCase()} moved from ${currentStatus.toLowerCase()} to ${status.toLowerCase()}.`,
-        entityType: NotificationEntityType.ORDER,
-        entityId: orderId,
-      });
+        if (!updatedOrder) {
+          throw new BadRequestException('Order not found');
+        }
 
-      return updatedOrder;
+        return { updatedOrder, currentStatus };
+      },
+    );
+
+    this.queueTenantNotification({
+      tenantId,
+      createdByUserId: userId,
+      type: NotificationType.ORDER_STATUS_CHANGED,
+      title: 'Order status updated',
+      message: `Order ${orderId.slice(0, 8).toUpperCase()} moved from ${currentStatus.toLowerCase()} to ${status.toLowerCase()}.`,
+      entityType: NotificationEntityType.ORDER,
+      entityId: orderId,
     });
+
+    return updatedOrder;
   }
 }

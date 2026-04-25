@@ -61,7 +61,21 @@ export function AppHeader({ title, onMenuClick }: { title: string; onMenuClick: 
 
   const markOneAsReadMutation = useMutation({
     mutationFn: markNotificationAsRead,
-    onSuccess: () => {
+    onSuccess: (result, notificationId) => {
+      queryClient.setQueryData<NotificationItem[]>(['notifications'], (current = []) =>
+        current.map((notification) =>
+          notification.id === notificationId
+            ? {
+                ...notification,
+                isRead: true,
+                readAt: notification.readAt ?? new Date().toISOString(),
+              }
+            : notification,
+        ),
+      );
+      queryClient.setQueryData(['notifications', 'unread-count'], {
+        unreadCount: result.unreadCount ?? 0,
+      });
       void queryClient.invalidateQueries({ queryKey: ['notifications'] });
       void queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
     },
@@ -69,7 +83,18 @@ export function AppHeader({ title, onMenuClick }: { title: string; onMenuClick: 
 
   const markAllAsReadMutation = useMutation({
     mutationFn: markAllNotificationsAsRead,
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const readAt = new Date().toISOString();
+      queryClient.setQueryData<NotificationItem[]>(['notifications'], (current = []) =>
+        current.map((notification) => ({
+          ...notification,
+          isRead: true,
+          readAt: notification.readAt ?? readAt,
+        })),
+      );
+      queryClient.setQueryData(['notifications', 'unread-count'], {
+        unreadCount: result.unreadCount ?? 0,
+      });
       void queryClient.invalidateQueries({ queryKey: ['notifications'] });
       void queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
     },

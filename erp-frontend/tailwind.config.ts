@@ -6,9 +6,7 @@ export default {
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
   theme: {
-    screens: {
-      xs: "480px",
-    },
+
     container: {
       center: true,
       padding: {
@@ -21,6 +19,7 @@ export default {
       },
     },
     extend: {
+      screens: { xs: "480px" },
       fontFamily: {
         sans: ["'IBM Plex Sans'", "system-ui", "sans-serif"],
       },

@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import {
   NotificationEntityType,
@@ -41,10 +42,28 @@ const PURCHASE_STATUS_TRANSITIONS: Record<
 
 @Injectable()
 export class PurchaseService {
+  private readonly logger = new Logger(PurchaseService.name);
+
   constructor(
     private prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private async notifyTenant(
+    input: Parameters<NotificationsService['createForTenant']>[0],
+  ) {
+    try {
+      await this.notificationsService.createForTenant(input);
+    } catch (error) {
+      this.logger.error('Purchase notification could not be created.', error);
+    }
+  }
+
+  private queueTenantNotification(
+    input: Parameters<NotificationsService['createForTenant']>[0],
+  ) {
+    void this.notifyTenant(input);
+  }
 
   private formatPurchaseOrderDate(date = new Date()) {
     const year = date.getFullYear();
@@ -256,7 +275,7 @@ export class PurchaseService {
       throw new BadRequestException('Purchase order could not be created.');
     });
 
-    await this.notificationsService.createForTenant({
+    this.queueTenantNotification({
       tenantId,
       createdByUserId: userId,
       type: NotificationType.PURCHASE_CREATED,
@@ -275,7 +294,7 @@ export class PurchaseService {
     purchaseId: string,
     expectedUpdatedAt?: string,
   ) {
-    return await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
         where: { id: purchaseId, tenantId },
         include: { items: true },
@@ -294,13 +313,17 @@ export class PurchaseService {
           `Invalid status transition from ${currentStatus} to ${PurchaseLifecycleStatus.RECEIVED}`,
         );
       }
-      await tx.purchase.update({
-        where: { id: purchaseId },
+      const purchaseUpdate = await tx.purchase.updateMany({
+        where: { id: purchaseId, tenantId },
         data: {
           status: PurchaseLifecycleStatus.RECEIVED,
           receivedAt: new Date(),
         },
       });
+
+      if (purchaseUpdate.count === 0) {
+        throw new NotFoundException('Purchase order not found');
+      }
 
       await tx.stockMovement.createMany({
         data: purchase.items.map((item) => ({
@@ -350,22 +373,29 @@ export class PurchaseService {
 
       await Promise.all(inventoryUpserts);
 
-      await this.notificationsService.createForTenant({
-        client: tx,
-        tenantId,
-        createdByUserId: userId,
-        type: NotificationType.PURCHASE_RECEIVED,
-        title: 'Purchase order received',
-        message: `Purchase order ${purchase.purchaseOrder} was marked as received and inventory was updated.`,
-        entityType: NotificationEntityType.PURCHASE,
-        entityId: purchase.id,
-      });
-
       return {
-        success: true,
-        message: 'Purchase order received and stock updated',
+        response: {
+          success: true,
+          message: 'Purchase order received and stock updated',
+        },
+        notification: {
+          purchaseOrder: purchase.purchaseOrder,
+          purchaseId: purchase.id,
+        },
       };
     });
+
+    this.queueTenantNotification({
+      tenantId,
+      createdByUserId: userId,
+      type: NotificationType.PURCHASE_RECEIVED,
+      title: 'Purchase order received',
+      message: `Purchase order ${result.notification.purchaseOrder} was marked as received and inventory was updated.`,
+      entityType: NotificationEntityType.PURCHASE,
+      entityId: result.notification.purchaseId,
+    });
+
+    return result.response;
   }
 
   async updateStatus(
@@ -384,7 +414,7 @@ export class PurchaseService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
         where: { id: purchaseId, tenantId },
       });
@@ -410,9 +440,17 @@ export class PurchaseService {
         );
       }
 
-      const updatedPurchase = await tx.purchase.update({
-        where: { id: purchaseId },
+      const purchaseUpdate = await tx.purchase.updateMany({
+        where: { id: purchaseId, tenantId },
         data: { status },
+      });
+
+      if (purchaseUpdate.count === 0) {
+        throw new NotFoundException('Purchase order not found');
+      }
+
+      const updatedPurchase = await tx.purchase.findFirst({
+        where: { id: purchaseId, tenantId },
         include: {
           items: {
             include: {
@@ -424,18 +462,27 @@ export class PurchaseService {
         },
       });
 
-      await this.notificationsService.createForTenant({
-        client: tx,
-        tenantId,
-        createdByUserId: userId,
-        type: NotificationType.PURCHASE_STATUS_CHANGED,
-        title: 'Purchase status updated',
-        message: `Purchase order ${purchase.purchaseOrder} moved from ${currentStatus.toLowerCase()} to ${status.toLowerCase()}.`,
-        entityType: NotificationEntityType.PURCHASE,
-        entityId: purchaseId,
-      });
+      if (!updatedPurchase) {
+        throw new NotFoundException('Purchase order not found');
+      }
 
-      return updatedPurchase;
+      return {
+        updatedPurchase,
+        currentStatus,
+        purchaseOrder: purchase.purchaseOrder,
+      };
     });
+
+    this.queueTenantNotification({
+      tenantId,
+      createdByUserId: userId,
+      type: NotificationType.PURCHASE_STATUS_CHANGED,
+      title: 'Purchase status updated',
+      message: `Purchase order ${result.purchaseOrder} moved from ${result.currentStatus.toLowerCase()} to ${status.toLowerCase()}.`,
+      entityType: NotificationEntityType.PURCHASE,
+      entityId: purchaseId,
+    });
+
+    return result.updatedPurchase;
   }
 }
