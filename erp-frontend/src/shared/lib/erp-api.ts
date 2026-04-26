@@ -358,7 +358,7 @@ type BackendDashboardSummary = {
       orderNumber: string;
       customerId?: string | null;
       customerName?: string | null;
-      status: Order["status"];
+      status: Order['status'];
       totalAmount: number;
       createdAt: string;
       updatedAt: string;
@@ -367,23 +367,6 @@ type BackendDashboardSummary = {
   purchases: {
     draftCount: number;
   };
-  stockTrend: Array<{ month: string; in: number; out: number }>;
-  trends: {
-    products: DashboardTrend;
-    customers: DashboardTrend;
-    suppliers: DashboardTrend;
-    warehouses: DashboardTrend;
-    activeOrders: DashboardTrend;
-    draftPurchases: DashboardTrend;
-    availableInventory: DashboardTrend;
-  };
-};
-
-type DashboardTrend = {
-  value: number;
-  label: string;
-  current: number;
-  previous: number;
 };
 
 export const AUTH_SLOW_OPERATION_NOTICE_MS = 8000;
