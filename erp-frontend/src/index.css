@@ -149,22 +149,22 @@
     @apply bg-muted text-muted-foreground;
   }
   .status-confirmed {
-    @apply bg-info/10 text-info;
+    @apply border border-sky-200 bg-sky-50 text-sky-800;
   }
   .status-picked {
-    @apply bg-secondary text-secondary-foreground;
+    @apply border border-indigo-200 bg-indigo-50 text-indigo-800;
   }
   .status-cancelled {
     @apply bg-destructive/10 text-destructive;
   }
   .status-shipped {
-    @apply bg-warning/10 text-warning;
+    @apply border border-amber-200 bg-amber-50 text-amber-800;
   }
   .status-delivered {
-    @apply bg-success/10 text-success;
+    @apply border border-emerald-200 bg-emerald-50 text-emerald-800;
   }
   .status-received {
-    @apply bg-success/10 text-success;
+    @apply border border-emerald-200 bg-emerald-50 text-emerald-800;
   }
   .status-pending {
     @apply bg-warning/10 text-warning;

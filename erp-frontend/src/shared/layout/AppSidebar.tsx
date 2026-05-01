@@ -7,9 +7,8 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Sheet, SheetContent } from '@/shared/ui/sheet';
 import {
   LayoutDashboard, Package, Boxes, ShoppingCart, Truck,
-  Users, Factory, Warehouse, Settings, ChevronLeft, LogOut, UserCircle, Building2, ChevronDown
+  Users, Factory, Warehouse, Settings, ChevronLeft, UserCircle, Building2, ChevronDown
 } from 'lucide-react';
-import { RoleBadge } from '@/shared/components/StatusBadge';
 
 const navGroups = [
   {
@@ -56,7 +55,7 @@ export function AppSidebar({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [closedGroups, setClosedGroups] = useState<string[]>([]);
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
   const isMobile = useIsMobile();
   const groups = user?.isPlatformAdmin
@@ -166,36 +165,6 @@ export function AppSidebar({
         })}
       </nav>
 
-      {/* User section */}
-      {user && (
-        <div className="border-t border-sidebar-border p-3">
-          <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
-            <div className="h-8 w-8 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground text-sm font-semibold shrink-0">
-              {user.name.split(' ').map(n => n[0]).join('')}
-            </div>
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-accent-foreground truncate">{user.name}</p>
-                <RoleBadge role={user.role} />
-              </div>
-            )}
-            {!collapsed && (
-              <button
-                onClick={() => {
-                  if (isMobile) {
-                    onMobileOpenChange(false);
-                  }
-                  logout();
-                }}
-                className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-muted hover:text-sidebar-accent-foreground transition-colors"
-                title="Logout"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </aside>
   );
 
