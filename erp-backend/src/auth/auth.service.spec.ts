@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { AuthService, SIGNUP_EMAIL_EXISTS_MESSAGE } from './auth.service';
 import { Role } from './enums/role.enum';
 
@@ -269,6 +273,45 @@ describe('AuthService tenant invites', () => {
     ).rejects.toThrow(new BadRequestException('Pending invite was not found.'));
 
     expect(prisma.tenantInvite.update).not.toHaveBeenCalled();
+  });
+
+  it('fails fast when invite links are generated in production without a frontend site URL', async () => {
+    const productionConfig = {
+      get: jest.fn((key: string) => {
+        const values: Record<string, string> = {
+          NODE_ENV: 'production',
+          SUPABASE_URL: 'https://supabase.example',
+          SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+        };
+        return values[key];
+      }),
+    };
+    service = new AuthService(prisma as any, productionConfig as any);
+
+    const expiresAt = new Date('2026-04-30T00:00:00.000Z');
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.tenantInvite.findFirst.mockResolvedValue(null);
+    prisma.tenantInvite.create.mockResolvedValue({
+      id: 'invite-1',
+      email: 'staff@example.com',
+      name: 'Staff User',
+      role: Role.STAFF,
+      status: 'PENDING',
+      expiresAt,
+      createdAt: new Date('2026-04-23T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.createTenantInvite(adminUser, {
+        email: 'staff@example.com',
+        name: 'Staff User',
+        role: Role.STAFF,
+      }),
+    ).rejects.toThrow(
+      new InternalServerErrorException(
+        'FRONTEND_SITE_URL must be configured in production to generate invite links.',
+      ),
+    );
   });
 });
 

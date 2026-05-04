@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  InternalServerErrorException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -126,7 +127,17 @@ export class AuthService {
       this.config.get<string>('PUBLIC_APP_URL') ||
       this.config.get<string>('CORS_ORIGINS')?.split(',')[0];
 
-    return (configuredUrl || 'http://localhost:8080').trim().replace(/\/$/, '');
+    if (configuredUrl) {
+      return configuredUrl.trim().replace(/\/$/, '');
+    }
+
+    if ((this.config.get<string>('NODE_ENV') ?? 'development') === 'production') {
+      throw new InternalServerErrorException(
+        'FRONTEND_SITE_URL must be configured in production to generate invite links.',
+      );
+    }
+
+    return 'http://localhost:8080';
   }
 
   private createInviteLink(token: string) {

@@ -31,6 +31,8 @@ function isLocalhostOrigin(origin: string) {
 async function bootstrap() {
   const app: INestApplication = await NestFactory.create(AppModule);
   const isProduction = process.env.NODE_ENV === 'production';
+  const shouldEnableSwagger =
+    !isProduction || process.env.ENABLE_SWAGGER === 'true';
   const allowedOrigins = getAllowedOrigins(isProduction);
   const allowNgrokOrigins = isProduction
     ? process.env.CORS_ALLOW_NGROK === 'true'
@@ -80,25 +82,27 @@ async function bootstrap() {
   });
 
   // 2. SWAGGER CONFIGURATION
-  const config = new DocumentBuilder()
-    .setTitle('MANIFEST ERP API')
-    .setDescription('The core engine for Inventory, Orders, and Procurement.')
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Enter JWT token',
-        in: 'header',
-      },
-      'access-token',
-    )
-    .build();
+  if (shouldEnableSwagger) {
+    const config = new DocumentBuilder()
+      .setTitle('MANIFEST ERP API')
+      .setDescription('The core engine for Inventory, Orders, and Procurement.')
+      .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'access-token',
+      )
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('/api', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('/api', app, document);
+  }
 
   // 3. START THE SERVER
   const port = process.env.PORT || 3000;
@@ -107,7 +111,9 @@ async function bootstrap() {
   await app.listen(port, host);
 
   console.log(`ERP API is live on ${host}:${port}`);
-  console.log('Swagger docs available at /api');
+  if (shouldEnableSwagger) {
+    console.log('Swagger docs available at /api');
+  }
 }
 
 void bootstrap();
