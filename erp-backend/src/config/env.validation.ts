@@ -21,11 +21,7 @@ export function validateEnvironment(config: EnvConfig) {
   const requiredKeys = ['DATABASE_URL', 'SUPABASE_URL'];
 
   if (isProduction(config)) {
-    requiredKeys.push(
-      'SUPABASE_SERVICE_ROLE_KEY',
-      'FRONTEND_SITE_URL',
-      'CORS_ORIGINS',
-    );
+    requiredKeys.push('SUPABASE_SERVICE_ROLE_KEY');
   }
 
   const missingKeys = requiredKeys.filter((key) => isBlank(config[key]));

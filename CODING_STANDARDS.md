@@ -226,4 +226,3 @@ Use extra care when editing:
 - Shared API clients and auth providers
 
 These areas should usually include tests for both the expected path and the failure path.
-

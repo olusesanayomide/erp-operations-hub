@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.git/
+.git-archive/
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+test/
+csv dump/
+README.md
+*.tsbuildinfo
+

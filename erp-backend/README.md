@@ -72,11 +72,16 @@ remove(@Param('id') id: string) { ... }
 
 ##  Getting Started
 
-1. **Environment Setup:** Create a `.env` file with `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, `SUPABASE_SERVICE_ROLE_KEY`, and `SEED_ADMIN_PASSWORD` for admin-user seeding. Add `SUPABASE_JWT_SECRET` only if your Supabase project still signs tokens with HS256.
+1. **Environment Setup:** Create a `.env` file with `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, `SUPABASE_SERVICE_ROLE_KEY`, and `SEED_ADMIN_PASSWORD` for admin-user seeding. Add `SUPABASE_JWT_SECRET` only if your Supabase project still signs tokens with HS256. `FRONTEND_SITE_URL` and `CORS_ORIGINS` can be added later if you are deploying the backend before the frontend.
 2. **Install:** `npm install`
 3. **Database:** `npm run prisma:migrate:dev`
 4. **Run:** `npm run start:dev`
 5. **Docs:** Visit `http://localhost:3000/api`
+
+### Docker Compose
+
+- For local backend development, run `docker compose up --build`. This uses `docker-compose.yml`, loads `.env`, and forces `NODE_ENV=development` so localhost frontend URLs are allowed.
+- For a production-style container run, use `docker compose -f docker-compose.prod.yml up --build`. In that mode, the backend can start before the frontend is hosted, but invite-link generation will still require `FRONTEND_SITE_URL`. Once the frontend is live, set `FRONTEND_SITE_URL` and `CORS_ORIGINS` to the real hosted frontend URL(s), not `localhost`.
 
 ### Seeding Note
 
