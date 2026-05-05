@@ -140,8 +140,8 @@ export default function LoginPage() {
               />
               <div className="relative rounded-[28px] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(246,250,255,0.68))] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_36px_rgba(59,107,255,0.08)] sm:p-7">
                 <div className="text-center">
-                  <h2 className="text-[30px] font-bold tracking-tight text-slate-950">Welcome Back</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <h2 className="text-[24px] font-bold tracking-tight text-slate-950 sm:text-[30px]">Welcome Back</h2>
+                  <p className="mt-2 text-[13px] leading-6 text-slate-600 sm:text-sm">
                     Enter your details to access your ERP dashboard.
                   </p>
                 </div>
@@ -154,7 +154,7 @@ export default function LoginPage() {
 
                 <form onSubmit={handleSubmit} className="mt-8 space-y-6">
                   <motion.div variants={itemVariants} className="space-y-2">
-                    <Label htmlFor="email" className="text-[15px] font-semibold text-slate-900">Email</Label>
+                    <Label htmlFor="email" className="text-[14px] font-semibold text-slate-900 sm:text-[15px]">Email</Label>
                     <Input
                       id="email"
                       type="email"
@@ -169,7 +169,7 @@ export default function LoginPage() {
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
-                    <Label htmlFor="password" className="text-[15px] font-semibold text-slate-900">Password</Label>
+                    <Label htmlFor="password" className="text-[14px] font-semibold text-slate-900 sm:text-[15px]">Password</Label>
                     <div className="relative">
                       <Input
                         id="password"
@@ -214,7 +214,7 @@ export default function LoginPage() {
                   )}
 
                   <motion.div variants={itemVariants} className="flex min-h-11 items-center justify-end">
-                    <Link to="/forgot-password" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary transition-colors hover:text-[#2f57da]">
+                    <Link to="/forgot-password" className="inline-flex min-h-11 items-center text-[13px] font-semibold text-primary transition-colors hover:text-[#2f57da] sm:text-sm">
                       Forgot password?
                     </Link>
                   </motion.div>
@@ -223,7 +223,7 @@ export default function LoginPage() {
                     <Button
                       type="submit"
                       requiresOnline
-                      className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-base font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105"
+                      className="h-12 w-full rounded-full border border-[#5f85ff] bg-[linear-gradient(135deg,#3B6BFF_0%,#6D8FFF_100%)] text-[15px] font-semibold shadow-[0_18px_40px_rgba(59,107,255,0.35),inset_0_1px_0_rgba(255,255,255,0.28)] hover:brightness-105 sm:text-base"
                       disabled={loading}
                     >
                       {loading ? (
@@ -237,7 +237,7 @@ export default function LoginPage() {
                   </motion.div>
                 </form>
 
-                <motion.div variants={itemVariants} className="mt-6 text-center text-sm text-slate-600">
+                <motion.div variants={itemVariants} className="mt-6 text-center text-[13px] text-slate-600 sm:text-sm">
                   New organization?{' '}
                   <Link to="/signup" className="font-semibold text-primary transition-colors hover:text-[#2f57da]">
                     Create a workspace
