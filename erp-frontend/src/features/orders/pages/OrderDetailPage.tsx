@@ -75,7 +75,22 @@ export default function OrderDetailPage() {
   if (!order) return <EmptyState icon={ShoppingCart} title="Order not found" description="This order does not exist" action={<Link to="/orders"><Button variant="outline">Back to Orders</Button></Link>} />;
 
   const customer = order.customer || customers.find((item) => item.id === order.customerId);
-  const warehouse = order.warehouse || warehouses.find((item) => item.id === order.warehouseId);
+  const orderWarehouses = Array.from(
+    new Map(
+      order.items
+        .map((item) => {
+          const warehouse = warehouses.find((entry) => entry.id === item.warehouseId);
+          return warehouse ? [warehouse.id, warehouse] : null;
+        })
+        .filter(Boolean) as Array<[string, (typeof warehouses)[number]]>,
+    ).values(),
+  );
+  const warehouseSummary =
+    orderWarehouses.length === 0
+      ? 'Unknown warehouse'
+      : orderWarehouses.length === 1
+        ? orderWarehouses[0].name
+        : `${orderWarehouses.length} warehouses`;
   const reachedStatuses = {
     confirmed: ['confirmed', 'picked', 'shipped', 'delivered'].includes(order.status),
     picked: ['picked', 'shipped', 'delivered'].includes(order.status),
@@ -106,7 +121,7 @@ export default function OrderDetailPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Confirm this order?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  <span className="flex items-start gap-2 text-warning"><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />This will reserve stock from {warehouse?.name}. Stock leaves inventory history only when the order is marked shipped.</span>
+                  <span className="flex items-start gap-2 text-warning"><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />This will reserve stock across the warehouse assignments on each line item. Stock leaves inventory history only when the order is marked shipped.</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -172,9 +187,13 @@ export default function OrderDetailPage() {
           <p className="mt-1 text-xs text-muted-foreground">{customer?.email}</p>
         </div>
         <div className="erp-card p-5">
-          <p className="mb-1 text-sm text-muted-foreground">Warehouse</p>
-          <p className="font-semibold">{warehouse?.name}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{warehouse?.location}</p>
+          <p className="mb-1 text-sm text-muted-foreground">Fulfillment Warehouses</p>
+          <p className="font-semibold">{warehouseSummary}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {orderWarehouses.length > 1
+              ? orderWarehouses.map((warehouse) => warehouse.name).join(', ')
+              : orderWarehouses[0]?.location || 'Warehouse assignment is stored per line item.'}
+          </p>
         </div>
         <div className="erp-card p-5">
           <p className="mb-1 text-sm text-muted-foreground">Total Amount</p>
@@ -189,6 +208,7 @@ export default function OrderDetailPage() {
           <table className="w-full">
             <thead><tr className="erp-table-header">
               <th className="text-left p-3">Product</th>
+              <th className="text-left p-3">Warehouse</th>
               <th className="text-right p-3">Qty</th>
               <th className="text-right p-3">Unit Price</th>
               <th className="text-right p-3">Subtotal</th>
@@ -197,13 +217,16 @@ export default function OrderDetailPage() {
               {order.items.map((item) => (
                 <tr key={item.id} className="erp-table-row">
                   <td className="p-3 text-sm font-medium">{item.product?.name}</td>
+                  <td className="p-3 text-sm text-muted-foreground">
+                    {warehouses.find((warehouse) => warehouse.id === item.warehouseId)?.name ?? 'Unknown warehouse'}
+                  </td>
                   <td className="p-3 text-sm text-right">{item.quantity}</td>
                   <td className="p-3 text-sm text-right">{formatMoney(item.unitPrice)}</td>
                   <td className="p-3 text-sm text-right font-semibold">{formatMoney(item.quantity * item.unitPrice)}</td>
                 </tr>
               ))}
               <tr className="border-t-2">
-                <td colSpan={3} className="p-3 text-sm font-semibold text-right">Total</td>
+                <td colSpan={4} className="p-3 text-sm font-semibold text-right">Total</td>
                 <td className="p-3 text-sm font-bold text-right">{formatMoney(order.totalAmount)}</td>
               </tr>
             </tbody>
@@ -216,12 +239,18 @@ export default function OrderDetailPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground">{item.product?.name}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Qty {item.quantity}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {warehouses.find((warehouse) => warehouse.id === item.warehouseId)?.name ?? 'Unknown warehouse'}
+                  </p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold text-foreground">{formatMoney(item.quantity * item.unitPrice)}</p>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Qty</p>
+                  <p className="mt-1 font-medium text-foreground">{item.quantity}</p>
+                </div>
                 <div>
                   <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Unit price</p>
                   <p className="mt-1 font-medium text-foreground">{formatMoney(item.unitPrice)}</p>

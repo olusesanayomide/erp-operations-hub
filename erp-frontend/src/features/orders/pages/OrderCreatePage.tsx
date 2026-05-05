@@ -14,6 +14,7 @@ import { cn } from '@/shared/lib/utils';
 
 interface DraftItem {
   productId: string;
+  warehouseId: string;
   quantity: string;
 }
 
@@ -26,13 +27,14 @@ function parsePositiveInteger(value: string) {
   return numericValue;
 }
 
-function getRequestedStockByProduct(items: DraftItem[]) {
+function getRequestedStockByBucket(items: DraftItem[]) {
   const totals = new Map<string, number>();
 
   for (const item of items) {
-    if (!item.productId) continue;
+    if (!item.productId || !item.warehouseId) continue;
     const quantity = parsePositiveInteger(item.quantity) ?? 0;
-    totals.set(item.productId, (totals.get(item.productId) ?? 0) + quantity);
+    const bucketKey = `${item.productId}:${item.warehouseId}`;
+    totals.set(bucketKey, (totals.get(bucketKey) ?? 0) + quantity);
   }
 
   return totals;
@@ -43,8 +45,9 @@ export default function OrderCreatePage() {
   const { formatMoney } = useSettings();
   const queryClient = useQueryClient();
   const [customerId, setCustomerId] = useState('');
-  const [warehouseId, setWarehouseId] = useState('');
-  const [items, setItems] = useState<DraftItem[]>([{ productId: '', quantity: '1' }]);
+  const [items, setItems] = useState<DraftItem[]>([
+    { productId: '', warehouseId: '', quantity: '1' },
+  ]);
   const createToastRef = useRef<string | number | null>(null);
 
   const { data: customers = [] } = useQuery({
@@ -80,7 +83,8 @@ export default function OrderCreatePage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const addItem = () => setItems([...items, { productId: '', quantity: '1' }]);
+  const addItem = () =>
+    setItems([...items, { productId: '', warehouseId: '', quantity: '1' }]);
   const removeItem = (index: number) => setItems(items.filter((_, itemIndex) => itemIndex !== index));
   const updateItem = (index: number, field: keyof DraftItem, value: string) => {
     const updated = [...items];
@@ -88,11 +92,11 @@ export default function OrderCreatePage() {
     setItems(updated);
   };
 
-  const requestedStockByProduct = getRequestedStockByProduct(items);
+  const requestedStockByBucket = getRequestedStockByBucket(items);
 
-  const getAvailableStock = (productId: string) => {
-    if (!warehouseId || !productId) return null;
-    const inventoryItem = inventory.find((item) => item.productId === productId && item.warehouseId === warehouseId);
+  const getAvailableStock = (productId: string, selectedWarehouseId: string) => {
+    if (!selectedWarehouseId || !productId) return null;
+    const inventoryItem = inventory.find((item) => item.productId === productId && item.warehouseId === selectedWarehouseId);
     return inventoryItem?.quantity ?? 0;
   };
 
@@ -103,7 +107,10 @@ export default function OrderCreatePage() {
   }, 0);
 
   const handleSubmit = () => {
-    if (!customerId || !warehouseId || items.some((item) => !item.productId)) {
+    if (
+      !customerId ||
+      items.some((item) => !item.productId || !item.warehouseId)
+    ) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -116,9 +123,9 @@ export default function OrderCreatePage() {
 
     createMutation.mutate({
       customerId,
-      warehouseId,
       items: items.map((item) => ({
         productId: item.productId,
+        warehouseId: item.warehouseId,
         quantity: parsePositiveInteger(item.quantity) as number,
       })),
     });
@@ -168,40 +175,28 @@ export default function OrderCreatePage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>Source Warehouse *</Label>
-          <Select value={warehouseId} onValueChange={setWarehouseId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select warehouse" />
-            </SelectTrigger>
-            <SelectContent>
-              {warehouses.map((warehouse) => (
-                <SelectItem key={warehouse.id} value={warehouse.id}>
-                  {warehouse.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       <div className="erp-card p-4 sm:p-5">
         <h3 className="erp-section-title">Line Items</h3>
         <p className="mb-4 text-sm text-muted-foreground">
-          Current warehouse stock is shown for reference while drafting. Warnings here do not block draft creation; the final stock check happens when you confirm.
+          Each line can be fulfilled from a different warehouse. Stock guidance is shown per product and warehouse pair, and the final reservation still happens when you confirm the order.
         </p>
 
         <div className="space-y-3">
           {items.map((item, index) => {
-            const stock = getAvailableStock(item.productId);
+            const stock = getAvailableStock(item.productId, item.warehouseId);
             const quantity = parsePositiveInteger(item.quantity) ?? 0;
-            const requestedStock = item.productId ? requestedStockByProduct.get(item.productId) ?? quantity : quantity;
+            const requestedStock =
+              item.productId && item.warehouseId
+                ? requestedStockByBucket.get(`${item.productId}:${item.warehouseId}`) ?? quantity
+                : quantity;
             const insufficientStock = stock !== null && requestedStock > stock;
             const product = products.find((entry) => entry.id === item.productId);
             const stockLabel = stock === null
               ? 'Select a warehouse and product to view current stock.'
               : insufficientStock
-                ? `Current available stock is ${stock}; this draft requests ${requestedStock} in total for this product.`
+                ? `Current available stock is ${stock}; this draft requests ${requestedStock} in total for this product from this warehouse.`
                 : `Current available stock: ${stock}.`;
 
             return (
@@ -229,7 +224,7 @@ export default function OrderCreatePage() {
                   </Button>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px]">
                   <div className="space-y-1">
                     <Label className="text-xs">Product</Label>
                     <Select value={item.productId} onValueChange={(value) => updateItem(index, 'productId', value)}>
@@ -240,6 +235,25 @@ export default function OrderCreatePage() {
                         {products.map((entry) => (
                           <SelectItem key={entry.id} value={entry.id}>
                             {entry.name} ({formatMoney(entry.basePrice)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs">Warehouse</Label>
+                    <Select
+                      value={item.warehouseId}
+                      onValueChange={(value) => updateItem(index, 'warehouseId', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select warehouse" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {warehouses.map((warehouse) => (
+                          <SelectItem key={warehouse.id} value={warehouse.id}>
+                            {warehouse.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

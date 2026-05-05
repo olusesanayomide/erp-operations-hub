@@ -11,7 +11,9 @@ describe('OrdersService.updateStatus', () => {
   let prisma: {
     $transaction: jest.Mock;
     order: { findFirst: jest.Mock; updateMany: jest.Mock };
-    inventoryItem: { updateMany: jest.Mock };
+    inventoryItem: { updateMany: jest.Mock; findMany: jest.Mock };
+    product: { findMany: jest.Mock };
+    warehouse: { findMany: jest.Mock };
     stockMovement: { create: jest.Mock };
   };
   let notificationsService: { createForTenant: jest.Mock };
@@ -20,7 +22,9 @@ describe('OrdersService.updateStatus', () => {
     prisma = {
       $transaction: jest.fn(),
       order: { findFirst: jest.fn(), updateMany: jest.fn() },
-      inventoryItem: { updateMany: jest.fn() },
+      inventoryItem: { updateMany: jest.fn(), findMany: jest.fn() },
+      product: { findMany: jest.fn() },
+      warehouse: { findMany: jest.fn() },
       stockMovement: { create: jest.fn() },
     };
     notificationsService = { createForTenant: jest.fn() };
@@ -99,6 +103,13 @@ describe('OrdersService.updateStatus', () => {
         id: orderId,
         status: OrderLifecycleStatus.SHIPPED,
       });
+    prisma.inventoryItem.findMany.mockResolvedValue([
+      { productId: 'p-1', warehouseId: 'w-1', reservedQuantity: 3 },
+    ]);
+    prisma.product.findMany.mockResolvedValue([{ id: 'p-1', name: 'Product A' }]);
+    prisma.warehouse.findMany.mockResolvedValue([
+      { id: 'w-1', name: 'Warehouse X' },
+    ]);
     prisma.inventoryItem.updateMany.mockResolvedValue({ count: 1 });
     prisma.stockMovement.create.mockResolvedValue({});
     prisma.order.updateMany.mockResolvedValue({ count: 1 });
@@ -140,7 +151,13 @@ describe('OrdersService.updateStatus', () => {
       status: OrderLifecycleStatus.PICKED,
       items: [{ productId: 'p-1', warehouseId: 'w-1', quantity: 10 }],
     });
-    prisma.inventoryItem.updateMany.mockResolvedValue({ count: 0 });
+    prisma.inventoryItem.findMany.mockResolvedValue([
+      { productId: 'p-1', warehouseId: 'w-1', reservedQuantity: 4 },
+    ]);
+    prisma.product.findMany.mockResolvedValue([{ id: 'p-1', name: 'Product A' }]);
+    prisma.warehouse.findMany.mockResolvedValue([
+      { id: 'w-1', name: 'Warehouse X' },
+    ]);
 
     await expect(
       service.updateStatus(
@@ -149,9 +166,14 @@ describe('OrdersService.updateStatus', () => {
         orderId,
         OrderLifecycleStatus.SHIPPED,
       ),
-    ).rejects.toThrow(new BadRequestException('Insufficient reserved stock'));
+    ).rejects.toThrow(
+      new BadRequestException(
+        'Unable to ship order. Reserved stock is missing for 1 item: Product A in Warehouse X. Review the line items, verify warehouse stock, then re-pick before shipping.',
+      ),
+    );
 
     expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    expect(prisma.inventoryItem.updateMany).not.toHaveBeenCalled();
   });
 
   it('cancels confirmed order and releases reserved stock', async () => {

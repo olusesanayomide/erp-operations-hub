@@ -166,6 +166,7 @@ export class OrdersService {
     productId: string,
     warehouseId: string,
     quantity: number,
+    missingReservedStockMessage?: string,
   ) {
     const updatedInventory = await tx.inventoryItem.updateMany({
       where: {
@@ -180,7 +181,9 @@ export class OrdersService {
     });
 
     if (updatedInventory.count === 0) {
-      throw new BadRequestException('Insufficient reserved stock');
+      throw new BadRequestException(
+        missingReservedStockMessage || 'Insufficient reserved stock',
+      );
     }
 
     await tx.stockMovement.create({
@@ -193,6 +196,20 @@ export class OrdersService {
         reference: `Order ${orderId} shipped`,
       },
     });
+  }
+
+  private buildMissingReservedStockMessage(
+    missingItems: Array<{ productName: string; warehouseName: string }>,
+  ) {
+    const itemCount = missingItems.length;
+    const itemLabel = itemCount === 1 ? 'item' : 'item(s)';
+    const missingDetails = missingItems
+      .map(
+        (item) => `${item.productName} in ${item.warehouseName}`,
+      )
+      .join(', ');
+
+    return `Unable to ship order. Reserved stock is missing for ${itemCount} ${itemLabel}: ${missingDetails}. Review the line items, verify warehouse stock, then re-pick before shipping.`;
   }
 
   async createOrder(tenantId: string, userId: string, dto: CreateOrderDto) {
@@ -317,6 +334,12 @@ export class OrdersService {
       where: { id: productId, tenantId },
     });
     if (!product) throw new BadRequestException('product not found');
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: { id: warehouseId, tenantId },
+    });
+    if (!warehouse) {
+      throw new BadRequestException('warehouse not found');
+    }
     const price = new Prisma.Decimal(product.price);
 
     const orderItem = await this.prisma.orderItem.create({
@@ -472,7 +495,90 @@ export class OrdersService {
           currentStatus === OrderLifecycleStatus.PICKED &&
           status === OrderLifecycleStatus.SHIPPED
         ) {
-          for (const item of this.aggregateStockBuckets(order.items)) {
+          const stockBuckets = this.aggregateStockBuckets(order.items);
+          const [inventoryRows, products, warehouses] = await Promise.all([
+            tx.inventoryItem.findMany({
+              where: {
+                tenantId,
+                OR: stockBuckets.map((item) => ({
+                  productId: item.productId,
+                  warehouseId: item.warehouseId,
+                })),
+              },
+              select: {
+                productId: true,
+                warehouseId: true,
+                reservedQuantity: true,
+              },
+            }),
+            tx.product.findMany({
+              where: {
+                tenantId,
+                id: { in: stockBuckets.map((item) => item.productId) },
+              },
+              select: {
+                id: true,
+                name: true,
+              },
+            }),
+            tx.warehouse.findMany({
+              where: {
+                tenantId,
+                id: { in: stockBuckets.map((item) => item.warehouseId) },
+              },
+              select: {
+                id: true,
+                name: true,
+              },
+            }),
+          ]);
+
+          const inventoryByBucket = new Map(
+            inventoryRows.map((item) => [
+              `${item.productId}:${item.warehouseId}`,
+              item,
+            ]),
+          );
+          const productNamesById = new Map(
+            products.map((product) => [product.id, product.name]),
+          );
+          const warehouseNamesById = new Map(
+            warehouses.map((warehouse) => [warehouse.id, warehouse.name]),
+          );
+
+          const missingReservedItems = stockBuckets
+            .filter((item) => {
+              const inventory = inventoryByBucket.get(
+                `${item.productId}:${item.warehouseId}`,
+              );
+              return !inventory || inventory.reservedQuantity < item.quantity;
+            })
+            .map((item) => ({
+              productName:
+                productNamesById.get(item.productId) || 'Unknown product',
+              warehouseName:
+                warehouseNamesById.get(item.warehouseId) ||
+                'Unknown warehouse',
+            }));
+
+          if (missingReservedItems.length > 0) {
+            throw new BadRequestException(
+              this.buildMissingReservedStockMessage(missingReservedItems),
+            );
+          }
+
+          for (const item of stockBuckets) {
+            const missingReservedStockMessage =
+              this.buildMissingReservedStockMessage([
+                {
+                  productName:
+                    productNamesById.get(item.productId) || 'Unknown product',
+                  warehouseName:
+                    warehouseNamesById.get(item.warehouseId) ||
+                    'Unknown warehouse',
+                },
+              ]);
+
             await this.consumeReservedOrderItemStock(
               tx,
               tenantId,
@@ -480,6 +586,7 @@ export class OrdersService {
               item.productId,
               item.warehouseId,
               item.quantity,
+              missingReservedStockMessage,
             );
           }
         }

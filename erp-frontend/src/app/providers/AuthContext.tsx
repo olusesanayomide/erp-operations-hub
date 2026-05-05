@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, UserRole } from '@/shared/types/erp';
+import { SUPABASE_CONFIG_ERROR_MESSAGE } from '@/shared/lib/env';
 import {
   AUTH_API_ERROR_EVENT,
   ApiError,
@@ -188,10 +189,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!isSupabaseAuthConfigured) {
         console.warn('Supabase auth is enabled, but VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are missing.');
-        setAuthError('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+        setAuthError(SUPABASE_CONFIG_ERROR_MESSAGE);
         return {
           success: false,
-          error: 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+          error: SUPABASE_CONFIG_ERROR_MESSAGE,
         };
       }
 

@@ -45,6 +45,18 @@ export default function OrdersPage() {
     return matchSearch && matchStatus;
   });
 
+  const getOrderWarehouseSummary = (order: (typeof orders)[number]) => {
+    const orderWarehouses = Array.from(
+      new Set(order.items.map((item) => item.warehouseId)),
+    )
+      .map((warehouseId) => warehouses.find((item) => item.id === warehouseId)?.name)
+      .filter(Boolean) as string[];
+
+    if (orderWarehouses.length === 0) return 'Unknown warehouse';
+    if (orderWarehouses.length === 1) return orderWarehouses[0];
+    return `${orderWarehouses.length} warehouses`;
+  };
+
   return (
     <div className="animate-fade-in">
       <PageHeader title="Orders" description={`${orders.length} orders`}>
@@ -98,7 +110,7 @@ export default function OrdersPage() {
             <tbody>
               {filtered.map((order) => {
                 const customer = order.customer || customers.find((item) => item.id === order.customerId);
-                const warehouse = order.warehouse || warehouses.find((item) => item.id === order.warehouseId);
+                const warehouseSummary = getOrderWarehouseSummary(order);
 
                 return (
                   <tr key={order.id} className="erp-table-row">
@@ -108,7 +120,7 @@ export default function OrdersPage() {
                       </Link>
                     </td>
                     <td className="p-3 text-sm">{customer?.name ?? 'Unknown customer'}</td>
-                    <td className="p-3 text-sm text-muted-foreground">{warehouse?.name ?? 'Unknown warehouse'}</td>
+                    <td className="p-3 text-sm text-muted-foreground">{warehouseSummary}</td>
                     <td className="p-3 text-right text-sm">{order.items.length}</td>
                     <td className="p-3 text-right text-sm font-medium">{formatMoney(order.totalAmount)}</td>
                     <td className="p-3">
@@ -126,7 +138,7 @@ export default function OrdersPage() {
           <div className="grid gap-3 p-3 md:hidden">
             {filtered.map((order) => {
               const customer = order.customer || customers.find((item) => item.id === order.customerId);
-              const warehouse = order.warehouse || warehouses.find((item) => item.id === order.warehouseId);
+              const warehouseSummary = getOrderWarehouseSummary(order);
 
               return (
                 <Link
@@ -138,7 +150,7 @@ export default function OrdersPage() {
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-primary">{order.orderNumber}</p>
                       <p className="mt-1 truncate text-sm text-foreground">{customer?.name ?? 'Unknown customer'}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{warehouse?.name ?? 'Unknown warehouse'}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{warehouseSummary}</p>
                     </div>
                     <StatusBadge status={order.status} />
                   </div>

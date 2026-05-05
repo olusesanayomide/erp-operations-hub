@@ -18,6 +18,7 @@ import type {
 } from "@/shared/types/erp";
 import { apiRequest } from "./api";
 import type { Session } from "@supabase/supabase-js";
+import { getSiteUrl } from "./env";
 import { supabase } from "./supabase";
 
 type BackendAuthUser = {
@@ -269,7 +270,7 @@ type BackendOrder = {
   totalAmount: number;
   createdAt: string;
   updatedAt: string;
-  items: Array<{
+  items?: Array<{
     id: string;
     productId: string;
     warehouseId: string;
@@ -700,19 +701,19 @@ export function normalizeInventoryItem(
 }
 
 export function normalizeOrder(raw: BackendOrder): Order {
-  const warehouseId = raw.items[0]?.warehouseId || "";
   const normalizedStatus = raw.status.toLowerCase() as Order["status"];
+  const items = raw.items || [];
   const statusRank = getOrderStatusRank(normalizedStatus);
 
   return {
     id: raw.id,
     orderNumber: createOrderNumber(raw.id),
     customerId: raw.customerId || "",
-    warehouseId,
     status: normalizedStatus,
-    items: raw.items.map((item) => ({
+    items: items.map((item) => ({
       id: item.id,
       productId: item.productId,
+      warehouseId: item.warehouseId,
       quantity: item.quantity,
       unitPrice: item.price,
       product: item.product ? normalizeProduct(item.product) : undefined,
@@ -921,21 +922,7 @@ export async function loginWithSupabase(email: string, password: string) {
 }
 
 function getAuthRedirectBaseUrl() {
-  const configuredUrl = import.meta.env.VITE_SITE_URL?.trim();
-
-  if (configuredUrl) {
-    return configuredUrl.replace(/\/$/, "");
-  }
-
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-
-  if (import.meta.env.PROD) {
-    throw new Error("VITE_SITE_URL must be configured for production password reset links.");
-  }
-
-  return "http://localhost:8080";
+  return getSiteUrl();
 }
 
 export async function sendPasswordResetEmail(email: string) {
@@ -1288,18 +1275,13 @@ export async function getOrderById(id: string) {
 
 export async function createOrder(payload: {
   customerId: string;
-  warehouseId: string;
-  items: Array<{ productId: string; quantity: number }>;
+  items: Array<{ productId: string; warehouseId: string; quantity: number }>;
 }) {
   const order = await apiRequest<BackendOrder>("/orders", {
     method: "POST",
     body: {
       customerId: payload.customerId,
-      items: payload.items.map((item) => ({
-        productId: item.productId,
-        warehouseId: payload.warehouseId,
-        quantity: item.quantity,
-      })),
+      items: payload.items,
     },
   });
 

@@ -125,16 +125,17 @@ export type OrderStatus =
 export interface OrderItem {
   id: string;
   productId: string;
+  warehouseId: string;
   quantity: number;
   unitPrice: number;
   product?: Product;
+  warehouse?: Warehouse;
 }
 
 export interface Order {
   id: string;
   orderNumber: string;
   customerId: string;
-  warehouseId: string;
   status: OrderStatus;
   items: OrderItem[];
   totalAmount: number;

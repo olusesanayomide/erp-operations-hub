@@ -1,21 +1,8 @@
+import { getApiBaseUrl } from "./env";
 import { supabase } from "./supabase";
 import { OFFLINE_MESSAGE, isBrowserOnline } from "./online-status";
 
-const DEFAULT_LOCAL_API_BASE_URL = "http://localhost:3000";
-
-const API_BASE_URL = (() => {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-
-  if (configuredBaseUrl) {
-    return configuredBaseUrl.replace(/\/$/, "");
-  }
-
-  if (import.meta.env.PROD) {
-    throw new Error("VITE_API_BASE_URL must be configured for production builds.");
-  }
-
-  return DEFAULT_LOCAL_API_BASE_URL;
-})();
+const API_BASE_URL = getApiBaseUrl();
 
 const USER_STORAGE_KEY = "erp.auth.user";
 const DEFAULT_API_TIMEOUT_MS = 20000;
@@ -42,10 +29,6 @@ export class ApiError extends Error {
 function isReadRequest(method: string | undefined) {
   const normalizedMethod = method?.toUpperCase() ?? "GET";
   return normalizedMethod === "GET" || normalizedMethod === "HEAD";
-}
-
-export function getApiBaseUrl() {
-  return API_BASE_URL;
 }
 
 export function getStoredUser<T>() {
@@ -207,7 +190,7 @@ export async function apiRequest<T>(
     }
 
     throw new ApiError(
-      `Unable to reach the ERP backend at ${API_BASE_URL}. Make sure the API server is running.`,
+      `Unable to reach the ERP backend at ${API_BASE_URL}. Check that the deployed API is healthy and that this frontend origin is allowed by CORS.`,
       0,
     );
   } finally {

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
+import { SUPABASE_CONFIG_ERROR_MESSAGE } from '@/shared/lib/env';
 import { AUTH_SLOW_OPERATION_NOTICE_MS } from '@/shared/lib/erp-api';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -132,7 +133,7 @@ export default function LoginPage() {
 
               {!isSupabaseAuthConfigured && (
                 <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-                  Supabase auth mode is enabled, but `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are not configured yet.
+                  {SUPABASE_CONFIG_ERROR_MESSAGE}
                 </div>
               )}
 

@@ -165,7 +165,17 @@ export class CustomersService {
   async findOne(id: string, user: UserPayload) {
     const customer = await this.prisma.customer.findFirst({
       where: { id, tenantId: user.tenantId },
-      include: { orders: true },
+      include: {
+        orders: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
     });
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
