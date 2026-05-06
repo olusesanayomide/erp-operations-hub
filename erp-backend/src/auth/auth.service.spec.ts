@@ -12,6 +12,12 @@ const adminUser = {
   email: 'admin@example.com',
   roles: [Role.ADMIN],
   isPlatformAdmin: false,
+  tenant: {
+    id: 'tenant-1',
+    name: 'Tenant One',
+    slug: 'tenant-one',
+    status: 'ACTIVE',
+  },
 };
 
 const staffUser = {
@@ -20,6 +26,12 @@ const staffUser = {
   email: 'staff@example.com',
   roles: [Role.STAFF],
   isPlatformAdmin: false,
+  tenant: {
+    id: 'tenant-1',
+    name: 'Tenant One',
+    slug: 'tenant-one',
+    status: 'ACTIVE',
+  },
 };
 
 function createAuthPrismaMock() {
@@ -60,16 +72,29 @@ function createConfigMock() {
   };
 }
 
+function createMailServiceMock() {
+  return {
+    sendInviteEmail: jest.fn(),
+    sendWelcomeEmail: jest.fn(),
+  };
+}
+
 describe('AuthService tenant invites', () => {
   let service: AuthService;
   let prisma: ReturnType<typeof createAuthPrismaMock>;
   let fetchMock: jest.Mock;
+  let mailService: ReturnType<typeof createMailServiceMock>;
 
   beforeEach(() => {
     prisma = createAuthPrismaMock();
     fetchMock = jest.fn();
+    mailService = createMailServiceMock();
     global.fetch = fetchMock;
-    service = new AuthService(prisma as any, createConfigMock() as any);
+    service = new AuthService(
+      prisma as any,
+      createConfigMock() as any,
+      mailService as any,
+    );
   });
 
   it('creates an invite scoped to the admin tenant', async () => {
@@ -85,6 +110,7 @@ describe('AuthService tenant invites', () => {
       expiresAt,
       createdAt: new Date('2026-04-23T00:00:00.000Z'),
     });
+    mailService.sendInviteEmail.mockResolvedValue(true);
 
     const result = await service.createTenantInvite(adminUser, {
       email: ' STAFF@example.com ',
@@ -101,7 +127,39 @@ describe('AuthService tenant invites', () => {
         createdByUserId: 'admin-1',
       }),
     });
+    expect(mailService.sendInviteEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'staff@example.com',
+        tenantName: 'Tenant One',
+      }),
+    );
     expect(result.inviteLink).toMatch(/^https:\/\/erp\.example\/join\//);
+    expect(result.emailDelivery).toBe('sent');
+  });
+
+  it('keeps invite creation successful when invite email delivery fails', async () => {
+    const expiresAt = new Date('2026-04-30T00:00:00.000Z');
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.tenantInvite.findFirst.mockResolvedValue(null);
+    prisma.tenantInvite.create.mockResolvedValue({
+      id: 'invite-1',
+      email: 'staff@example.com',
+      name: 'Staff User',
+      role: Role.STAFF,
+      status: 'PENDING',
+      expiresAt,
+      createdAt: new Date('2026-04-23T00:00:00.000Z'),
+    });
+    mailService.sendInviteEmail.mockRejectedValue(new Error('smtp unavailable'));
+
+    const result = await service.createTenantInvite(adminUser, {
+      email: 'staff@example.com',
+      name: 'Staff User',
+      role: Role.STAFF,
+    });
+
+    expect(result.inviteLink).toMatch(/^https:\/\/erp\.example\/join\//);
+    expect(result.emailDelivery).toBe('failed');
   });
 
   it('blocks non-admin users from creating invites', async () => {
@@ -197,6 +255,7 @@ describe('AuthService tenant invites', () => {
       ok: true,
       json: async () => ({ id: 'supabase-user-1' }),
     });
+    mailService.sendWelcomeEmail.mockResolvedValue(true);
     prisma.$transaction.mockImplementation(async (callback) =>
       callback({
         user: {
@@ -229,6 +288,12 @@ describe('AuthService tenant invites', () => {
         id: 'supabase-user-1',
         email: 'staff@example.com',
         roles: [Role.MANAGER],
+      }),
+    );
+    expect(mailService.sendWelcomeEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'staff@example.com',
+        tenantName: 'Tenant One',
       }),
     );
   });
@@ -286,7 +351,11 @@ describe('AuthService tenant invites', () => {
         return values[key];
       }),
     };
-    service = new AuthService(prisma as any, productionConfig as any);
+    service = new AuthService(
+      prisma as any,
+      productionConfig as any,
+      mailService as any,
+    );
 
     const expiresAt = new Date('2026-04-30T00:00:00.000Z');
     prisma.user.findUnique.mockResolvedValue(null);
@@ -322,6 +391,7 @@ describe('AuthService.signupTenant', () => {
     user: { findUnique: jest.Mock; create: jest.Mock };
   };
   let fetchMock: jest.Mock;
+  let mailService: ReturnType<typeof createMailServiceMock>;
 
   beforeEach(() => {
     prisma = {
@@ -336,8 +406,70 @@ describe('AuthService.signupTenant', () => {
       },
     };
     fetchMock = jest.fn();
+    mailService = createMailServiceMock();
     global.fetch = fetchMock;
-    service = new AuthService(prisma as any, {} as any);
+    service = new AuthService(
+      prisma as any,
+      createConfigMock() as any,
+      mailService as any,
+    );
+  });
+
+  it('creates a setup workspace when signup only provides email and password', async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.tenant.findUnique.mockResolvedValueOnce(null);
+    prisma.tenant.create.mockResolvedValue({
+      id: 'tenant-setup-1',
+      name: "Jane Doe's Workspace",
+      slug: 'setup-ab12cd34',
+      status: 'ACTIVE',
+    });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'supabase-user-1' }),
+    });
+    prisma.user.create.mockResolvedValue({
+      id: 'supabase-user-1',
+      email: 'jane.doe@example.com',
+      name: 'Jane Doe',
+      isPlatformAdmin: false,
+      roles: [{ name: Role.ADMIN }],
+      tenant: {
+        id: 'tenant-setup-1',
+        name: "Jane Doe's Workspace",
+        slug: 'setup-ab12cd34',
+        status: 'ACTIVE',
+      },
+    });
+    mailService.sendWelcomeEmail.mockResolvedValue(true);
+
+    const result = await service.signupTenant({
+      adminEmail: 'jane.doe@example.com',
+      adminPassword: 'StrongPassword123!',
+    });
+
+    expect(prisma.tenant.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "Jane Doe's Workspace",
+        slug: expect.stringMatching(/^setup-/),
+      }),
+    });
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          email: 'jane.doe@example.com',
+          name: 'Jane Doe',
+        }),
+      }),
+    );
+    expect(result.tenant.slug).toMatch(/^setup-/);
+    expect(result.user.name).toBe('Jane Doe');
+    expect(mailService.sendWelcomeEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'jane.doe@example.com',
+        tenantName: "Jane Doe's Workspace",
+      }),
+    );
   });
 
   it('rejects an existing tenant slug before creating records or Supabase users', async () => {
@@ -405,7 +537,11 @@ describe('AuthService.updateUser', () => {
 
     (prisma as any).user.count = prisma.count;
 
-    service = new AuthService(prisma as any, {} as any);
+    service = new AuthService(
+      prisma as any,
+      {} as any,
+      createMailServiceMock() as any,
+    );
   });
 
   it('updates a user name and role for the same tenant', async () => {

@@ -16,11 +16,12 @@ import {
 } from '@/shared/ui/dialog';
 import { Label } from '@/shared/ui/label';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Download, FileSpreadsheet, Plus, Search, Users } from 'lucide-react';
+import { Download, FileSpreadsheet, Plus, Search, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   commitCustomerImport,
   createCustomer,
+  deleteCustomer,
   listPaginatedCustomers,
   previewCustomerImport,
 } from '@/shared/lib/erp-api';
@@ -52,6 +53,7 @@ export default function CustomersPage() {
   const [preview, setPreview] = useState<CustomerImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const createToastRef = useRef<string | number | null>(null);
+  const [removingCustomerId, setRemovingCustomerId] = useState<string | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -97,6 +99,21 @@ export default function CustomersPage() {
       setImportDialogOpen(false);
     },
     onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteCustomer,
+    onMutate: (id) => {
+      setRemovingCustomerId(id);
+    },
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success(result.message);
+    },
+    onError: (error: Error) => toast.error(error.message),
+    onSettled: () => {
+      setRemovingCustomerId(null);
+    },
   });
 
   function handleCreateCustomer(event: React.FormEvent<HTMLFormElement>) {
@@ -174,6 +191,18 @@ export default function CustomersPage() {
     link.download = 'customers-import-template.csv';
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function handleRemoveCustomer(customerId: string, customerName: string) {
+    const confirmed = window.confirm(
+      `Remove ${customerName}?\n\nUnused customers will be deleted permanently. Customers with order history will be archived instead and removed from active customer lists.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteMutation.mutate(customerId);
   }
 
   return (
@@ -582,6 +611,7 @@ export default function CustomersPage() {
                 <th className="text-left p-3">Phone</th>
                 <th className="text-right p-3">Orders</th>
                 <th className="text-left p-3">Created</th>
+                {canPerform('customers.delete') && <th className="text-right p-3">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -605,12 +635,26 @@ export default function CustomersPage() {
                   <td className="p-3 text-sm text-muted-foreground">
                     {customer.createdAt}
                   </td>
+                  {canPerform('customers.delete') && (
+                    <td className="p-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        requiresOnline
+                        disabled={deleteMutation.isPending && removingCustomerId === customer.id}
+                        onClick={() => handleRemoveCustomer(customer.id, customer.name)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {deleteMutation.isPending && removingCustomerId === customer.id ? 'Removing...' : 'Remove'}
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={5} /></div>}
+        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={canPerform('customers.delete') ? 6 : 5} /></div>}
         {isError && (
           <ErrorState
             title="Unable to load customers"

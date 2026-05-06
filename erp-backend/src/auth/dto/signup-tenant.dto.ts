@@ -1,4 +1,5 @@
 import {
+  IsUUID,
   IsEmail,
   IsNotEmpty,
   IsOptional,
@@ -6,15 +7,24 @@ import {
   Matches,
   MinLength,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SignupTenantDto {
-  @ApiProperty({ example: 'Acme Incorporated' })
-  @IsString()
-  @IsNotEmpty()
-  companyName: string;
+  @ApiPropertyOptional({
+    example: 'a2d6c4ee-3aaf-4ac9-92d0-4d54e1ef7b5c',
+    description:
+      'Supabase auth user id created by the email verification signup flow.',
+  })
+  @IsOptional()
+  @IsUUID()
+  authUserId?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({ example: 'Acme Incorporated' })
+  @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @ApiPropertyOptional({
     required: false,
     example: 'acme',
     description:
@@ -25,10 +35,10 @@ export class SignupTenantDto {
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   slug?: string;
 
-  @ApiProperty({ example: 'Jane Founder' })
+  @ApiPropertyOptional({ example: 'Jane Founder' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  adminName: string;
+  adminName?: string;
 
   @ApiProperty({ example: 'founder@acme.com' })
   @IsEmail()

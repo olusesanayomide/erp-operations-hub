@@ -130,7 +130,12 @@ export default function UsersPage() {
         invite,
         ...(current || []),
       ]);
-      toast.success('Invite created. Copy the link and share it securely.');
+      if (invite.emailDelivery === 'failed') {
+        toast.error('Invite created, but the email could not be sent. Copy the link and share it manually.');
+        return;
+      }
+
+      toast.success('Invite created and emailed successfully.');
     },
     onError: (mutationError: Error) => toast.error(mutationError.message),
   });
@@ -453,8 +458,21 @@ export default function UsersPage() {
                 </div>
 
                 {createdInvite?.inviteLink && (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
-                    <p className="font-semibold">Invite link created</p>
+                  <div className={`rounded-2xl p-3 text-sm ${
+                    createdInvite.emailDelivery === 'failed'
+                      ? 'border border-amber-200 bg-amber-50 text-amber-950'
+                      : 'border border-emerald-200 bg-emerald-50 text-emerald-950'
+                  }`}>
+                    <p className="font-semibold">
+                      {createdInvite.emailDelivery === 'failed'
+                        ? 'Invite created, but email was not sent'
+                        : 'Invite created and emailed'}
+                    </p>
+                    <p className="mt-1 text-xs">
+                      {createdInvite.emailDelivery === 'failed'
+                        ? 'Use the fallback link below to share access manually.'
+                        : 'Keep this link as a fallback in case the recipient needs it again.'}
+                    </p>
                     <div className="mt-2 flex gap-2">
                       <Input readOnly value={createdInvite.inviteLink} aria-label="Invite link" />
                       <Button type="button" variant="outline" onClick={copyInviteLink} className="gap-2">

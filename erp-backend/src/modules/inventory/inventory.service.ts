@@ -12,7 +12,7 @@ export class InventoryService {
     warehouseId: string,
   ) {
     const product = await this.prisma.product.findFirst({
-      where: { id: productId, tenantId },
+      where: { id: productId, tenantId, archivedAt: null },
     });
     if (!product) {
       throw new BadRequestException('Product does not exist');
@@ -173,7 +173,7 @@ export class InventoryService {
     }
 
     const product = await this.prisma.product.findFirst({
-      where: { id: productId, tenantId },
+      where: { id: productId, tenantId, archivedAt: null },
     });
     if (!product) {
       throw new BadRequestException('Product does not exist');

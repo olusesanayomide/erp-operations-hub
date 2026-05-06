@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '@/app/providers/AuthContext';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
-import { signupTenant } from '@/shared/lib/erp-api';
+import { signupTenant, signupWithSupabase } from '@/shared/lib/erp-api';
 import { ApiError } from '@/shared/lib/api';
 import { toast } from 'sonner';
 import { LoadingText } from '@/shared/components/LoadingMotion';
@@ -35,22 +36,12 @@ const itemVariants = {
 const SLOW_SIGNUP_NOTICE_MS = 8000;
 const SIGNUP_EMAIL_EXISTS_MESSAGE =
   'An account already exists for this email. Please sign in or reset your password.';
-
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-{2,}/g, '-');
-}
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupPage() {
+  const { authStatusMessage } = useAuth();
   const navigate = useNavigate();
   const prefersReducedMotion = useReducedMotion();
-  const [companyName, setCompanyName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -58,12 +49,6 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [duplicateSignupEmail, setDuplicateSignupEmail] = useState('');
   const [showSlowSignupNotice, setShowSlowSignupNotice] = useState(false);
-  const [slugEdited, setSlugEdited] = useState(false);
-
-  const slugPreview = useMemo(
-    () => (slugEdited ? slug : slugify(companyName)),
-    [companyName, slug, slugEdited],
-  );
 
   useEffect(() => {
     if (!loading) {
@@ -83,24 +68,18 @@ export default function SignupPage() {
     setError('');
     setDuplicateSignupEmail('');
 
-    if (!companyName.trim() || !adminName.trim() || !adminEmail.trim() || !adminPassword.trim()) {
-      setError('Company name, admin name, email, and password are required.');
+    if (!adminEmail.trim() || !adminPassword.trim()) {
+      setError('Email and password are required.');
       return;
     }
 
-    const nextSlug = (slugEdited ? slug : slugPreview).trim();
-    if (!nextSlug) {
-      setError('A valid company slug is required.');
-      return;
-    }
-
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(nextSlug)) {
-      setError('Slug can only use lowercase letters, numbers, and hyphens.');
+    if (!EMAIL_PATTERN.test(adminEmail.trim())) {
+      setError('Enter a valid email address.');
       return;
     }
 
     if (adminPassword.length < 8) {
-      setError('Admin password must be at least 8 characters.');
+      setError('Password must be at least 8 characters.');
       return;
     }
 
@@ -108,18 +87,23 @@ export default function SignupPage() {
     setShowSlowSignupNotice(false);
 
     try {
+      const authUserId = await signupWithSupabase(
+        adminEmail.trim(),
+        adminPassword,
+      );
+
       await signupTenant({
-        companyName: companyName.trim(),
-        slug: nextSlug,
-        adminName: adminName.trim(),
+        authUserId,
         adminEmail: adminEmail.trim(),
         adminPassword,
       });
 
-      toast.success('Tenant created. You can sign in with the new admin account.');
+      toast.success('Account created. Check your email to verify your account before signing in.');
       navigate('/login', {
         replace: true,
-        state: { email: adminEmail.trim() },
+        state: {
+          email: adminEmail.trim(),
+        },
       });
     } catch (signupError) {
       if (
@@ -135,7 +119,9 @@ export default function SignupPage() {
         signupError instanceof ApiError
           ? signupError.message
           : signupError instanceof Error
-            ? signupError.message
+            ? /email not confirmed/i.test(signupError.message)
+              ? 'Check your email to verify your account before signing in.'
+              : signupError.message
             : 'Unable to create the tenant right now.',
       );
     } finally {
@@ -187,61 +173,16 @@ export default function SignupPage() {
               />
               <div className="relative rounded-[28px] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(246,250,255,0.68))] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.94),0_16px_36px_rgba(59,107,255,0.08)] sm:p-7">
                 <div className="text-center">
-                  <h2 className="text-[30px] font-bold tracking-tight text-slate-950">Create Your Workspace</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Launch a new company tenant and set up the first administrator in one step.
+                  <h2 className="text-[24px] font-bold tracking-tight text-slate-950 sm:text-[30px]">Create Your Account</h2>
+                  <p className="mt-2 text-[13px] leading-6 text-slate-600 sm:text-sm">
+                    Start with your email and password. We&apos;ll help you finish workspace setup after sign in.
                   </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-                  <motion.div variants={itemVariants} className="grid gap-5 sm:grid-cols-2">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="companyName" className="text-[15px] font-semibold text-slate-900">Company name</Label>
-                      <Input
-                        id="companyName"
-                        value={companyName}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setCompanyName(value);
-                          if (!slugEdited) {
-                            setSlug(slugify(value));
-                          }
-                        }}
-                        placeholder="Acme Incorporated"
-                        className="h-12 rounded-2xl border border-slate-300 bg-white text-slate-950 shadow-[0_8px_24px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.92)] focus-visible:border-[#4f7dff] focus-visible:ring-2 focus-visible:ring-[#4f7dff]/20"
-                      />
-                    </div>
-
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="slug" className="text-[15px] font-semibold text-slate-900">Workspace slug</Label>
-                      <Input
-                        id="slug"
-                        value={slugEdited ? slug : slugPreview}
-                        onChange={(event) => {
-                          setSlugEdited(true);
-                          setSlug(slugify(event.target.value));
-                        }}
-                        placeholder="acme-incorporated"
-                        className="h-12 rounded-2xl border border-slate-300 bg-white text-slate-950 shadow-[0_8px_24px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.92)] focus-visible:border-[#4f7dff] focus-visible:ring-2 focus-visible:ring-[#4f7dff]/20"
-                      />
-                      <p className="text-xs text-slate-500">
-                        This becomes the unique business identifier for your tenant.
-                      </p>
-                    </div>
-
+                  <motion.div variants={itemVariants} className="space-y-5">
                     <div className="space-y-2">
-                      <Label htmlFor="adminName" className="text-[15px] font-semibold text-slate-900">Admin name</Label>
-                      <Input
-                        id="adminName"
-                        value={adminName}
-                        onChange={(event) => setAdminName(event.target.value)}
-                        placeholder="Jane Founder"
-                        className="h-12 rounded-2xl border border-slate-300 bg-white text-slate-950 shadow-[0_8px_24px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.92)] focus-visible:border-[#4f7dff] focus-visible:ring-2 focus-visible:ring-[#4f7dff]/20"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="adminEmail" className="text-[15px] font-semibold text-slate-900">Admin email</Label>
+                      <Label htmlFor="adminEmail" className="text-[14px] font-semibold text-slate-900 sm:text-[15px]">Email</Label>
                       <Input
                         id="adminEmail"
                         type="email"
@@ -252,8 +193,8 @@ export default function SignupPage() {
                       />
                     </div>
 
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="adminPassword" className="text-[15px] font-semibold text-slate-900">Admin password</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="adminPassword" className="text-[14px] font-semibold text-slate-900 sm:text-[15px]">Password</Label>
                       <div className="relative">
                         <Input
                           id="adminPassword"
@@ -317,7 +258,7 @@ export default function SignupPage() {
                       animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
                       className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900"
                     >
-                      Still creating your workspace. On slower or unstable networks this can take a little longer because we are setting up both your company and first admin account. Please keep this page open.
+                      Still creating your account. Please keep this page open.
                     </motion.p>
                   )}
 
@@ -330,10 +271,10 @@ export default function SignupPage() {
                     >
                       {loading ? (
                         <LoadingText>
-                          {showSlowSignupNotice ? 'Still creating workspace...' : 'Creating workspace...'}
+                          {showSlowSignupNotice ? 'Still creating account...' : authStatusMessage || 'Creating account...'}
                         </LoadingText>
                       ) : (
-                        'Create workspace'
+                        'Create account'
                       )}
                     </Button>
                   </motion.div>

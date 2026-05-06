@@ -6,13 +6,13 @@ import { PaginationControls } from '@/shared/components/PaginationControls';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Download, FileSpreadsheet, Package, Plus, Search } from 'lucide-react';
+import { Download, FileSpreadsheet, Package, Plus, Search, Trash2 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 } from '@/shared/ui/dialog';
 import { Label } from '@/shared/ui/label';
 import { toast } from 'sonner';
-import { commitProductImport, createProduct, listPaginatedRawProducts, normalizeProduct, previewProductImport } from '@/shared/lib/erp-api';
+import { commitProductImport, createProduct, deleteProduct, listPaginatedRawProducts, normalizeProduct, previewProductImport } from '@/shared/lib/erp-api';
 import { useSettings } from '@/app/providers/SettingsContext';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
@@ -49,6 +49,7 @@ export default function ProductsPage() {
   const [preview, setPreview] = useState<ProductImportPreview | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const createToastRef = useRef<string | number | null>(null);
+  const [removingProductId, setRemovingProductId] = useState<string | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -94,6 +95,26 @@ export default function ProductsPage() {
       setImportDialogOpen(false);
     },
     onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteProduct,
+    onMutate: (id) => {
+      setRemovingProductId(id);
+    },
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success(result.message, {
+        description:
+          result.action === 'deleted'
+            ? 'The product was permanently removed from the active catalog.'
+            : 'The product stays available in historical records but is no longer usable in new transactions.',
+      });
+    },
+    onError: (error: Error) => toast.error(error.message),
+    onSettled: () => {
+      setRemovingProductId(null);
+    },
   });
 
   const products = rawProducts.map(normalizeProduct);
@@ -173,6 +194,18 @@ export default function ProductsPage() {
       unit: form.unit.trim(),
       description: form.description.trim(),
     });
+  }
+
+  function handleRemoveProduct(productId: string, productName: string) {
+    const confirmed = window.confirm(
+      `Remove ${productName}?\n\nUnused products will be deleted permanently. Products linked to inventory, orders, purchases, or stock movements will be archived instead and removed from the active catalog.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteMutation.mutate(productId);
   }
 
   useEffect(() => {
@@ -427,21 +460,22 @@ export default function ProductsPage() {
       {/* Table */}
       <div className="erp-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[720px] w-full">
-            <thead>
-              <tr className="erp-table-header">
+	          <table className="min-w-[720px] w-full">
+	            <thead>
+	              <tr className="erp-table-header">
                 <th className="text-left p-3">Name</th>
                 <th className="text-left p-3">SKU</th>
                 <th className="text-left p-3">Category</th>
                 <th className="text-right p-3">Base Price</th>
                 <th className="text-right p-3">Min Stock</th>
-                <th className="text-right p-3">Total Stock</th>
-                <th className="text-left p-3">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map(p => (
-                <tr key={p.id} className="erp-table-row">
+	                <th className="text-right p-3">Total Stock</th>
+	                <th className="text-left p-3">Created</th>
+                    {canPerform('products.delete') && <th className="text-right p-3">Actions</th>}
+	              </tr>
+	            </thead>
+	            <tbody>
+	              {products.map(p => (
+	                <tr key={p.id} className="erp-table-row">
                   <td className="p-3">
                     <Link to={`/products/${p.id}`} className="font-medium text-primary hover:underline">{p.name}</Link>
                   </td>
@@ -449,14 +483,28 @@ export default function ProductsPage() {
                   <td className="p-3 text-sm">{p.category}</td>
                   <td className="p-3 text-sm text-right font-medium">{formatMoney(p.basePrice)}</td>
                   <td className="p-3 text-sm text-right text-muted-foreground">{p.minStock}</td>
-                  <td className="p-3 text-sm text-right">{getTotalInventory(p.id)}</td>
-                  <td className="p-3 text-sm text-muted-foreground">{p.createdAt}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={7} /></div>}
+	                  <td className="p-3 text-sm text-right">{getTotalInventory(p.id)}</td>
+	                  <td className="p-3 text-sm text-muted-foreground">{p.createdAt}</td>
+                      {canPerform('products.delete') && (
+                        <td className="p-3 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            requiresOnline
+                            disabled={deleteMutation.isPending && removingProductId === p.id}
+                            onClick={() => handleRemoveProduct(p.id, p.name)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {deleteMutation.isPending && removingProductId === p.id ? 'Removing...' : 'Remove'}
+                          </Button>
+                        </td>
+                      )}
+	                </tr>
+	              ))}
+	            </tbody>
+	          </table>
+	        </div>
+	        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={canPerform('products.delete') ? 8 : 7} /></div>}
         {isError && (
           <ErrorState
             title="Unable to load products"

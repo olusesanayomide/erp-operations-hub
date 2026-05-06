@@ -327,6 +327,7 @@ export class JwtStrategy
       name: user.name,
       roles: user.roles.map((role) => role.name),
       isPlatformAdmin: user.isPlatformAdmin,
+      onboardingRequired: user.tenant.slug.startsWith('setup-'),
       createdAt: user.createdAt,
       tenant: {
         id: user.tenant.id,

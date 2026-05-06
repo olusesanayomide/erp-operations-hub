@@ -110,16 +110,16 @@ export class WarehousesController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({
-    summary: 'Delete warehouse',
+    summary: 'Safely remove warehouse',
     description:
-      'Removes a warehouse. Will fail if the warehouse currently contains stock.',
+      'Permanently deletes unused warehouses, archives warehouses with history, and blocks removal when active stock remains.',
   })
-  @ApiResponse({ status: 200, description: 'Warehouse deleted successfully.' })
+  @ApiResponse({ status: 200, description: 'Warehouse safely removed or archived.' })
   @ApiResponse({
     status: 400,
-    description: 'Cannot delete warehouse with active inventory.',
+    description: 'Cannot remove warehouse with active inventory.',
   })
   @ApiResponse({ status: 404, description: 'Warehouse not found.' })
   remove(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {

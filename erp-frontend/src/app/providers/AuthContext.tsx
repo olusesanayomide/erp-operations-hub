@@ -40,17 +40,19 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const AUTH_EXPIRED_MESSAGE =
   'Your session has expired or is no longer valid. Please sign in again.';
+const EMAIL_VERIFICATION_REQUIRED_MESSAGE =
+  'Check your email to verify your account before signing in.';
 
 const rolePermissions: Record<UserRole, string[]> = {
   admin: ['*'],
   manager: [
-    'products.create', 'products.edit', 'products.view',
+    'products.create', 'products.delete', 'products.edit', 'products.view',
     'inventory.view', 'inventory.stock-in', 'inventory.stock-out', 'inventory.transfer', 'inventory.adjust',
     'orders.view', 'orders.create', 'orders.confirm', 'orders.pick', 'orders.ship', 'orders.deliver', 'orders.cancel',
     'purchases.view', 'purchases.create', 'purchases.confirm', 'purchases.receive',
-    'customers.view', 'customers.create', 'customers.edit',
-    'suppliers.view', 'suppliers.create', 'suppliers.edit',
-    'warehouses.view', 'warehouses.create', 'warehouses.edit',
+    'customers.view', 'customers.create', 'customers.edit', 'customers.delete',
+    'suppliers.view', 'suppliers.create', 'suppliers.edit', 'suppliers.delete',
+    'warehouses.view', 'warehouses.create', 'warehouses.edit', 'warehouses.delete',
     'users.view',
   ],
   staff: [
@@ -127,6 +129,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsLoading(false);
         }
         resolveTransition({ success: true });
+        return;
+      }
+
+      if (!session.user.email_confirmed_at) {
+        clearCurrentUserRequest();
+        setStoredUser(null);
+        setUser(null);
+        setIsVerifiedSession(false);
+        hasResolvedInitialSessionRef.current = true;
+        void logoutSupabase();
+        if (shouldBlockUi) {
+          setAuthStatusMessage('');
+          setIsLoading(false);
+        }
+        setAuthError(EMAIL_VERIFICATION_REQUIRED_MESSAGE);
+        resolveTransition({
+          success: false,
+          error: EMAIL_VERIFICATION_REQUIRED_MESSAGE,
+        });
         return;
       }
 
@@ -218,7 +239,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error instanceof ApiError
           ? error.message
           : error instanceof Error
-            ? error.message
+            ? /email not confirmed/i.test(error.message)
+              ? EMAIL_VERIFICATION_REQUIRED_MESSAGE
+              : error.message
             : 'Unable to sign in.';
       setAuthError(message);
 

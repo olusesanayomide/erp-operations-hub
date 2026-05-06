@@ -136,13 +136,13 @@ export class CustomersController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({
-    summary: 'Remove customer',
+    summary: 'Safely remove customer',
     description:
-      'Deletes a customer from the registry. Fails if customer has existing orders.',
+      'Permanently deletes unused customers and archives customers with order history.',
   })
-  @ApiResponse({ status: 200, description: 'Customer deleted successfully.' })
+  @ApiResponse({ status: 200, description: 'Customer safely removed or archived.' })
   @ApiResponse({
     status: 400,
     description: 'Cannot delete customer with order history.',

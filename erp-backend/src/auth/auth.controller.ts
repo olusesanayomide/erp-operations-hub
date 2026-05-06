@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AcceptTenantInviteDto } from './dto/accept-tenant-invite.dto';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 import { CreateTenantInviteDto } from './dto/create-tenant-invite.dto';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
 import { UpdateTenantStatusDto } from './dto/update-tenant-status.dto';
@@ -64,6 +65,19 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Returns user payload from token.' })
   getme(@GetUser() user: UserPayload) {
     return this.authService.serializeCurrentUser(user);
+  }
+
+  @Patch('onboarding')
+  @ApiOperation({ summary: 'Complete initial workspace onboarding' })
+  @ApiResponse({
+    status: 200,
+    description: 'Workspace onboarding completed successfully.',
+  })
+  completeOnboarding(
+    @GetUser() user: UserPayload,
+    @Body() dto: CompleteOnboardingDto,
+  ) {
+    return this.authService.completeOnboarding(user, dto);
   }
 
   @Get('users')

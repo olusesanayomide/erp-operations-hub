@@ -6,6 +6,7 @@ import { Label } from '@/shared/ui/label';
 import { Settings } from 'lucide-react';
 import { useSettings } from '@/app/providers/SettingsContext';
 import { useAuth } from '@/app/providers/AuthContext';
+import { isValidCurrencyCode, isValidLocale } from '@/shared/lib/currency';
 import { toast } from 'sonner';
 import { LoadingText } from '@/shared/components/LoadingMotion';
 
@@ -30,16 +31,28 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     const exchangeRate = Number(form.exchangeRate);
+    const currencyCode = form.currencyCode.trim().toUpperCase();
+    const locale = form.locale.trim();
 
-    if (!form.currencyCode.trim() || !form.locale.trim() || !(exchangeRate > 0)) {
+    if (!currencyCode || !locale || !(exchangeRate > 0)) {
       toast.error('Currency code, locale, and a valid exchange rate are required');
+      return;
+    }
+
+    if (!isValidLocale(locale)) {
+      toast.error('Use a valid locale like en-US or en-NG');
+      return;
+    }
+
+    if (!isValidCurrencyCode(currencyCode, locale)) {
+      toast.error('Use a valid 3-letter currency code like USD, EUR, or NGN');
       return;
     }
 
     try {
       await updateCurrency({
-        currencyCode: form.currencyCode.trim().toUpperCase(),
-        locale: form.locale.trim(),
+        currencyCode,
+        locale,
         exchangeRate,
       });
       toast.success('Currency settings updated');

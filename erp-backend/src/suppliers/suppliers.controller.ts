@@ -76,9 +76,9 @@ export class SuppliersController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Delete a supplier' })
-  @ApiResponse({ status: 200, description: 'Supplier deleted successfully' })
+  @Roles(Role.ADMIN, Role.MANAGER)
+  @ApiOperation({ summary: 'Safely remove a supplier' })
+  @ApiResponse({ status: 200, description: 'Supplier safely removed or archived' })
   remove(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: UserPayload) {
     return this.suppliersService.remove(id, user);
   }

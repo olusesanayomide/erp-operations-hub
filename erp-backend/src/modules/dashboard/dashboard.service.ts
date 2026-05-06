@@ -62,7 +62,7 @@ export class DashboardService {
       DashboardHeadlineCounts[]
     >`
       SELECT
-        (SELECT COUNT(*)::bigint FROM "Product"   WHERE "tenantId" = ${tenantId}) AS "productCount",
+        (SELECT COUNT(*)::bigint FROM "Product"   WHERE "tenantId" = ${tenantId} AND "archivedAt" IS NULL) AS "productCount",
         (SELECT COUNT(*)::bigint FROM "Customer"  WHERE "tenantId" = ${tenantId}) AS "customerCount",
         (SELECT COUNT(*)::bigint FROM "Supplier"  WHERE "tenantId" = ${tenantId}) AS "supplierCount",
         (SELECT COUNT(*)::bigint FROM "Warehouse" WHERE "tenantId" = ${tenantId}) AS "warehouseCount",
@@ -103,6 +103,7 @@ export class DashboardService {
         FROM "InventoryItem" inventory
         INNER JOIN "Product" product ON product."id" = inventory."productId"
         WHERE inventory."tenantId" = ${tenantId}
+          AND product."archivedAt" IS NULL
           AND inventory."quantity" <= product."minStock"
       `,
 
@@ -133,6 +134,7 @@ export class DashboardService {
         INNER JOIN "Product"   product   ON product."id"   = inventory."productId"
         INNER JOIN "Warehouse" warehouse ON warehouse."id" = inventory."warehouseId"
         WHERE inventory."tenantId" = ${tenantId}
+          AND product."archivedAt" IS NULL
           AND inventory."quantity" <= product."minStock"
         ORDER BY inventory."quantity" ASC, product."name" ASC
         LIMIT 5

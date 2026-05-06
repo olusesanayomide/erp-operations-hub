@@ -34,6 +34,7 @@ type BackendAuthUser = {
   };
   roles: string[];
   isPlatformAdmin: boolean;
+  onboardingRequired?: boolean;
   createdAt?: string;
 };
 
@@ -68,6 +69,7 @@ type BackendTenantInvite = {
   expiresAt: string;
   createdAt: string;
   inviteLink?: string;
+  emailDelivery?: 'sent' | 'failed';
 };
 
 type BackendTenantInviteDetails = {
@@ -107,6 +109,7 @@ type BackendProduct = {
   unit?: string | null;
   minStock?: number | null;
   price: number;
+  archivedAt?: string | null;
   createdAt: string;
   updatedAt?: string | null;
   inventoryItems?: Array<{
@@ -160,6 +163,23 @@ type ProductImportCommitResult = {
   rows: ProductImportRowPreview[];
 };
 
+type ProductRemovalResult = {
+  action: "deleted" | "archived";
+  message: string;
+  dependencySummary: {
+    inventoryItems: number;
+    stockMovements: number;
+    orderItems: number;
+    purchaseItems: number;
+  };
+};
+
+type EntityRemovalResult = {
+  action: "deleted" | "archived";
+  message: string;
+  dependencySummary: Record<string, number>;
+};
+
 type CustomerImportMode = "create" | "upsert";
 
 type CustomerImportRowPreview = {
@@ -197,6 +217,7 @@ type BackendWarehouse = {
   name: string;
   location?: string | null;
   description?: string | null;
+  archivedAt?: string | null;
   createdAt: string;
   inventoryItems?: Array<{
     id: string;
@@ -242,6 +263,7 @@ type BackendCustomer = {
   email: string;
   phone?: string | null;
   address?: string | null;
+  archivedAt?: string | null;
   createdAt: string;
   orders?: BackendOrder[];
   _count?: {
@@ -255,6 +277,7 @@ type BackendSupplier = {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  archivedAt?: string | null;
   createdAt: string;
   purchases?: BackendPurchase[];
   _count?: {
@@ -387,6 +410,7 @@ export type ListPageParams = {
   pageSize?: number;
   search?: string;
   status?: string;
+  includeArchived?: boolean;
 };
 
 export type PaginatedResponse<T> = {
@@ -418,6 +442,7 @@ function buildListQuery(params: ListPageParams) {
   if (params.status?.trim() && params.status !== "all") {
     searchParams.set("status", params.status.trim());
   }
+  if (params.includeArchived) searchParams.set("includeArchived", "true");
 
   const query = searchParams.toString();
   return query ? `?${query}` : "";
@@ -441,6 +466,7 @@ function normalizeAuthUser(data: BackendAuthUser): User {
     role: normalizeRole(data.roles?.[0]),
     tenant: normalizeTenant(data.tenant),
     isPlatformAdmin: data.isPlatformAdmin,
+    onboardingRequired: data.onboardingRequired ?? false,
     createdAt: data.createdAt || new Date().toISOString(),
   } satisfies User;
 }
@@ -478,6 +504,7 @@ function normalizeTenantInvite(raw: BackendTenantInvite): TenantInvite {
     expiresAt: formatDate(raw.expiresAt),
     createdAt: formatDate(raw.createdAt),
     inviteLink: raw.inviteLink,
+    emailDelivery: raw.emailDelivery,
   };
 }
 
@@ -584,6 +611,8 @@ export function normalizeProduct(raw: BackendProduct): Product {
     category: raw.category || "General",
     unit: raw.unit || "unit",
     minStock: raw.minStock ?? 10,
+    archivedAt: raw.archivedAt ? formatDate(raw.archivedAt) : undefined,
+    isArchived: Boolean(raw.archivedAt),
     createdAt: formatDate(raw.createdAt),
     updatedAt: formatDate(raw.updatedAt || raw.createdAt),
   };
@@ -596,6 +625,8 @@ export function normalizeWarehouse(raw: BackendWarehouse): Warehouse {
     location: raw.location || "Unspecified location",
     description: raw.description || "",
     itemCount: raw._count?.inventoryItems ?? raw.inventoryItems?.length ?? 0,
+    archivedAt: raw.archivedAt ? formatDate(raw.archivedAt) : undefined,
+    isArchived: Boolean(raw.archivedAt),
     createdAt: formatDate(raw.createdAt),
   };
 }
@@ -612,6 +643,7 @@ function normalizeInventoryProduct(
     category: "General",
     unit: "unit",
     minStock: raw.minStock ?? 10,
+    isArchived: false,
     createdAt: "",
     updatedAt: "",
   };
@@ -643,6 +675,8 @@ export function normalizeCustomer(raw: BackendCustomer): Customer {
     phone: raw.phone || "N/A",
     address: raw.address || "N/A",
     orderCount: raw._count?.orders ?? raw.orders?.length ?? 0,
+    archivedAt: raw.archivedAt ? formatDate(raw.archivedAt) : undefined,
+    isArchived: Boolean(raw.archivedAt),
     createdAt: formatDate(raw.createdAt),
   };
 }
@@ -655,6 +689,8 @@ export function normalizeSupplier(raw: BackendSupplier): Supplier {
     phone: raw.phone || "N/A",
     address: raw.address || "N/A",
     purchaseCount: raw._count?.purchases ?? raw.purchases?.length ?? 0,
+    archivedAt: raw.archivedAt ? formatDate(raw.archivedAt) : undefined,
+    isArchived: Boolean(raw.archivedAt),
     createdAt: formatDate(raw.createdAt),
   };
 }
@@ -921,6 +957,30 @@ export async function loginWithSupabase(email: string, password: string) {
   return data.session satisfies Session | null;
 }
 
+export async function signupWithSupabase(email: string, password: string) {
+  if (!supabase) {
+    throw new Error("Supabase auth is not configured.");
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${getSiteUrl()}/dashboard`,
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data.user?.id) {
+    throw new Error("Supabase did not return a pending user.");
+  }
+
+  return data.user.id;
+}
+
 function getAuthRedirectBaseUrl() {
   return getSiteUrl();
 }
@@ -957,9 +1017,10 @@ export async function logoutSupabase() {
 }
 
 export async function signupTenant(payload: {
-  companyName: string;
+  authUserId?: string;
+  companyName?: string;
   slug?: string;
-  adminName: string;
+  adminName?: string;
   adminEmail: string;
   adminPassword: string;
 }) {
@@ -969,6 +1030,19 @@ export async function signupTenant(payload: {
     timeoutMessage: TENANT_SIGNUP_TIMEOUT_MESSAGE,
     timeoutMs: TENANT_SIGNUP_TIMEOUT_MS,
   });
+}
+
+export async function completeOnboarding(payload: {
+  companyName: string;
+  slug?: string;
+  adminName?: string;
+}) {
+  const item = await apiRequest<BackendAuthUser>("/auth/onboarding", {
+    method: "PATCH",
+    body: payload,
+  });
+
+  return normalizeAuthUser(item);
 }
 
 export async function listTenants() {
@@ -1064,13 +1138,13 @@ export async function getDashboardSummary() {
   });
 }
 
-export async function listProducts() {
-  const items = await apiRequest<BackendProduct[]>("/products");
+export async function listProducts(params: Pick<ListPageParams, 'includeArchived'> = {}) {
+  const items = await apiRequest<BackendProduct[]>(`/products${buildListQuery(params)}`);
   return items.map(normalizeProduct);
 }
 
-export async function listRawProducts() {
-  return apiRequest<BackendProduct[]>("/products");
+export async function listRawProducts(params: Pick<ListPageParams, 'includeArchived'> = {}) {
+  return apiRequest<BackendProduct[]>(`/products${buildListQuery(params)}`);
 }
 
 export async function listPaginatedRawProducts(params: ListPageParams) {
@@ -1111,6 +1185,12 @@ export async function createProduct(payload: {
   return normalizeProduct(item);
 }
 
+export async function deleteProduct(id: string) {
+  return apiRequest<ProductRemovalResult>(`/products/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function previewProductImport(payload: {
   csv: string;
   mode?: ProductImportMode;
@@ -1131,8 +1211,8 @@ export async function commitProductImport(payload: {
   });
 }
 
-export async function listCustomers() {
-  const items = await apiRequest<BackendCustomer[]>("/customers");
+export async function listCustomers(params: Pick<ListPageParams, 'includeArchived'> = {}) {
+  const items = await apiRequest<BackendCustomer[]>(`/customers${buildListQuery(params)}`);
   return items.map(normalizeCustomer);
 }
 
@@ -1162,6 +1242,12 @@ export async function createCustomer(payload: {
   return normalizeCustomer(item);
 }
 
+export async function deleteCustomer(id: string) {
+  return apiRequest<EntityRemovalResult>(`/customers/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function previewCustomerImport(payload: {
   csv: string;
   mode?: CustomerImportMode;
@@ -1182,8 +1268,8 @@ export async function commitCustomerImport(payload: {
   });
 }
 
-export async function listSuppliers() {
-  const items = await apiRequest<BackendSupplier[]>("/suppliers");
+export async function listSuppliers(params: Pick<ListPageParams, 'includeArchived'> = {}) {
+  const items = await apiRequest<BackendSupplier[]>(`/suppliers${buildListQuery(params)}`);
   return items.map(normalizeSupplier);
 }
 
@@ -1213,8 +1299,14 @@ export async function createSupplier(payload: {
   return normalizeSupplier(item);
 }
 
-export async function listWarehouses() {
-  const items = await apiRequest<BackendWarehouse[]>("/warehouses");
+export async function deleteSupplier(id: string) {
+  return apiRequest<EntityRemovalResult>(`/suppliers/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function listWarehouses(params: Pick<ListPageParams, 'includeArchived'> = {}) {
+  const items = await apiRequest<BackendWarehouse[]>(`/warehouses${buildListQuery(params)}`);
   return items.map(normalizeWarehouse);
 }
 
@@ -1256,6 +1348,12 @@ export async function createWarehouse(payload: {
     body: payload,
   });
   return normalizeWarehouse(item);
+}
+
+export async function deleteWarehouse(id: string) {
+  return apiRequest<EntityRemovalResult>(`/warehouses/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export async function listOrders() {
@@ -1367,7 +1465,7 @@ export async function updatePurchaseStatus(
 export async function listInventory() {
   const [summary, rawProducts, warehouses] = await Promise.all([
     apiRequest<BackendInventorySummary[]>("/inventory"),
-    listRawProducts(),
+    listRawProducts({ includeArchived: true }),
     listWarehouses(),
   ]);
 

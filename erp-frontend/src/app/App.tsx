@@ -1,6 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/shared/ui/sonner";
 import { TooltipProvider } from "@/shared/ui/tooltip";
 import { AuthProvider, useAuth } from "@/app/providers/AuthContext";
@@ -19,6 +19,7 @@ import {
   LandingPage,
   LoginPage,
   NotFound,
+  OnboardingPage,
   OrderCreatePage,
   OrderDetailPage,
   OrdersPage,
@@ -118,13 +119,20 @@ class AppErrorBoundary extends Component<
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading, authStatusMessage, authError } = useAuth();
+  const { isAuthenticated, isLoading, authStatusMessage, authError, user } = useAuth();
+  const location = useLocation();
   if (isLoading) {
     return (
       <LoadingScreen message={authStatusMessage || 'Restoring your session...'} />
     );
   }
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ authError }} />;
+  if (user?.onboardingRequired && location.pathname !== "/onboarding/workspace") {
+    return <Navigate to="/onboarding/workspace" replace />;
+  }
+  if (!user?.onboardingRequired && location.pathname === "/onboarding/workspace") {
+    return <Navigate to="/dashboard" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -170,6 +178,14 @@ const App = () => (
                 <Route path="/join/:token" element={<JoinTenantPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+                <Route
+                  path="/onboarding/workspace"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route element={<ProtectedRoute><SettingsProvider><AppLayout /></SettingsProvider></ProtectedRoute>}>
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/products" element={<ProductsPage />} />

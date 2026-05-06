@@ -233,6 +233,11 @@ export default function InventoryPage() {
     queryFn: listProducts,
   });
 
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['products', 'normalized', 'includeArchived'],
+    queryFn: () => listProducts({ includeArchived: true }),
+  });
+
   const { data: warehouses = [], isError: isWarehousesError } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
@@ -315,11 +320,11 @@ export default function InventoryPage() {
     () =>
       inventory.map((item) => ({
         ...item,
-        product: item.product || products.find((product) => product.id === item.productId),
+        product: item.product || allProducts.find((product) => product.id === item.productId),
         warehouse: item.warehouse || warehouses.find((warehouse) => warehouse.id === item.warehouseId),
         stockStatus: getStockStatus(item.quantity, item.minStock),
       })),
-    [inventory, products, warehouses],
+    [allProducts, inventory, warehouses],
   );
 
   const filtered = enriched.filter((item) => {

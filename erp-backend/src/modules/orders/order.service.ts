@@ -240,6 +240,7 @@ export class OrdersService {
       this.prisma.product.findMany({
         where: {
           tenantId,
+          archivedAt: null,
           id: { in: productIds },
         },
       }),
@@ -331,7 +332,7 @@ export class OrdersService {
       throw new BadRequestException('Cannot add items to a non-draft order');
 
     const product = await this.prisma.product.findFirst({
-      where: { id: productId, tenantId },
+      where: { id: productId, tenantId, archivedAt: null },
     });
     if (!product) throw new BadRequestException('product not found');
     const warehouse = await this.prisma.warehouse.findFirst({

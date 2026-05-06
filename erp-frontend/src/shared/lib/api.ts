@@ -26,6 +26,31 @@ export class ApiError extends Error {
   }
 }
 
+function humanizeValidationMessage(message: string) {
+  const normalized = message.trim();
+
+  switch (normalized) {
+    case "adminEmail must be an email":
+      return "Enter a valid email address.";
+    case "adminEmail should not be empty":
+      return "Email is required.";
+    case "adminPassword should not be empty":
+      return "Password is required.";
+    case "adminPassword must be longer than or equal to 8 characters":
+      return "Password must be at least 8 characters.";
+    case "companyName should not be empty":
+      return "Company name is required.";
+    case "companyName must be a string":
+      return "Company name is invalid.";
+    case "adminName should not be empty":
+      return "Your name is required.";
+    case "adminName must be a string":
+      return "Your name is invalid.";
+    default:
+      return normalized;
+  }
+}
+
 function isReadRequest(method: string | undefined) {
   const normalizedMethod = method?.toUpperCase() ?? "GET";
   return normalizedMethod === "GET" || normalizedMethod === "HEAD";
@@ -203,9 +228,9 @@ export async function apiRequest<T>(
     try {
       const errorData = await response.json();
       if (typeof errorData?.message === "string") {
-        message = errorData.message;
+        message = humanizeValidationMessage(errorData.message);
       } else if (Array.isArray(errorData?.message)) {
-        message = errorData.message.join(", ");
+        message = errorData.message.map(humanizeValidationMessage).join(", ");
       } else if (typeof errorData?.error === "string") {
         message = errorData.error;
       }

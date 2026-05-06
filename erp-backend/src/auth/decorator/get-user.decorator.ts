@@ -8,6 +8,7 @@ export class UserPayload {
   name?: string | null;
   roles: string[];
   isPlatformAdmin: boolean;
+  onboardingRequired?: boolean;
   createdAt?: Date;
   tenant?: {
     id: string;

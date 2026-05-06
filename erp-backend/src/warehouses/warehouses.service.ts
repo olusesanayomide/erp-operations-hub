@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Role } from 'src/auth/enums/role.enum';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -19,6 +20,33 @@ import {
 export class WarehousesService {
   constructor(private prisma: PrismaService) {}
 
+  private shouldIncludeArchived(user: UserPayload, query: ListQuery = {}) {
+    return (
+      query.includeArchived === 'true' &&
+      (user.roles.includes(Role.ADMIN) || user.roles.includes(Role.MANAGER))
+    );
+  }
+
+  private buildWarehouseWhere(
+    user: UserPayload,
+    query: ListQuery = {},
+  ): Prisma.WarehouseWhereInput {
+    const options = getPaginationOptions(query);
+
+    return {
+      tenantId: user.tenantId,
+      ...(this.shouldIncludeArchived(user, query) ? {} : { archivedAt: null }),
+      ...(options.search
+        ? {
+            OR: [
+              { name: { contains: options.search, mode: 'insensitive' } },
+              { location: { contains: options.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    } as const;
+  }
+
   async create(createWarehouseDto: CreateWarehouseDto, user: UserPayload) {
     return this.prisma.warehouse.create({
       data: {
@@ -31,17 +59,7 @@ export class WarehousesService {
   async findAll(user: UserPayload, query: ListQuery = {}) {
     if (hasListQuery(query)) {
       const options = getPaginationOptions(query);
-      const where: Prisma.WarehouseWhereInput = {
-        tenantId: user.tenantId,
-        ...(options.search
-          ? {
-              OR: [
-                { name: { contains: options.search, mode: 'insensitive' } },
-                { location: { contains: options.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      } as const;
+      const where = this.buildWarehouseWhere(user, query);
       const [items, total] = await Promise.all([
         this.prisma.warehouse.findMany({
           where,
@@ -61,7 +79,7 @@ export class WarehousesService {
     }
 
     return this.prisma.warehouse.findMany({
-      where: { tenantId: user.tenantId },
+      where: this.buildWarehouseWhere(user, query),
       include: {
         _count: {
           select: { inventoryItems: true, purchases: true },
@@ -159,7 +177,11 @@ export class WarehousesService {
     updateWarehouseDto: UpdateWarehouseDto,
     user: UserPayload,
   ) {
-    await this.findOne(id, user);
+    const warehouse = await this.findOne(id, user);
+
+    if (warehouse.archivedAt) {
+      throw new BadRequestException('Archived warehouses cannot be updated.');
+    }
 
     return this.prisma.warehouse.update({
       where: { id },
@@ -168,25 +190,73 @@ export class WarehousesService {
   }
 
   async remove(id: string, user: UserPayload) {
-    const warehouse = await this.prisma.warehouse.findFirst({
-      where: { id, tenantId: user.tenantId },
-      include: {
-        _count: {
-          select: {
-            inventoryItems: true,
-            purchases: true,
+    const [warehouse, activeInventoryItems] = await Promise.all([
+      this.prisma.warehouse.findFirst({
+        where: { id, tenantId: user.tenantId },
+        include: {
+          _count: {
+            select: {
+              inventoryItems: true,
+              purchases: true,
+              stockMovements: true,
+            },
           },
         },
-      },
-    });
+      }),
+      this.prisma.inventoryItem.count({
+        where: {
+          tenantId: user.tenantId,
+          warehouseId: id,
+          OR: [{ quantity: { gt: 0 } }, { reservedQuantity: { gt: 0 } }],
+        },
+      }),
+    ]);
+
     if (!warehouse) {
       throw new NotFoundException(`Warehouse with ID ${id} not found`);
     }
-    if (warehouse._count.inventoryItems > 0) {
+
+    const dependencySummary = {
+      inventoryItems: warehouse._count.inventoryItems,
+      activeInventoryItems,
+      purchases: warehouse._count.purchases,
+      stockMovements: warehouse._count.stockMovements,
+    };
+
+    if (dependencySummary.activeInventoryItems > 0) {
       throw new BadRequestException(
-        'Cannot delete  warehouse: It still contains, inventory . Move stock to another stock location ',
+        'Cannot remove warehouse while it still holds active inventory. Move or clear stock first.',
       );
     }
-    return this.prisma.warehouse.delete({ where: { id } });
+
+    const hasDependencies =
+      dependencySummary.inventoryItems > 0 ||
+      dependencySummary.purchases > 0 ||
+      dependencySummary.stockMovements > 0;
+
+    if (hasDependencies) {
+      if (!warehouse.archivedAt) {
+        await this.prisma.warehouse.update({
+          where: { id },
+          data: { archivedAt: new Date() },
+        });
+      }
+
+      return {
+        action: 'archived' as const,
+        message:
+          'Warehouse archived because it is linked to historical inventory or purchasing records.',
+        dependencySummary,
+      };
+    }
+
+    await this.prisma.warehouse.delete({ where: { id } });
+
+    return {
+      action: 'deleted' as const,
+      message:
+        'Warehouse deleted permanently because it had no related records.',
+      dependencySummary,
+    };
   }
 }

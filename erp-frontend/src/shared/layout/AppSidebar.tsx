@@ -128,38 +128,45 @@ export function AppSidebar({
                 </button>
               )}
 
-              {isOpen && (
-                <div className="space-y-0.5">
-                  {group.items.map(item => {
-                    const isActive = location.pathname.startsWith(item.path);
-                    return (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        onClick={() => {
-                          if (isMobile) {
-                            onMobileOpenChange(false);
-                          }
-                        }}
-                        onMouseEnter={() => handleIntent(item.path)}
-                        onFocus={() => handleIntent(item.path)}
-                        onTouchStart={() => handleIntent(item.path)}
-                        className={cn(
-                          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                          isActive
-                            ? 'bg-sidebar-accent text-sidebar-primary-foreground'
-                            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                          collapsed && 'justify-center px-2'
-                        )}
-                        title={collapsed ? item.label : undefined}
-                      >
-                        <item.icon className="h-4.5 w-4.5 shrink-0" strokeWidth={2} />
-                        {!collapsed && <span className="truncate">{item.label}</span>}
-                      </NavLink>
-                    );
-                  })}
+              <div
+                className={cn(
+                  'grid transition-[grid-template-rows,opacity] duration-300 ease-out',
+                  isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+                )}
+              >
+                <div className="overflow-hidden">
+                  <div className="space-y-0.5 pt-0.5">
+                    {group.items.map(item => {
+                      const isActive = location.pathname.startsWith(item.path);
+                      return (
+                        <NavLink
+                          key={item.path}
+                          to={item.path}
+                          onClick={() => {
+                            if (isMobile) {
+                              onMobileOpenChange(false);
+                            }
+                          }}
+                          onMouseEnter={() => handleIntent(item.path)}
+                          onFocus={() => handleIntent(item.path)}
+                          onTouchStart={() => handleIntent(item.path)}
+                          className={cn(
+                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-sidebar-accent text-sidebar-primary-foreground'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                            collapsed && 'justify-center px-2'
+                          )}
+                          title={collapsed ? item.label : undefined}
+                        >
+                          <item.icon className="h-4.5 w-4.5 shrink-0" strokeWidth={2} />
+                          {!collapsed && <span className="truncate">{item.label}</span>}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}

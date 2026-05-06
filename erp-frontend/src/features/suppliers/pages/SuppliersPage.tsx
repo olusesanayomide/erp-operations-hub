@@ -8,9 +8,9 @@ import { Input } from '@/shared/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/ui/dialog';
 import { Label } from '@/shared/ui/label';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Plus, Search, Factory } from 'lucide-react';
+import { Plus, Search, Factory, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createSupplier, listPaginatedSuppliers } from '@/shared/lib/erp-api';
+import { createSupplier, deleteSupplier, listPaginatedSuppliers } from '@/shared/lib/erp-api';
 
 const PAGE_SIZE = 25;
 
@@ -22,6 +22,7 @@ export default function SuppliersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', address: '' });
   const createToastRef = useRef<string | number | null>(null);
+  const [removingSupplierId, setRemovingSupplierId] = useState<string | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -43,6 +44,21 @@ export default function SuppliersPage() {
       toast.success('Supplier created');
     },
     onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteSupplier,
+    onMutate: (id) => {
+      setRemovingSupplierId(id);
+    },
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      toast.success(result.message);
+    },
+    onError: (error: Error) => toast.error(error.message),
+    onSettled: () => {
+      setRemovingSupplierId(null);
+    },
   });
 
   function handleCreateSupplier(event: React.FormEvent<HTMLFormElement>) {
@@ -76,6 +92,18 @@ export default function SuppliersPage() {
       createToastRef.current = null;
     }
   }, [createMutation.isPending]);
+
+  function handleRemoveSupplier(supplierId: string, supplierName: string) {
+    const confirmed = window.confirm(
+      `Remove ${supplierName}?\n\nUnused suppliers will be deleted permanently. Suppliers with purchase history will be archived instead and removed from active supplier lists.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteMutation.mutate(supplierId);
+  }
 
   return (
     <div className="animate-fade-in">
@@ -111,6 +139,7 @@ export default function SuppliersPage() {
               <th className="text-left p-3">Phone</th>
               <th className="text-right p-3">Purchases</th>
               <th className="text-left p-3">Created</th>
+              {canPerform('suppliers.delete') && <th className="text-right p-3">Actions</th>}
             </tr></thead>
             <tbody>
               {suppliers.map(s => (
@@ -120,12 +149,26 @@ export default function SuppliersPage() {
                   <td className="p-3 text-sm">{s.phone}</td>
                   <td className="p-3 text-sm text-right font-medium">{s.purchaseCount}</td>
                   <td className="p-3 text-sm text-muted-foreground">{s.createdAt}</td>
+                  {canPerform('suppliers.delete') && (
+                    <td className="p-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        requiresOnline
+                        disabled={deleteMutation.isPending && removingSupplierId === s.id}
+                        onClick={() => handleRemoveSupplier(s.id, s.name)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {deleteMutation.isPending && removingSupplierId === s.id ? 'Removing...' : 'Remove'}
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={5} /></div>}
+        {isLoading && <div className="p-6"><TableSkeleton rows={6} cols={canPerform('suppliers.delete') ? 6 : 5} /></div>}
         {isError && (
           <ErrorState
             title="Unable to load suppliers"

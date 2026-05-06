@@ -21,6 +21,7 @@ import { Product } from '@prisma/client';
 import {
   ProductDto,
   ProductImportDto,
+  ProductRemovalResultDto,
   UpdateProductDto,
 } from './dto/product.dto';
 import { Roles } from 'src/auth/decorator/role.decorator';
@@ -29,6 +30,7 @@ import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { RolesGuard } from 'src/auth/guard/role.guard';
 import { GetUser, UserPayload } from 'src/auth/decorator/get-user.decorator';
 import type { ListQuery } from 'src/common/pagination';
+import type { ProductRemovalResult } from './product.service';
 
 @ApiBearerAuth('access-token')
 @UseGuards(JwtGuard, RolesGuard)
@@ -145,21 +147,25 @@ export class ProductController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.MANAGER)
   @ApiOperation({
-    summary: 'Archive/Delete product',
+    summary: 'Safely remove a product',
     description:
-      'Removes a product from the catalog. Note: This may fail if the product has existing transaction history.',
+      'Permanently deletes unused products and archives products that are linked to historical records.',
   })
-  @ApiResponse({ status: 200, description: 'Product deleted successfully.' })
   @ApiResponse({
-    status: 409,
-    description: 'Conflict: Product is linked to existing orders.',
+    status: 200,
+    description: 'Product safely removed or archived.',
+    type: ProductRemovalResultDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Product not found.',
   })
   async delete(
     @Param('id', ParseUUIDPipe) id: string,
     @GetUser() user: UserPayload,
-  ): Promise<Product> {
+  ): Promise<ProductRemovalResult> {
     return this.productService.deleteProduct(id, user);
   }
 }

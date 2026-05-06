@@ -203,6 +203,7 @@ export class PurchaseService {
       this.prisma.product.findMany({
         where: {
           tenantId,
+          archivedAt: null,
           id: { in: productIds },
         },
         select: { id: true },

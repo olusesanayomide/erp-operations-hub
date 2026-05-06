@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCurrencySettings, updateCurrencySettings } from '@/shared/lib/erp-api';
+import {
+  DEFAULT_CURRENCY_SETTINGS,
+  formatCurrencyAmount,
+  resolveCurrencySettings,
+} from '@/shared/lib/currency';
 
 type CurrencySettings = {
   currencyCode: string;
@@ -18,11 +23,7 @@ type SettingsContextType = {
   isSaving: boolean;
 };
 
-const defaultCurrency: CurrencySettings = {
-  currencyCode: 'USD',
-  locale: 'en-US',
-  exchangeRate: 1,
-};
+const defaultCurrency: CurrencySettings = DEFAULT_CURRENCY_SETTINGS;
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
@@ -41,21 +42,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   });
 
   const value = useMemo<SettingsContextType>(() => {
-    const convertAmount = (amount: number) => amount * currency.exchangeRate;
+    const resolvedCurrency = resolveCurrencySettings(currency);
+    const convertAmount = (amount: number) => amount * resolvedCurrency.exchangeRate;
 
-    const formatMoney = (amount: number) =>
-      new Intl.NumberFormat(currency.locale, {
-        style: 'currency',
-        currency: currency.currencyCode,
-        maximumFractionDigits: 2,
-      }).format(convertAmount(amount));
+    const formatMoney = (amount: number) => formatCurrencyAmount(amount, currency);
 
-	  const updateCurrency = async (next: CurrencySettings) => {
-	      await mutation.mutateAsync({
-	        ...next,
-	        expectedUpdatedAt: currency.updatedAt,
-	      });
-	  };
+    const updateCurrency = async (next: CurrencySettings) => {
+      await mutation.mutateAsync({
+        ...next,
+        expectedUpdatedAt: currency.updatedAt,
+      });
+    };
 
     return {
       currency,

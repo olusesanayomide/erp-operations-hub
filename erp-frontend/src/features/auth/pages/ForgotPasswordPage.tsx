@@ -9,6 +9,7 @@ import { sendPasswordResetEmail } from '@/shared/lib/erp-api';
 import { toast } from 'sonner';
 import { LoadingText } from '@/shared/components/LoadingMotion';
 
+
 function getEmailFromLocationState(state: unknown) {
   if (!state || typeof state !== 'object' || !('email' in state)) {
     return '';

@@ -4,19 +4,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, Product } from '@prisma/client';
-import { PrismaService } from 'prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { Role } from '../../auth/enums/role.enum';
 import { ProductImportMode } from './dto/product.dto';
 import {
   buildProductImportPreview,
   ProductImportPreviewResult,
 } from './product-import';
-import { UserPayload } from 'src/auth/decorator/get-user.decorator';
+import { UserPayload } from '../../auth/decorator/get-user.decorator';
 import {
   createPaginatedResult,
   getPaginationOptions,
   hasListQuery,
   ListQuery,
-} from 'src/common/pagination';
+} from '../../common/pagination';
 
 type ProductListItem = Prisma.ProductGetPayload<{
   include: {
@@ -42,9 +43,97 @@ type ProductListResult =
   | ProductListItem[]
   | ReturnType<typeof createPaginatedResult<ProductListItem>>;
 
+type ProductDetail = Prisma.ProductGetPayload<{
+  include: {
+    inventoryItems: true;
+    orderItems: true;
+    stockMovements: true;
+    purchaseItems: true;
+  };
+}>;
+
+type ProductDependencySummary = {
+  inventoryItems: number;
+  activeInventoryItems: number;
+  stockMovements: number;
+  orderItems: number;
+  purchaseItems: number;
+};
+
+export type ProductRemovalResult = {
+  action: 'deleted' | 'archived';
+  message: string;
+  dependencySummary: ProductDependencySummary;
+};
+
 @Injectable()
 export class ProductService {
   constructor(private prisma: PrismaService) {}
+
+  private shouldIncludeArchived(
+    user: UserPayload,
+    query: ListQuery = {},
+  ) {
+    return (
+      query.includeArchived === 'true' &&
+      (user.roles.includes(Role.ADMIN) || user.roles.includes(Role.MANAGER))
+    );
+  }
+
+  private buildProductWhere(
+    user: UserPayload,
+    query: ListQuery = {},
+  ): Prisma.ProductWhereInput {
+    const search = query.search?.trim() ?? '';
+    const includeArchived = this.shouldIncludeArchived(user, query);
+
+    return {
+      tenantId: user.tenantId,
+      ...(includeArchived ? {} : { archivedAt: null }),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { sku: { contains: search, mode: 'insensitive' } },
+              { category: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+  }
+
+  private async getScopedProduct(
+    id: string,
+    user: UserPayload,
+  ): Promise<ProductDetail> {
+    const product = await this.prisma.product.findFirst({
+      where: { id, tenantId: user.tenantId },
+      include: {
+        inventoryItems: true,
+        orderItems: true,
+        stockMovements: true,
+        purchaseItems: true,
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return product;
+  }
+
+  private summarizeDependencies(product: ProductDetail): ProductDependencySummary {
+    return {
+      inventoryItems: product.inventoryItems.length,
+      activeInventoryItems: product.inventoryItems.filter(
+        (item) => item.quantity > 0 || item.reservedQuantity > 0,
+      ).length,
+      stockMovements: product.stockMovements.length,
+      orderItems: product.orderItems.length,
+      purchaseItems: product.purchaseItems.length,
+    };
+  }
 
   async getAll(
     user: UserPayload,
@@ -52,18 +141,7 @@ export class ProductService {
   ): Promise<ProductListResult> {
     if (hasListQuery(query)) {
       const options = getPaginationOptions(query);
-      const where: Prisma.ProductWhereInput = {
-        tenantId: user.tenantId,
-        ...(options.search
-          ? {
-              OR: [
-                { name: { contains: options.search, mode: 'insensitive' } },
-                { sku: { contains: options.search, mode: 'insensitive' } },
-                { category: { contains: options.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      } as const;
+      const where = this.buildProductWhere(user, query);
       const [items, total] = await Promise.all([
         this.prisma.product.findMany({
           where,
@@ -95,7 +173,7 @@ export class ProductService {
     }
 
     return this.prisma.product.findMany({
-      where: { tenantId: user.tenantId },
+      where: this.buildProductWhere(user, query),
       include: {
         inventoryItems: {
           select: {
@@ -116,19 +194,8 @@ export class ProductService {
     });
   }
 
-  async getById(id: string, user: UserPayload): Promise<Product> {
-    const product = await this.prisma.product.findFirst({
-      where: { id, tenantId: user.tenantId },
-      include: {
-        inventoryItems: true,
-        orderItems: true,
-        stockMovements: true,
-      },
-    });
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-    return product;
+  async getById(id: string, user: UserPayload): Promise<ProductDetail> {
+    return this.getScopedProduct(id, user);
   }
 
   async createProduct(
@@ -237,6 +304,7 @@ export class ProductService {
             name: row.name,
             price: row.price ?? 0,
             minStock: row.minStock ?? 10,
+            archivedAt: null,
           },
         });
       }),
@@ -265,7 +333,11 @@ export class ProductService {
     },
     user: UserPayload,
   ): Promise<Product> {
-    await this.getById(id, user);
+    const product = await this.getScopedProduct(id, user);
+
+    if (product.archivedAt) {
+      throw new BadRequestException('Archived products cannot be updated.');
+    }
 
     const normalizedData = {
       ...data,
@@ -286,9 +358,43 @@ export class ProductService {
     });
   }
 
-  async deleteProduct(id: string, user: UserPayload): Promise<Product> {
-    await this.getById(id, user);
+  async deleteProduct(
+    id: string,
+    user: UserPayload,
+  ): Promise<ProductRemovalResult> {
+    const product = await this.getScopedProduct(id, user);
+    const dependencySummary = this.summarizeDependencies(product);
+    if (dependencySummary.activeInventoryItems > 0) {
+      throw new BadRequestException(
+        'Cannot remove product while stock is still assigned to it. Clear or transfer inventory first.',
+      );
+    }
+    const hasDependencies = Object.values(dependencySummary).some(
+      (count) => count > 0,
+    );
 
-    return this.prisma.product.delete({ where: { id } });
+    if (!hasDependencies) {
+      await this.prisma.product.delete({ where: { id } });
+
+      return {
+        action: 'deleted',
+        message: 'Product deleted permanently because it had no related records.',
+        dependencySummary,
+      };
+    }
+
+    if (!product.archivedAt) {
+      await this.prisma.product.update({
+        where: { id },
+        data: { archivedAt: new Date() },
+      });
+    }
+
+    return {
+      action: 'archived',
+      message:
+        'Product archived because it is linked to existing business records.',
+      dependencySummary,
+    };
   }
 }

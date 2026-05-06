@@ -26,6 +26,7 @@ export interface User {
   role: UserRole;
   tenant: TenantSummary;
   isPlatformAdmin: boolean;
+  onboardingRequired?: boolean;
   avatar?: string;
   createdAt: string;
   updatedAt?: string;
@@ -43,6 +44,7 @@ export interface TenantInvite {
   expiresAt: string;
   createdAt: string;
   inviteLink?: string;
+  emailDelivery?: 'sent' | 'failed';
 }
 
 export interface TenantInviteDetails {
@@ -81,6 +83,8 @@ export interface Product {
   category: string;
   unit: string;
   minStock: number;
+  archivedAt?: string;
+  isArchived: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -187,6 +191,8 @@ export interface Customer {
   phone: string;
   address: string;
   orderCount: number;
+  archivedAt?: string;
+  isArchived: boolean;
   createdAt: string;
 }
 
@@ -197,6 +203,8 @@ export interface Supplier {
   phone: string;
   address: string;
   purchaseCount: number;
+  archivedAt?: string;
+  isArchived: boolean;
   createdAt: string;
 }
 
@@ -206,6 +214,8 @@ export interface Warehouse {
   location: string;
   description: string;
   itemCount: number;
+  archivedAt?: string;
+  isArchived: boolean;
   createdAt: string;
 }
 

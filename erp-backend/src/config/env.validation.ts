@@ -19,6 +19,14 @@ function isLocalUrl(value: string) {
 
 export function validateEnvironment(config: EnvConfig) {
   const requiredKeys = ['DATABASE_URL', 'SUPABASE_URL'];
+  const smtpKeys = [
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_USER',
+    'SMTP_PASSWORD',
+    'SMTP_FROM_EMAIL',
+    'SMTP_FROM_NAME',
+  ] as const;
 
   if (isProduction(config)) {
     requiredKeys.push('SUPABASE_SERVICE_ROLE_KEY');
@@ -29,6 +37,14 @@ export function validateEnvironment(config: EnvConfig) {
   if (missingKeys.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missingKeys.join(', ')}`,
+    );
+  }
+
+  const configuredSmtpKeys = smtpKeys.filter((key) => !isBlank(config[key]));
+  if (configuredSmtpKeys.length > 0 && configuredSmtpKeys.length < smtpKeys.length) {
+    const missingSmtpKeys = smtpKeys.filter((key) => isBlank(config[key]));
+    throw new Error(
+      `SMTP configuration is incomplete. Missing: ${missingSmtpKeys.join(', ')}`,
     );
   }
 

@@ -3,6 +3,7 @@ export type ListQuery = {
   pageSize?: string;
   search?: string;
   status?: string;
+  includeArchived?: string;
 };
 
 export type PaginationOptions = {
@@ -21,7 +22,8 @@ export function hasListQuery(query: ListQuery) {
     query.page ||
     query.pageSize ||
     query.search?.trim() ||
-    query.status?.trim(),
+    query.status?.trim() ||
+    query.includeArchived?.trim(),
   );
 }
 

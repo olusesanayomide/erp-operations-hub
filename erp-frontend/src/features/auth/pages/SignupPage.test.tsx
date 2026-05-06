@@ -11,6 +11,13 @@ vi.mock('@/shared/lib/erp-api', () => ({
   signupTenant: vi.fn(),
 }));
 
+vi.mock('@/app/providers/AuthContext', () => ({
+  useAuth: () => ({
+    login: vi.fn().mockResolvedValue({ success: false, error: 'Sign in to continue.' }),
+    authStatusMessage: '',
+  }),
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
@@ -19,16 +26,10 @@ vi.mock('sonner', () => ({
 }));
 
 function fillSignupForm() {
-  fireEvent.change(screen.getByLabelText(/company name/i), {
-    target: { value: 'Acme Incorporated' },
-  });
-  fireEvent.change(screen.getByLabelText(/admin name/i), {
-    target: { value: 'Jane Founder' },
-  });
-  fireEvent.change(screen.getByLabelText(/admin email/i), {
+  fireEvent.change(screen.getByLabelText(/^email$/i), {
     target: { value: 'jane@example.com' },
   });
-  fireEvent.change(screen.getByLabelText(/admin password/i), {
+  fireEvent.change(screen.getByLabelText(/^password$/i), {
     target: { value: 'StrongPassword123!' },
   });
 }
@@ -54,7 +55,7 @@ describe('SignupPage', () => {
     );
 
     fillSignupForm();
-    fireEvent.click(screen.getByRole('button', { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
     expect(await screen.findByText(SIGNUP_EMAIL_EXISTS_MESSAGE)).toBeInTheDocument();
     expect(
@@ -78,15 +79,15 @@ describe('SignupPage', () => {
     );
 
     fillSignupForm();
-    fireEvent.click(screen.getByRole('button', { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
-    expect(screen.getByText(/creating workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/creating account/i)).toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(8000);
     });
 
-    expect(screen.getByText(/still creating your workspace/i)).toBeInTheDocument();
-    expect(screen.getByText(/still creating workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/still creating your account/i)).toBeInTheDocument();
+    expect(screen.getByText(/still creating account/i)).toBeInTheDocument();
   });
 });

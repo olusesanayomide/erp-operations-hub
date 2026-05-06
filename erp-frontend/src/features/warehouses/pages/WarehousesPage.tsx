@@ -7,9 +7,9 @@ import { Input } from '@/shared/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/ui/dialog';
 import { Label } from '@/shared/ui/label';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Plus, Search, Warehouse, MapPin, Package } from 'lucide-react';
+import { Plus, Search, Warehouse, MapPin, Package, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createWarehouse, listWarehouses } from '@/shared/lib/erp-api';
+import { createWarehouse, deleteWarehouse, listWarehouses } from '@/shared/lib/erp-api';
 
 export default function WarehousesPage() {
   const { canPerform } = useAuth();
@@ -18,6 +18,7 @@ export default function WarehousesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: '', location: '', description: '' });
   const createToastRef = useRef<string | number | null>(null);
+  const [removingWarehouseId, setRemovingWarehouseId] = useState<string | null>(null);
 
   const {
     data: warehouses = [],
@@ -39,6 +40,21 @@ export default function WarehousesPage() {
       toast.success('Warehouse created');
     },
     onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteWarehouse,
+    onMutate: (id) => {
+      setRemovingWarehouseId(id);
+    },
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      toast.success(result.message);
+    },
+    onError: (error: Error) => toast.error(error.message),
+    onSettled: () => {
+      setRemovingWarehouseId(null);
+    },
   });
 
   const filtered = warehouses.filter(w =>
@@ -76,6 +92,18 @@ export default function WarehousesPage() {
     }
   }, [createMutation.isPending]);
 
+  function handleRemoveWarehouse(warehouseId: string, warehouseName: string) {
+    const confirmed = window.confirm(
+      `Remove ${warehouseName}?\n\nUnused warehouses will be deleted permanently. Warehouses with history will be archived instead. Warehouses with active stock cannot be removed until inventory is cleared or transferred.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteMutation.mutate(warehouseId);
+  }
+
   return (
     <div className="animate-fade-in">
       <PageHeader title="Warehouses" description={`${warehouses.length} warehouses`}>
@@ -100,8 +128,8 @@ export default function WarehousesPage() {
         <Input placeholder="Search warehouses..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
       </div>
 
-		      {/* Warehouse Cards */}
-	      {isWarehousesLoading && <div className="rounded-xl border p-6"><TableSkeleton rows={6} cols={3} /></div>}
+			      {/* Warehouse Cards */}
+		      {isWarehousesLoading && <div className="rounded-xl border p-6"><TableSkeleton rows={6} cols={3} /></div>}
 	      {isWarehousesError && (
 	        <ErrorState
 	          title="Unable to load warehouses"
@@ -109,30 +137,44 @@ export default function WarehousesPage() {
 	          action={<RetryButton onClick={() => void refetchWarehouses()} />}
 	        />
 	      )}
-	      {!isWarehousesLoading && !isWarehousesError && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-	        {filtered.map(w => {
-	          return (
-	            <Link key={w.id} to={`/warehouses/${w.id}`} className="erp-card p-5 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-2.5 rounded-lg bg-primary/10">
-                  <Warehouse className="h-5 w-5 text-primary" />
-                </div>
-              </div>
-              <h3 className="font-semibold mb-1">{w.name}</h3>
-              <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
-                <MapPin className="h-3.5 w-3.5" />{w.location}
-              </div>
-              <div className="flex items-center gap-4 pt-3 border-t">
-	                <div className="flex items-center gap-1.5 text-sm">
-	                  <Package className="h-3.5 w-3.5 text-muted-foreground" />
-	                  <span className="font-medium">{w.itemCount}</span>
-	                  <span className="text-muted-foreground">products</span>
-	                </div>
-	              </div>
-	            </Link>
-	          );
-        })}
-      </div>}
+		      {!isWarehousesLoading && !isWarehousesError && <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+		        {filtered.map((warehouse) => {
+		          return (
+		            <div key={warehouse.id} className="erp-card p-5 transition-shadow hover:shadow-md">
+		              <div className="mb-3 flex items-start justify-between gap-3">
+		                <div className="p-2.5 rounded-lg bg-primary/10">
+		                  <Warehouse className="h-5 w-5 text-primary" />
+		                </div>
+		                {canPerform('warehouses.delete') && (
+		                  <Button
+		                    variant="ghost"
+		                    size="sm"
+		                    requiresOnline
+		                    disabled={deleteMutation.isPending && removingWarehouseId === warehouse.id}
+		                    onClick={() => handleRemoveWarehouse(warehouse.id, warehouse.name)}
+		                  >
+		                    <Trash2 className="mr-2 h-4 w-4" />
+		                    {deleteMutation.isPending && removingWarehouseId === warehouse.id ? 'Removing...' : 'Remove'}
+		                  </Button>
+		                )}
+		              </div>
+		              <Link to={`/warehouses/${warehouse.id}`} className="block">
+		                <h3 className="mb-1 font-semibold">{warehouse.name}</h3>
+		                <div className="mb-3 flex items-center gap-1 text-sm text-muted-foreground">
+		                  <MapPin className="h-3.5 w-3.5" />{warehouse.location}
+		                </div>
+		                <div className="flex items-center gap-4 border-t pt-3">
+		                  <div className="flex items-center gap-1.5 text-sm">
+		                    <Package className="h-3.5 w-3.5 text-muted-foreground" />
+		                    <span className="font-medium">{warehouse.itemCount}</span>
+		                    <span className="text-muted-foreground">products</span>
+		                  </div>
+		                </div>
+		              </Link>
+		            </div>
+		          );
+	        })}
+	      </div>}
 	      {!isWarehousesLoading && !isWarehousesError && filtered.length === 0 && <EmptyState icon={Warehouse} title="No warehouses found" description="Add your first warehouse" />}
     </div>
   );

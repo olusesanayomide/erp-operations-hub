@@ -3,12 +3,15 @@ import {
   ForbiddenException,
   InternalServerErrorException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SignupTenantDto } from './dto/signup-tenant.dto';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 import { AcceptTenantInviteDto } from './dto/accept-tenant-invite.dto';
 import { CreateTenantInviteDto } from './dto/create-tenant-invite.dto';
 import {
@@ -19,6 +22,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { assertUnchangedSinceLoaded } from '../common/concurrency';
 import { Role } from './enums/role.enum';
 import { UserPayload } from './decorator/get-user.decorator';
+import { MailService } from '../common/mail.service';
 
 export const SIGNUP_EMAIL_EXISTS_MESSAGE =
   'An account already exists for this email. Please sign in or reset your password.';
@@ -26,12 +30,16 @@ const INVITE_EXPIRY_DAYS = 7;
 const INVITE_STATUS_PENDING = 'PENDING';
 const INVITE_STATUS_ACCEPTED = 'ACCEPTED';
 const INVITE_STATUS_REVOKED = 'REVOKED';
+const SETUP_SLUG_PREFIX = 'setup-';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private mailService: MailService,
   ) {}
 
   private getSupabaseAdminConfig() {
@@ -49,12 +57,25 @@ export class AuthService {
 
     return {
       supabaseUrl,
+      serviceRoleKey,
       headers: {
         apikey: serviceRoleKey,
         Authorization: `Bearer ${serviceRoleKey}`,
         'Content-Type': 'application/json',
       },
     };
+  }
+
+  private createSupabaseServerClient() {
+    const { supabaseUrl, serviceRoleKey } = this.getSupabaseAdminConfig();
+
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
   }
 
   private slugifyTenantName(value: string) {
@@ -70,6 +91,48 @@ export class AuthService {
     }
 
     return slug;
+  }
+
+  private inferAdminNameFromEmail(email: string) {
+    const localPart = email.trim().split('@')[0] || 'Owner';
+    const cleaned = localPart.replace(/[._-]+/g, ' ').trim();
+
+    if (!cleaned) {
+      return 'Owner';
+    }
+
+    return cleaned
+      .split(/\s+/)
+      .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+      .join(' ');
+  }
+
+  private isOnboardingRequiredSlug(slug: string) {
+    return slug.startsWith(SETUP_SLUG_PREFIX);
+  }
+
+  private async generateUniqueSetupSlug() {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const slug = `${SETUP_SLUG_PREFIX}${randomBytes(4).toString('hex')}`;
+      const existingTenant = await this.prisma.tenant.findUnique({
+        where: { slug },
+        select: { id: true },
+      });
+
+      if (!existingTenant) {
+        return slug;
+      }
+    }
+
+    throw new InternalServerErrorException(
+      'Unable to generate a workspace identifier right now.',
+    );
+  }
+
+  private isOnboardingRequiredForUser(user: {
+    tenant?: { slug: string } | null;
+  }) {
+    return Boolean(user.tenant?.slug && this.isOnboardingRequiredSlug(user.tenant.slug));
   }
 
   private async createSupabaseAuthUser(
@@ -98,6 +161,48 @@ export class AuthService {
 
     const result = (await response.json()) as { id: string };
     return result.id;
+  }
+
+  private async signupSupabaseAuthUser(
+    email: string,
+    password: string,
+    name: string,
+    tenantId: string,
+  ) {
+    const supabase = this.createSupabaseServerClient();
+    const signupRedirectTo = `${this.getFrontendBaseUrl()}/dashboard`;
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name, tenantId },
+        emailRedirectTo: signupRedirectTo,
+      },
+    });
+
+    if (error || !data.user?.id) {
+      throw new BadRequestException(
+        error?.message || 'Unable to create authentication account right now.',
+      );
+    }
+
+    return data.user.id;
+  }
+
+  private async getSupabaseAuthUser(userId: string) {
+    const { supabaseUrl, headers } = this.getSupabaseAdminConfig();
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new BadRequestException(
+        'Unable to verify the authentication account for this signup.',
+      );
+    }
+
+    return (await response.json()) as { id: string; email?: string | null };
   }
 
   private async deleteSupabaseAuthUser(userId: string) {
@@ -142,6 +247,26 @@ export class AuthService {
 
   private createInviteLink(token: string) {
     return `${this.getFrontendBaseUrl()}/join/${encodeURIComponent(token)}`;
+  }
+
+  private createLoginLink() {
+    return `${this.getFrontendBaseUrl()}/login`;
+  }
+
+  private async sendWelcomeEmailSafely(payload: {
+    email: string;
+    name?: string | null;
+    tenantName: string;
+  }) {
+    try {
+      await this.mailService.sendWelcomeEmail({
+        ...payload,
+        loginLink: this.createLoginLink(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Welcome email could not be sent to ${payload.email}: ${message}`);
+    }
   }
 
   private assertTenantAdmin(user: UserPayload) {
@@ -236,9 +361,29 @@ export class AuthService {
       },
     });
 
+    const inviteLink = this.createInviteLink(token);
+    let emailDelivery: 'sent' | 'failed' = 'sent';
+
+    try {
+      const delivered = await this.mailService.sendInviteEmail({
+        email: invite.email,
+        name: invite.name,
+        tenantName: user.tenant?.name || 'your workspace',
+        role: invite.role,
+        inviteLink,
+        expiresAt: invite.expiresAt,
+      });
+      emailDelivery = delivered ? 'sent' : 'failed';
+    } catch (error) {
+      emailDelivery = 'failed';
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Invite email could not be sent to ${invite.email}: ${message}`);
+    }
+
     return {
       ...this.serializeInvite(invite),
-      inviteLink: this.createInviteLink(token),
+      inviteLink,
+      emailDelivery,
     };
   }
 
@@ -369,6 +514,12 @@ export class AuthService {
         return createdUser;
       });
 
+      await this.sendWelcomeEmailSafely({
+        email: user.email,
+        name: user.name,
+        tenantName: user.tenant.name,
+      });
+
       return {
         tenant: {
           id: user.tenant.id,
@@ -394,18 +545,31 @@ export class AuthService {
   }
 
   async signupTenant(dto: SignupTenantDto) {
-    const slug = this.slugifyTenantName(dto.slug || dto.companyName);
-    const existingTenant = await this.prisma.tenant.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
+    const normalizedEmail = dto.adminEmail.trim().toLowerCase();
+    const inferredAdminName = this.inferAdminNameFromEmail(normalizedEmail);
+    const adminName = dto.adminName?.trim() || inferredAdminName;
+    const trimmedCompanyName = dto.companyName?.trim();
+    const hasWorkspaceSetupData = Boolean(trimmedCompanyName);
+    const companyName = hasWorkspaceSetupData
+      ? trimmedCompanyName as string
+      : `${adminName}'s Workspace`;
+    const slug = hasWorkspaceSetupData
+      ? this.slugifyTenantName(dto.slug || companyName)
+      : await this.generateUniqueSetupSlug();
 
-    if (existingTenant) {
-      throw new BadRequestException('Tenant slug is already in use.');
+    if (hasWorkspaceSetupData) {
+      const existingTenant = await this.prisma.tenant.findUnique({
+        where: { slug },
+        select: { id: true },
+      });
+
+      if (existingTenant) {
+        throw new BadRequestException('Tenant slug is already in use.');
+      }
     }
 
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.adminEmail },
+      where: { email: normalizedEmail },
       select: { id: true },
     });
 
@@ -415,7 +579,7 @@ export class AuthService {
 
     const tenant = await this.prisma.tenant.create({
       data: {
-        name: dto.companyName.trim(),
+        name: companyName,
         slug,
       },
     });
@@ -423,19 +587,31 @@ export class AuthService {
     let supabaseUserId: string | null = null;
 
     try {
-      supabaseUserId = await this.createSupabaseAuthUser(
-        dto.adminEmail,
-        dto.adminPassword,
-        dto.adminName,
-        tenant.id,
-      );
+      if (dto.authUserId) {
+        const authUser = await this.getSupabaseAuthUser(dto.authUserId);
+
+        if (this.normalizeEmail(authUser.email || '') !== normalizedEmail) {
+          throw new BadRequestException(
+            'The verification email must be completed with the same account used to start signup.',
+          );
+        }
+
+        supabaseUserId = authUser.id;
+      } else {
+        supabaseUserId = await this.signupSupabaseAuthUser(
+          normalizedEmail,
+          dto.adminPassword,
+          adminName,
+          tenant.id,
+        );
+      }
 
       const user = await this.prisma.user.create({
         data: {
           id: supabaseUserId,
           tenantId: tenant.id,
-          email: dto.adminEmail,
-          name: dto.adminName,
+          email: normalizedEmail,
+          name: adminName,
           roles: {
             connectOrCreate: {
               where: { name: Role.ADMIN },
@@ -447,6 +623,12 @@ export class AuthService {
           roles: true,
           tenant: true,
         },
+      });
+
+      await this.sendWelcomeEmailSafely({
+        email: user.email,
+        name: user.name,
+        tenantName: user.tenant.name,
       });
 
       return {
@@ -519,7 +701,71 @@ export class AuthService {
       tenant: user.tenant,
       roles: user.roles,
       isPlatformAdmin: user.isPlatformAdmin,
+      onboardingRequired: user.onboardingRequired ?? false,
       createdAt: user.createdAt,
+    };
+  }
+
+  async completeOnboarding(user: UserPayload, dto: CompleteOnboardingDto) {
+    const companyName = dto.companyName.trim();
+    const adminName = dto.adminName?.trim() || user.name?.trim() || this.inferAdminNameFromEmail(user.email);
+    const slug = this.slugifyTenantName(dto.slug || companyName);
+
+    const existingTenant = await this.prisma.tenant.findFirst({
+      where: {
+        slug,
+        NOT: { id: user.tenantId },
+      },
+      select: { id: true },
+    });
+
+    if (existingTenant) {
+      throw new BadRequestException('Tenant slug is already in use.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.tenant.update({
+        where: { id: user.tenantId },
+        data: {
+          name: companyName,
+          slug,
+        },
+      }),
+      this.prisma.user.update({
+        where: { id: user.userId },
+        data: {
+          name: adminName,
+        },
+      }),
+    ]);
+
+    const updatedUser = await this.prisma.user.findUnique({
+      where: { id: user.userId },
+      include: {
+        roles: true,
+        tenant: true,
+      },
+    });
+
+    if (!updatedUser) {
+      throw new UnauthorizedException('Authenticated user was not found');
+    }
+
+    return {
+      sub: updatedUser.id,
+      email: updatedUser.email,
+      name: updatedUser.name,
+      tenantId: updatedUser.tenantId,
+      tenant: {
+        id: updatedUser.tenant.id,
+        name: updatedUser.tenant.name,
+        slug: updatedUser.tenant.slug,
+        status: updatedUser.tenant.status,
+      },
+      roles: updatedUser.roles.map((role) => role.name),
+      isPlatformAdmin: updatedUser.isPlatformAdmin,
+      onboardingRequired: this.isOnboardingRequiredForUser(updatedUser),
+      createdAt: updatedUser.createdAt,
     };
   }
 

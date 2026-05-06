@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Role } from 'src/auth/enums/role.enum';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { PrismaService } from 'prisma/prisma.service';
@@ -23,6 +24,34 @@ import {
 @Injectable()
 export class CustomersService {
   constructor(private prisma: PrismaService) {}
+
+  private shouldIncludeArchived(user: UserPayload, query: ListQuery = {}) {
+    return (
+      query.includeArchived === 'true' &&
+      (user.roles.includes(Role.ADMIN) || user.roles.includes(Role.MANAGER))
+    );
+  }
+
+  private buildCustomerWhere(
+    user: UserPayload,
+    query: ListQuery = {},
+  ): Prisma.CustomerWhereInput {
+    const options = getPaginationOptions(query);
+
+    return {
+      tenantId: user.tenantId,
+      ...(this.shouldIncludeArchived(user, query) ? {} : { archivedAt: null }),
+      ...(options.search
+        ? {
+            OR: [
+              { name: { contains: options.search, mode: 'insensitive' } },
+              { email: { contains: options.search, mode: 'insensitive' } },
+              { phone: { contains: options.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    } as const;
+  }
 
   async create(createCustomerDto: CreateCustomerDto, user: UserPayload) {
     return this.prisma.customer.create({
@@ -104,6 +133,7 @@ export class CustomersService {
             name: row.name,
             phone: row.phone || null,
             address: row.address || null,
+            archivedAt: null,
           },
         });
       }),
@@ -122,18 +152,7 @@ export class CustomersService {
   async findAll(user: UserPayload, query: ListQuery = {}) {
     if (hasListQuery(query)) {
       const options = getPaginationOptions(query);
-      const where: Prisma.CustomerWhereInput = {
-        tenantId: user.tenantId,
-        ...(options.search
-          ? {
-              OR: [
-                { name: { contains: options.search, mode: 'insensitive' } },
-                { email: { contains: options.search, mode: 'insensitive' } },
-                { phone: { contains: options.search, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      } as const;
+      const where = this.buildCustomerWhere(user, query);
       const [items, total] = await Promise.all([
         this.prisma.customer.findMany({
           where,
@@ -153,7 +172,7 @@ export class CustomersService {
     }
 
     return this.prisma.customer.findMany({
-      where: { tenantId: user.tenantId },
+      where: this.buildCustomerWhere(user, query),
       include: {
         _count: {
           select: { orders: true },
@@ -188,7 +207,11 @@ export class CustomersService {
     updateCustomerDto: UpdateCustomerDto,
     user: UserPayload,
   ) {
-    await this.findOne(id, user);
+    const customer = await this.findOne(id, user);
+
+    if (customer.archivedAt) {
+      throw new BadRequestException('Archived customers cannot be updated.');
+    }
 
     return this.prisma.customer.update({
       where: { id },
@@ -204,11 +227,34 @@ export class CustomersService {
     if (!customer) {
       throw new BadRequestException(`Customer with ID ${id} not found  `);
     }
-    if (customer._count.orders > 0) {
-      throw new BadRequestException(
-        'Cannot delete customer with existing order history , Consider archiving instead',
-      );
+
+    const dependencySummary = {
+      orders: customer._count.orders,
+    };
+
+    if (dependencySummary.orders > 0) {
+      if (!customer.archivedAt) {
+        await this.prisma.customer.update({
+          where: { id },
+          data: { archivedAt: new Date() },
+        });
+      }
+
+      return {
+        action: 'archived' as const,
+        message:
+          'Customer archived because it is linked to existing order history.',
+        dependencySummary,
+      };
     }
-    return this.prisma.customer.delete({ where: { id } });
+
+    await this.prisma.customer.delete({ where: { id } });
+
+    return {
+      action: 'deleted' as const,
+      message:
+        'Customer deleted permanently because it had no related records.',
+      dependencySummary,
+    };
   }
 }

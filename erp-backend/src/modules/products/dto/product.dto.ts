@@ -127,3 +127,33 @@ export class ProductImportDto {
   @IsIn(PRODUCT_IMPORT_MODES)
   mode?: ProductImportMode;
 }
+
+export class ProductDependencySummaryDto {
+  @ApiProperty({ example: 0 })
+  inventoryItems: number;
+
+  @ApiProperty({ example: 0 })
+  activeInventoryItems: number;
+
+  @ApiProperty({ example: 2 })
+  stockMovements: number;
+
+  @ApiProperty({ example: 1 })
+  orderItems: number;
+
+  @ApiProperty({ example: 0 })
+  purchaseItems: number;
+}
+
+export class ProductRemovalResultDto {
+  @ApiProperty({ enum: ['deleted', 'archived'] })
+  action: 'deleted' | 'archived';
+
+  @ApiProperty({
+    example: 'Product archived because it is linked to existing business records.',
+  })
+  message: string;
+
+  @ApiProperty({ type: ProductDependencySummaryDto })
+  dependencySummary: ProductDependencySummaryDto;
+}
