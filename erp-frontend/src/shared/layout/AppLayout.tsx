@@ -12,7 +12,7 @@ import { DatabaseZap, RotateCw, ServerCrash } from 'lucide-react';
 import { useOnlineStatus } from '@/shared/lib/online-status';
 
 const pageTitles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
+  '/dashboard': 'Overview',
   '/products': 'Products',
   '/inventory': 'Inventory',
   '/orders': 'Orders',

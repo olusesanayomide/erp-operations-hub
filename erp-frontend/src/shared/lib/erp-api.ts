@@ -359,6 +359,7 @@ type BackendDashboardSummary = {
   inventory: {
     availableQuantity: number;
     reservedQuantity: number;
+    estimatedValue: number;
     lowStockCount: number;
     lowStockItems: Array<{
       id: string;
@@ -390,6 +391,34 @@ type BackendDashboardSummary = {
   };
   purchases: {
     draftCount: number;
+  };
+  analytics: {
+    sales: {
+      totalRevenue: number;
+      monthRevenue: number;
+      periodStart: string;
+      periodEnd: string;
+    };
+    purchasing: {
+      monthSpend: number;
+    };
+    monthly: Array<{
+      key: string;
+      label: string;
+      orders: number;
+      purchases: number;
+      net: number;
+    }>;
+    customerFunnel: Array<{
+      label: string;
+      count: number;
+      value: number;
+    }>;
+    orderFrequency: {
+      days: string[];
+      hours: string[];
+      values: number[][];
+    };
   };
 };
 
