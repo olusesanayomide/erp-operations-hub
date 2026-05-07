@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { PaginationControls } from '@/shared/components/PaginationControls';
+import { DestructiveConfirmDialog } from '@/shared/components/DestructiveConfirmDialog';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import {
@@ -16,7 +17,7 @@ import {
 } from '@/shared/ui/dialog';
 import { Label } from '@/shared/ui/label';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Download, FileSpreadsheet, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Download, FileSpreadsheet, Plus, Search, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   commitCustomerImport,
@@ -54,6 +55,7 @@ export default function CustomersPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const createToastRef = useRef<string | number | null>(null);
   const [removingCustomerId, setRemovingCustomerId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -113,6 +115,7 @@ export default function CustomersPage() {
     onError: (error: Error) => toast.error(error.message),
     onSettled: () => {
       setRemovingCustomerId(null);
+      setPendingRemoval(null);
     },
   });
 
@@ -194,19 +197,24 @@ export default function CustomersPage() {
   }
 
   function handleRemoveCustomer(customerId: string, customerName: string) {
-    const confirmed = window.confirm(
-      `Remove ${customerName}?\n\nUnused customers will be deleted permanently. Customers with order history will be archived instead and removed from active customer lists.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    deleteMutation.mutate(customerId);
+    setPendingRemoval({ id: customerId, name: customerName });
   }
 
   return (
     <div className="animate-fade-in">
+      <DestructiveConfirmDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) {
+            setPendingRemoval(null);
+          }
+        }}
+        title={pendingRemoval ? `Remove ${pendingRemoval.name}?` : 'Remove customer?'}
+        description=""
+        onConfirm={() => pendingRemoval && deleteMutation.mutate(pendingRemoval.id)}
+        isConfirming={deleteMutation.isPending}
+        confirmLabel="Remove"
+      />
       <PageHeader title="Customers" description={`${pagination.total} customers`}>
         {canPerform('customers.create') && (
           <>
@@ -609,7 +617,7 @@ export default function CustomersPage() {
                 <th className="text-left p-3">Name</th>
                 <th className="text-left p-3">Email</th>
                 <th className="text-left p-3">Phone</th>
-                <th className="text-right p-3">Orders</th>
+                <th className="text-right p-3">Sales</th>
                 <th className="text-left p-3">Created</th>
                 {canPerform('customers.delete') && <th className="text-right p-3">Actions</th>}
               </tr>
@@ -638,14 +646,27 @@ export default function CustomersPage() {
                   {canPerform('customers.delete') && (
                     <td className="p-3 text-right">
                       <Button
-                        variant="ghost"
-                        size="sm"
+                        variant="destructive"
+                        size="icon"
+                        className="rounded-full"
                         requiresOnline
                         disabled={deleteMutation.isPending && removingCustomerId === customer.id}
                         onClick={() => handleRemoveCustomer(customer.id, customer.name)}
+                        aria-label={`Remove ${customer.name}`}
+                        title={`Remove ${customer.name}`}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {deleteMutation.isPending && removingCustomerId === customer.id ? 'Removing...' : 'Remove'}
+                        {deleteMutation.isPending && removingCustomerId === customer.id ? (
+                          <span className="sr-only">Removing {customer.name}</span>
+                        ) : (
+                          <span className="sr-only">Remove {customer.name}</span>
+                        )}
+                        {deleteMutation.isPending && removingCustomerId === customer.id ? (
+                          <span className="flex items-center justify-center">
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          </span>
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
                       </Button>
                     </td>
                   )}

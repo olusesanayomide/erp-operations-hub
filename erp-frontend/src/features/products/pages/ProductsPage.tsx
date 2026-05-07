@@ -1,22 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DestructiveConfirmDialog } from '@/shared/components/DestructiveConfirmDialog';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { PaginationControls } from '@/shared/components/PaginationControls';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Download, FileSpreadsheet, Loader2, Package, Plus, Search, Trash2 } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/shared/ui/alert-dialog';
+import { Download, FileSpreadsheet, Loader2, Package, Plus, Search, X } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 } from '@/shared/ui/dialog';
@@ -450,43 +441,19 @@ export default function ProductsPage() {
         )}
       </PageHeader>
 
-      <AlertDialog
+      <DestructiveConfirmDialog
         open={pendingRemoval !== null}
         onOpenChange={(open) => {
           if (!open && !deleteMutation.isPending) {
             setPendingRemoval(null);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {pendingRemoval ? `Remove ${pendingRemoval.name}?` : 'Remove product?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Unused products will be deleted permanently. Products linked to inventory, orders, purchases, or stock
-              movements will be archived instead and removed from the active catalog.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={!pendingRemoval || deleteMutation.isPending}
-              onClick={() => pendingRemoval && deleteMutation.mutate(pendingRemoval.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleteMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Removing...
-                </>
-              ) : (
-                'Remove Product'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={pendingRemoval ? `Remove ${pendingRemoval.name}?` : 'Remove product?'}
+        description=""
+        onConfirm={() => pendingRemoval && deleteMutation.mutate(pendingRemoval.id)}
+        isConfirming={deleteMutation.isPending}
+        confirmLabel="Remove"
+      />
 
       {/* Search */}
       <div className="relative mb-4 max-w-sm">
@@ -526,17 +493,24 @@ export default function ProductsPage() {
                         <td className="p-3 text-right">
                           <Button
                             variant="destructive"
-                            size="sm"
+                            size="icon"
+                            className="rounded-full"
                             requiresOnline
                             disabled={deleteMutation.isPending && removingProductId === p.id}
                             onClick={() => handleRemoveProduct(p.id, p.name)}
+                            aria-label={`Remove ${p.name}`}
+                            title={`Remove ${p.name}`}
                           >
                             {deleteMutation.isPending && removingProductId === p.id ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              <span className="sr-only">Removing {p.name}</span>
                             ) : (
-                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span className="sr-only">Remove {p.name}</span>
                             )}
-                            {deleteMutation.isPending && removingProductId === p.id ? 'Removing...' : 'Remove'}
+                            {deleteMutation.isPending && removingProductId === p.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
                           </Button>
                         </td>
                       )}

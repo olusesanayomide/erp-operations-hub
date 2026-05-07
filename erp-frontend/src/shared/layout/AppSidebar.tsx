@@ -26,7 +26,7 @@ const navGroups = [
   {
     label: 'Operations',
     items: [
-      { label: 'Orders', path: '/orders', icon: ShoppingCart },
+      { label: 'Sales', path: '/orders', icon: ShoppingCart },
       { label: 'Purchases', path: '/purchases', icon: Truck },
     ],
   },

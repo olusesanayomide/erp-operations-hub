@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { PaginationControls } from '@/shared/components/PaginationControls';
+import { DestructiveConfirmDialog } from '@/shared/components/DestructiveConfirmDialog';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/ui/dialog';
 import { Label } from '@/shared/ui/label';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Plus, Search, Factory, Trash2 } from 'lucide-react';
+import { Factory, Plus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { createSupplier, deleteSupplier, listPaginatedSuppliers } from '@/shared/lib/erp-api';
 
@@ -23,6 +24,7 @@ export default function SuppliersPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', address: '' });
   const createToastRef = useRef<string | number | null>(null);
   const [removingSupplierId, setRemovingSupplierId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -58,6 +60,7 @@ export default function SuppliersPage() {
     onError: (error: Error) => toast.error(error.message),
     onSettled: () => {
       setRemovingSupplierId(null);
+      setPendingRemoval(null);
     },
   });
 
@@ -94,19 +97,24 @@ export default function SuppliersPage() {
   }, [createMutation.isPending]);
 
   function handleRemoveSupplier(supplierId: string, supplierName: string) {
-    const confirmed = window.confirm(
-      `Remove ${supplierName}?\n\nUnused suppliers will be deleted permanently. Suppliers with purchase history will be archived instead and removed from active supplier lists.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    deleteMutation.mutate(supplierId);
+    setPendingRemoval({ id: supplierId, name: supplierName });
   }
 
   return (
     <div className="animate-fade-in">
+      <DestructiveConfirmDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) {
+            setPendingRemoval(null);
+          }
+        }}
+        title={pendingRemoval ? `Remove ${pendingRemoval.name}?` : 'Remove supplier?'}
+        description=""
+        onConfirm={() => pendingRemoval && deleteMutation.mutate(pendingRemoval.id)}
+        isConfirming={deleteMutation.isPending}
+        confirmLabel="Remove"
+      />
       <PageHeader title="Suppliers" description={`${pagination.total} suppliers`}>
         {canPerform('suppliers.create') && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -152,14 +160,27 @@ export default function SuppliersPage() {
                   {canPerform('suppliers.delete') && (
                     <td className="p-3 text-right">
                       <Button
-                        variant="ghost"
-                        size="sm"
+                        variant="destructive"
+                        size="icon"
+                        className="rounded-full"
                         requiresOnline
                         disabled={deleteMutation.isPending && removingSupplierId === s.id}
                         onClick={() => handleRemoveSupplier(s.id, s.name)}
+                        aria-label={`Remove ${s.name}`}
+                        title={`Remove ${s.name}`}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {deleteMutation.isPending && removingSupplierId === s.id ? 'Removing...' : 'Remove'}
+                        {deleteMutation.isPending && removingSupplierId === s.id ? (
+                          <span className="sr-only">Removing {s.name}</span>
+                        ) : (
+                          <span className="sr-only">Remove {s.name}</span>
+                        )}
+                        {deleteMutation.isPending && removingSupplierId === s.id ? (
+                          <span className="flex items-center justify-center">
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          </span>
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
                       </Button>
                     </td>
                   )}

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { DestructiveConfirmDialog } from '@/shared/components/DestructiveConfirmDialog';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/ui/dialog';
 import { Label } from '@/shared/ui/label';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Plus, Search, Warehouse, MapPin, Package, Trash2 } from 'lucide-react';
+import { MapPin, Package, Plus, Search, Warehouse, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { createWarehouse, deleteWarehouse, listWarehouses } from '@/shared/lib/erp-api';
 
@@ -19,6 +20,7 @@ export default function WarehousesPage() {
   const [form, setForm] = useState({ name: '', location: '', description: '' });
   const createToastRef = useRef<string | number | null>(null);
   const [removingWarehouseId, setRemovingWarehouseId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
 
   const {
     data: warehouses = [],
@@ -54,6 +56,7 @@ export default function WarehousesPage() {
     onError: (error: Error) => toast.error(error.message),
     onSettled: () => {
       setRemovingWarehouseId(null);
+      setPendingRemoval(null);
     },
   });
 
@@ -93,19 +96,24 @@ export default function WarehousesPage() {
   }, [createMutation.isPending]);
 
   function handleRemoveWarehouse(warehouseId: string, warehouseName: string) {
-    const confirmed = window.confirm(
-      `Remove ${warehouseName}?\n\nUnused warehouses will be deleted permanently. Warehouses with history will be archived instead. Warehouses with active stock cannot be removed until inventory is cleared or transferred.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    deleteMutation.mutate(warehouseId);
+    setPendingRemoval({ id: warehouseId, name: warehouseName });
   }
 
   return (
     <div className="animate-fade-in">
+      <DestructiveConfirmDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) {
+            setPendingRemoval(null);
+          }
+        }}
+        title={pendingRemoval ? `Remove ${pendingRemoval.name}?` : 'Remove warehouse?'}
+        description=""
+        onConfirm={() => pendingRemoval && deleteMutation.mutate(pendingRemoval.id)}
+        isConfirming={deleteMutation.isPending}
+        confirmLabel="Remove"
+      />
       <PageHeader title="Warehouses" description={`${warehouses.length} warehouses`}>
         {canPerform('warehouses.create') && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -147,14 +155,27 @@ export default function WarehousesPage() {
 		                </div>
 		                {canPerform('warehouses.delete') && (
 		                  <Button
-		                    variant="ghost"
-		                    size="sm"
+		                    variant="destructive"
+		                    size="icon"
+		                    className="rounded-full"
 		                    requiresOnline
 		                    disabled={deleteMutation.isPending && removingWarehouseId === warehouse.id}
 		                    onClick={() => handleRemoveWarehouse(warehouse.id, warehouse.name)}
+		                    aria-label={`Remove ${warehouse.name}`}
+		                    title={`Remove ${warehouse.name}`}
 		                  >
-		                    <Trash2 className="mr-2 h-4 w-4" />
-		                    {deleteMutation.isPending && removingWarehouseId === warehouse.id ? 'Removing...' : 'Remove'}
+		                    {deleteMutation.isPending && removingWarehouseId === warehouse.id ? (
+		                      <span className="sr-only">Removing {warehouse.name}</span>
+		                    ) : (
+		                      <span className="sr-only">Remove {warehouse.name}</span>
+		                    )}
+		                    {deleteMutation.isPending && removingWarehouseId === warehouse.id ? (
+		                      <span className="flex items-center justify-center">
+		                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+		                      </span>
+		                    ) : (
+		                      <X className="h-4 w-4" />
+		                    )}
 		                  </Button>
 		                )}
 		              </div>

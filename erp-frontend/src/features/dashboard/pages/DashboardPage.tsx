@@ -202,7 +202,7 @@ function getAnalyticsDegradationMessages(summary: DashboardSummary) {
   }
 
   if (!summary.analytics?.orderFrequency?.values?.length) {
-    messages.push('Order frequency heatmap data is unavailable.');
+    messages.push('Sales frequency heatmap data is unavailable.');
   }
 
   return messages;
@@ -224,6 +224,14 @@ function buildOrderSources(statuses: DashboardSummary['orders']['byStatus'], tot
       flex: Math.max(4 - index, 1),
     };
   });
+}
+
+function formatSalesLabel(value: string) {
+  return value
+    .replace(/\bOrders\b/g, 'Sales')
+    .replace(/\bOrder\b/g, 'Sale')
+    .replace(/\borders\b/g, 'sales')
+    .replace(/\border\b/g, 'sale');
 }
 
 function MetricCard({
@@ -319,7 +327,7 @@ function MonthlyExpensesCard({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-[1.1rem] font-semibold text-slate-900">Monthly Revenue & Spend</h3>
-          <p className="mt-1 text-sm text-slate-400">Real monthly order revenue versus purchase spend.</p>
+          <p className="mt-1 text-sm text-slate-400">Real monthly sales revenue versus purchase spend.</p>
         </div>
 
         <div className="inline-flex rounded-[10px] border border-slate-200 bg-slate-50 p-1">
@@ -381,7 +389,7 @@ function MonthlyExpensesCard({
                       <div className="absolute left-1/2 top-0 z-20 w-[188px] -translate-x-1/2 rounded-[12px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
                         <div className="space-y-2 text-xs">
                           <div className="flex items-center justify-between gap-4 text-slate-500">
-                            <span>Order Revenue</span>
+                            <span>Sales Revenue</span>
                             <span className="font-semibold text-slate-900">{formatMoney(item.orders)}</span>
                           </div>
                           <div className="flex items-center justify-between gap-4 text-slate-500">
@@ -440,7 +448,7 @@ function TotalOrdersCard({
             <ShoppingCart className="h-3.1 w-4" />
           </div>
           <div>
-            <h3 className="text-[1.1rem] font-semibold text-slate-900">Total Orders</h3>
+            <h3 className="text-[1.1rem] font-semibold text-slate-900">Total Sales</h3>
           </div>
         </div>
 
@@ -493,7 +501,7 @@ function TotalOrdersCard({
       <div className="mt-4 flex items-center justify-between gap-3 rounded-[10px] border border-slate-200 bg-slate-50 px-3.5 py-2.5">
         <div className="flex min-w-0 items-center gap-2 text-sm text-slate-600">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          <span className="truncate">Track your order pipeline</span>
+          <span className="truncate">Track your sales pipeline</span>
         </div>
         <Button asChild variant="outline" className="h-8 rounded-[10px] border-slate-200 bg-white px-4 text-xs font-semibold shadow-none">
           <Link to="/orders">View Details</Link>
@@ -511,12 +519,15 @@ function CustomerFunnelCard({
   const funnelSteps = useMemo(
     () =>
       summary.analytics?.customerFunnel?.length
-        ? summary.analytics.customerFunnel
+        ? summary.analytics.customerFunnel.map((step) => ({
+            ...step,
+            label: formatSalesLabel(step.label),
+          }))
         : [
             { label: 'Customers Created', count: 0, value: 0 },
-            { label: 'Customers With Orders', count: 0, value: 0 },
+            { label: 'Customers With Sales', count: 0, value: 0 },
             { label: 'Customers In Fulfillment', count: 0, value: 0 },
-            { label: 'Customers With Delivered Orders', count: 0, value: 0 },
+            { label: 'Customers With Delivered Sales', count: 0, value: 0 },
             { label: 'Repeat Buyers', count: 0, value: 0 },
           ],
     [summary],
@@ -527,7 +538,7 @@ function CustomerFunnelCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-[1.1rem] font-semibold text-slate-900">Customer Funnel Analytics</h3>
-          <p className="mt-1 text-sm text-slate-400">Customer progression from account creation to order execution risk.</p>
+          <p className="mt-1 text-sm text-slate-400">Customer progression from account creation to sales execution risk.</p>
         </div>
 
         <button
@@ -577,7 +588,7 @@ function OrderFrequencyCard({
     <DashboardCard className="h-full p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[1.1rem] font-semibold text-slate-900">Order Frequency</h3>
+          <h3 className="text-[1.1rem] font-semibold text-slate-900">Sales Frequency</h3>
           <p className="mt-1 text-sm text-slate-400">Last 90 days</p>
         </div>
 

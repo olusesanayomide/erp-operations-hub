@@ -1,16 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { useAuth } from '@/app/providers/AuthContext';
-import { ArrowLeft, ShoppingCart, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
-} from '@/shared/ui/alert-dialog';
 import { getOrderById, listCustomers, listWarehouses, updateOrderStatus } from '@/shared/lib/erp-api';
 import { useSettings } from '@/app/providers/SettingsContext';
 
@@ -20,6 +17,8 @@ export default function OrderDetailPage() {
   const { formatMoney } = useSettings();
   const queryClient = useQueryClient();
   const statusToastRef = useRef<string | number | null>(null);
+  const [isConfirmSaleDialogOpen, setIsConfirmSaleDialogOpen] = useState(false);
+  const [isCancelSaleDialogOpen, setIsCancelSaleDialogOpen] = useState(false);
 
   const { data: order, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['orders', id],
@@ -45,7 +44,7 @@ export default function OrderDetailPage() {
         queryClient.invalidateQueries({ queryKey: ['orders'] }),
         queryClient.invalidateQueries({ queryKey: ['orders', id] })
       ]);
-      toast.success(`Order ${status.toLowerCase()}`);
+      toast.success(`Sale ${status.toLowerCase()}`);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -55,9 +54,9 @@ export default function OrderDetailPage() {
       if (!statusToastRef.current) {
         const targetStatus = updateStatusMutation.variables?.toLowerCase();
         statusToastRef.current = toast.loading(
-          targetStatus ? `Updating order to ${targetStatus}...` : 'Updating order...',
+          targetStatus ? `Updating sale to ${targetStatus}...` : 'Updating sale...',
           {
-            description: 'Please keep this page open while the order status is being updated.',
+            description: 'Please keep this page open while the sale status is being updated.',
           },
         );
       }
@@ -71,8 +70,8 @@ export default function OrderDetailPage() {
   }, [updateStatusMutation.isPending, updateStatusMutation.variables]);
 
   if (isLoading) return <DetailPageSkeleton />;
-  if (isError) return <ErrorState title="Unable to load order" description={(error as Error).message || 'The requested order could not be loaded right now.'} action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/orders"><Button variant="outline">Back to Orders</Button></Link></div>} />;
-  if (!order) return <EmptyState icon={ShoppingCart} title="Order not found" description="This order does not exist" action={<Link to="/orders"><Button variant="outline">Back to Orders</Button></Link>} />;
+  if (isError) return <ErrorState title="Unable to load sale" description={(error as Error).message || 'The requested sale could not be loaded right now.'} action={<div className="flex gap-2"><RetryButton onClick={() => void refetch()} /><Link to="/orders"><Button variant="outline">Back to Sales</Button></Link></div>} />;
+  if (!order) return <EmptyState icon={ShoppingCart} title="Sale not found" description="This sale does not exist" action={<Link to="/orders"><Button variant="outline">Back to Sales</Button></Link>} />;
 
   const customer = order.customer || customers.find((item) => item.id === order.customerId);
   const orderWarehouses = Array.from(
@@ -115,23 +114,18 @@ export default function OrderDetailPage() {
       <PageHeader title={order.orderNumber}>
         <StatusBadge status={order.status} className="px-3 py-1 text-sm" />
         {order.status === 'draft' && canPerform('orders.confirm') && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild><Button requiresOnline className="w-full sm:w-auto" disabled={updateStatusMutation.isPending}><CheckCircle className="h-4 w-4 mr-2" />Confirm Order</Button></AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Confirm this order?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  <span className="flex items-start gap-2 text-warning"><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />This will reserve stock across the warehouse assignments on each line item. Stock leaves inventory history only when the order is marked shipped.</span>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={updateStatusMutation.isPending}>Cancel</AlertDialogCancel>
-                <AlertDialogAction disabled={updateStatusMutation.isPending} onClick={() => updateStatusMutation.mutate('CONFIRMED')}>
-                  {updateStatusMutation.isPending ? 'Confirming...' : 'Confirm'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <>
+            <Button requiresOnline className="w-full sm:w-auto" disabled={updateStatusMutation.isPending} onClick={() => setIsConfirmSaleDialogOpen(true)}><CheckCircle className="h-4 w-4 mr-2" />Confirm Sale</Button>
+            <ConfirmDialog
+              open={isConfirmSaleDialogOpen}
+              onOpenChange={setIsConfirmSaleDialogOpen}
+              title="Confirm this sale?"
+              description="This will reserve stock for the items in this sale."
+              onConfirm={() => updateStatusMutation.mutate('CONFIRMED')}
+              isConfirming={updateStatusMutation.isPending}
+              confirmLabel="Confirm"
+            />
+          </>
         )}
         {order.status === 'confirmed' && canPerform('orders.pick') && (
           <Button requiresOnline className="w-full sm:w-auto" disabled={updateStatusMutation.isPending} onClick={() => updateStatusMutation.mutate('PICKED')} variant="default"><CheckCircle className="h-4 w-4 mr-2" />{updateStatusMutation.isPending ? 'Updating...' : 'Mark Picked'}</Button>
@@ -143,26 +137,27 @@ export default function OrderDetailPage() {
           <Button requiresOnline className="w-full sm:w-auto" disabled={updateStatusMutation.isPending} onClick={() => updateStatusMutation.mutate('DELIVERED')} variant="default"><CheckCircle className="h-4 w-4 mr-2" />{updateStatusMutation.isPending ? 'Updating...' : 'Mark Delivered'}</Button>
         )}
         {(order.status === 'draft' || order.status === 'confirmed' || order.status === 'picked') && canPerform('orders.cancel') && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild><Button requiresOnline className="w-full sm:w-auto" disabled={updateStatusMutation.isPending} variant="destructive"><XCircle className="h-4 w-4 mr-2" />Cancel</Button></AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Cancel this order?</AlertDialogTitle>
-                <AlertDialogDescription>This action is irreversible. Any reserved stock will be released for confirmed or picked orders.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={updateStatusMutation.isPending}>Keep Order</AlertDialogCancel>
-                <AlertDialogAction disabled={updateStatusMutation.isPending} onClick={() => updateStatusMutation.mutate('CANCELLED')} className="bg-destructive hover:bg-destructive/90">{updateStatusMutation.isPending ? 'Cancelling...' : 'Cancel Order'}</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <>
+            <Button requiresOnline className="w-full sm:w-auto" disabled={updateStatusMutation.isPending} variant="destructive" onClick={() => setIsCancelSaleDialogOpen(true)}><XCircle className="h-4 w-4 mr-2" />Cancel</Button>
+            <ConfirmDialog
+              open={isCancelSaleDialogOpen}
+              onOpenChange={setIsCancelSaleDialogOpen}
+              title="Cancel this sale?"
+              description="This can't be undone."
+              onConfirm={() => updateStatusMutation.mutate('CANCELLED')}
+              isConfirming={updateStatusMutation.isPending}
+              confirmLabel="Cancel sale"
+              cancelLabel="Keep sale"
+              confirmClassName="h-12 rounded-2xl bg-destructive text-base font-semibold text-destructive-foreground hover:bg-destructive/90"
+            />
+          </>
         )}
       </PageHeader>
 
       <div className="erp-card p-4 sm:p-5">
         <div className="mb-4">
-          <p className="text-sm font-medium text-foreground">Order lifecycle</p>
-          <p className="mt-1 text-sm text-muted-foreground">Draft orders can be adjusted freely. Stock is reserved only after confirmation.</p>
+          <p className="text-sm font-medium text-foreground">Sale lifecycle</p>
+          <p className="mt-1 text-sm text-muted-foreground">Draft sales can be adjusted freely. Stock is reserved only after confirmation.</p>
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:gap-8">
           {statusTimeline.map((step, i) => (

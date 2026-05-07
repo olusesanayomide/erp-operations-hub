@@ -27,7 +27,7 @@ const featureCards = [
     icon: Warehouse,
   },
   {
-    title: 'Orders',
+    title: 'Sales',
     description:
       'Move from draft to fulfillment with structured workflows built for real operations teams.',
     icon: Truck,
@@ -73,7 +73,7 @@ const problemSolution = [
   {
     title: 'One operating surface',
     description:
-      'Manifest brings inventory, purchasing, warehouse visibility, and order execution into one structured workflow.',
+      'Manifest brings inventory, purchasing, warehouse visibility, and sales execution into one structured workflow.',
   },
 ];
 
@@ -89,7 +89,7 @@ const steps = [
     step: '02',
     title: 'Run operational workflows',
     description:
-      'Handle procurement, stock movement, and order execution without switching contexts.',
+      'Handle procurement, stock movement, and sales execution without switching contexts.',
     icon: Route,
   },
   {
@@ -115,13 +115,13 @@ const capabilitySections = [
     icon: Warehouse,
   },
   {
-    eyebrow: 'Purchases & Orders',
+    eyebrow: 'Purchases & Sales',
     title: 'One flow from inbound purchases to outbound fulfillment.',
     description:
-      'Keep suppliers, purchases, customers, and orders connected so teams can move work forward with less friction.',
+      'Keep suppliers, purchases, customers, and sales connected so teams can move work forward with less friction.',
     points: [
       'Purchase and receiving workflows',
-      'Structured order lifecycle tracking',
+      'Structured sales lifecycle tracking',
       'Shared view across operations roles',
     ],
     icon: SlidersHorizontal,
@@ -595,7 +595,7 @@ export default function LandingPage() {
                 <p className="text-sm font-medium text-muted-foreground">Product</p>
                 <div className="mt-4 space-y-3 text-sm">
                   <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Inventory Management</a>
-                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Order Management</a>
+                  <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Sales Management</a>
                   <a href="#features" className="block text-foreground/90 transition-colors hover:text-foreground">Procurement Flow</a>
                 </div>
               </div>

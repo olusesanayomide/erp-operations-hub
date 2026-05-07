@@ -59,12 +59,12 @@ export default function OrdersPage() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Orders" description={`${orders.length} orders`}>
+      <PageHeader title="Sales" description={`${orders.length} sales`}>
         {canPerform('orders.create') && (
           <Link to="/orders/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              New Order
+              New Sale
             </Button>
           </Link>
         )}
@@ -75,7 +75,7 @@ export default function OrdersPage() {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <div className="relative min-w-[200px] flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Input placeholder="Search sales..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-40">
@@ -98,7 +98,7 @@ export default function OrdersPage() {
           <table className="w-full">
             <thead>
               <tr className="erp-table-header">
-                <th className="p-3 text-left">Order #</th>
+                <th className="p-3 text-left">Sale #</th>
                 <th className="p-3 text-left">Customer</th>
                 <th className="p-3 text-left">Warehouse</th>
                 <th className="p-3 text-right">Items</th>
@@ -183,14 +183,14 @@ export default function OrdersPage() {
 
         {isOrdersError && (
           <ErrorState
-            title="Unable to load orders"
-            description={(ordersError as Error)?.message || 'Orders could not be loaded right now.'}
+            title="Unable to load sales"
+            description={(ordersError as Error)?.message || 'Sales could not be loaded right now.'}
             action={<RetryButton onClick={() => void refetchOrders()} />}
           />
         )}
 
         {!isOrdersLoading && !isOrdersError && filtered.length === 0 && (
-          <EmptyState icon={ShoppingCart} title="No orders found" description="Create your first order" />
+          <EmptyState icon={ShoppingCart} title="No sales found" description="Create your first sale" />
         )}
       </div>
     </div>

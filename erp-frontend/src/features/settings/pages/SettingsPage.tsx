@@ -150,7 +150,7 @@ export default function SettingsPage() {
               <span className="font-medium">{formatMoney(125.5)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Order Total</span>
+              <span className="text-muted-foreground">Sale Total</span>
               <span className="font-medium">{formatMoney(2450.75)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">

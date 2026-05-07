@@ -1,22 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Loader2, Package, Trash2 } from 'lucide-react';
+import { ArrowLeft, Package, X } from 'lucide-react';
+import { DestructiveConfirmDialog } from '@/shared/components/DestructiveConfirmDialog';
 import { toast } from 'sonner';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useSettings } from '@/app/providers/SettingsContext';
 import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/shared/ui/alert-dialog';
 import { Button } from '@/shared/ui/button';
 import { deleteProduct, getProductById, listOrders, listPurchases, listWarehouses } from '@/shared/lib/erp-api';
 import { getStockStatus } from '@/shared/types/erp';
@@ -93,58 +84,43 @@ export default function ProductDetailPage() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <AlertDialog
+      <DestructiveConfirmDialog
         open={removeDialogOpen}
         onOpenChange={(open) => {
           if (!deleteMutation.isPending) {
             setRemoveDialogOpen(open);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove {product.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Unused products will be deleted permanently. Products linked to inventory, orders, purchases, or stock
-              movements will be archived instead and removed from the active catalog.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate(product.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleteMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Removing...
-                </>
-              ) : (
-                'Remove Product'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={`Remove ${product.name}?`}
+        description=""
+        onConfirm={() => deleteMutation.mutate(product.id)}
+        isConfirming={deleteMutation.isPending}
+        confirmLabel="Remove"
+      />
 
       <div className="flex items-center justify-between gap-3">
         <Link to="/products"><Button variant="ghost" size="sm"><ArrowLeft className="mr-1 h-4 w-4" />Back</Button></Link>
         {canPerform('products.delete') && !product.isArchived && (
           <Button
             variant="destructive"
-            size="sm"
+            size="icon"
+            className="rounded-full"
             requiresOnline
             disabled={deleteMutation.isPending}
             onClick={handleRemoveProduct}
+            aria-label={`Remove ${product.name}`}
+            title={`Remove ${product.name}`}
           >
             {deleteMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <span className="sr-only">Removing {product.name}</span>
             ) : (
-              <Trash2 className="mr-2 h-4 w-4" />
+              <span className="sr-only">Remove {product.name}</span>
             )}
-            {deleteMutation.isPending ? 'Removing...' : 'Remove Product'}
+            {deleteMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <X className="h-4 w-4" />
+            )}
           </Button>
         )}
       </div>
@@ -230,7 +206,7 @@ export default function ProductDetailPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="erp-card p-5">
-          <h3 className="erp-section-title">Related Orders ({relatedOrders.length})</h3>
+          <h3 className="erp-section-title">Related Sales ({relatedOrders.length})</h3>
           {relatedOrders.map((order) => (
             <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between rounded-lg p-2 hover:bg-muted/30">
               <span className="text-sm font-medium">{order.orderNumber}</span>

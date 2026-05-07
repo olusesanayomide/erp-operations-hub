@@ -37,10 +37,10 @@ export default function CustomerDetailPage() {
       </div>
 
       <div className="erp-card p-5">
-        <h3 className="erp-section-title">Orders ({orders.length})</h3>
+        <h3 className="erp-section-title">Sales ({orders.length})</h3>
         <table className="w-full">
           <thead><tr className="erp-table-header">
-            <th className="text-left p-3">Order #</th>
+            <th className="text-left p-3">Sale #</th>
             <th className="text-right p-3">Amount</th>
             <th className="text-left p-3">Status</th>
             <th className="text-left p-3">Date</th>
@@ -56,7 +56,7 @@ export default function CustomerDetailPage() {
             ))}
           </tbody>
         </table>
-        {orders.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No orders yet</p>}
+        {orders.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No sales yet</p>}
       </div>
     </div>
   );

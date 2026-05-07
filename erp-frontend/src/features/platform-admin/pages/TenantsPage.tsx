@@ -1,20 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, FolderArchive, PauseCircle, PlayCircle, ShieldAlert } from 'lucide-react';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { PageHeader, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Button } from '@/shared/ui/button';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/shared/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -189,55 +179,48 @@ export default function TenantsPage() {
                       {statusActions[tenant.status].map((action) => {
                         const Icon = action.icon;
                         return (
-                          <AlertDialog
-                            key={`${tenant.id}-${action.nextStatus}`}
-                            open={
-                              pendingAction?.tenant.id === tenant.id &&
-                              pendingAction?.nextStatus === action.nextStatus
-                            }
-                            onOpenChange={(open) => {
-                              if (!open) {
-                                setPendingAction(null);
-                              } else {
+                          <div key={`${tenant.id}-${action.nextStatus}`}>
+                            <Button
+                              requiresOnline
+                              variant="outline"
+                              size="sm"
+                              className={action.tone}
+                              onClick={() =>
                                 setPendingAction({
                                   tenant,
                                   nextStatus: action.nextStatus,
                                   label: action.label,
                                   description: action.description,
-                                });
+                                })
                               }
-                            }}
-                          >
-                            <AlertDialogTrigger asChild>
-                              <Button requiresOnline variant="outline" size="sm" className={action.tone}>
-                                <Icon className="mr-1.5 h-4 w-4" />
-                                {action.label}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>{action.label} {tenant.name}?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  {action.description}
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  disabled={mutation.isPending}
-                                  onClick={() =>
-	                                    mutation.mutate({
-	                                      tenantId: tenant.id,
-	                                      status: action.nextStatus,
-	                                      expectedUpdatedAt: tenant.concurrencyStamp,
-	                                    })
-                                  }
-                                >
-                                  {mutation.isPending ? 'Saving...' : action.label}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                            >
+                              <Icon className="mr-1.5 h-4 w-4" />
+                              {action.label}
+                            </Button>
+                            <ConfirmDialog
+                              open={
+                                pendingAction?.tenant.id === tenant.id &&
+                                pendingAction?.nextStatus === action.nextStatus
+                              }
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  setPendingAction(null);
+                                }
+                              }}
+                              title={`${action.label} ${tenant.name}?`}
+                              description={action.description}
+                              onConfirm={() =>
+                                mutation.mutate({
+                                  tenantId: tenant.id,
+                                  status: action.nextStatus,
+                                  expectedUpdatedAt: tenant.concurrencyStamp,
+                                })
+                              }
+                              isConfirming={mutation.isPending}
+                              confirmLabel={action.label}
+                              confirmClassName="h-12 rounded-2xl bg-foreground text-base font-semibold text-background hover:bg-foreground/90"
+                            />
+                          </div>
                         );
                       })}
                     </div>

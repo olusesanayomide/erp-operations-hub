@@ -487,6 +487,10 @@ function mapPaginatedResponse<TInput, TOutput>(
   } satisfies PaginatedResponse<TOutput>;
 }
 
+function extractItems<T>(response: T[] | PaginatedResponse<T>) {
+  return Array.isArray(response) ? response : response.items;
+}
+
 function normalizeAuthUser(data: BackendAuthUser): User {
   return {
     id: data.sub,
@@ -577,11 +581,22 @@ function normalizeNotificationEntityType(
 }
 
 function normalizeNotification(raw: BackendNotification): NotificationItem {
+  const title = raw.title
+    .replace(/\bOrders\b/g, 'Sales')
+    .replace(/\bOrder\b/g, 'Sale')
+    .replace(/\borders\b/g, 'sales')
+    .replace(/\border\b/g, 'sale');
+  const message = raw.message
+    .replace(/\bOrders\b/g, 'Sales')
+    .replace(/\bOrder\b/g, 'Sale')
+    .replace(/\borders\b/g, 'sales')
+    .replace(/\border\b/g, 'sale');
+
   return {
     id: raw.id,
     type: normalizeNotificationType(raw.type),
-    title: raw.title,
-    message: raw.message,
+    title,
+    message,
     entityType: normalizeNotificationEntityType(raw.entityType),
     entityId: raw.entityId || undefined,
     createdAt: raw.createdAt,
@@ -724,6 +739,10 @@ export function normalizeSupplier(raw: BackendSupplier): Supplier {
   };
 }
 
+function normalizeLookupKey(value: string) {
+  return value.trim().toLowerCase();
+}
+
 export function normalizeInventoryItem(
   raw:
     | BackendInventorySummary
@@ -738,14 +757,28 @@ export function normalizeInventoryItem(
       },
   productsById: Map<string, Product>,
   warehousesById: Map<string, Warehouse>,
+  productsByName: Map<string, Product> = new Map(),
+  warehousesByName: Map<string, Warehouse> = new Map(),
 ): InventoryItem {
-  const productId = "product" in raw ? raw.product : raw.productId;
-  const warehouseId = "location" in raw ? raw.location : raw.warehouseId;
   const quantity = "availableStock" in raw ? raw.availableStock : raw.quantity;
   const reservedQuantity =
     "reservedStock" in raw ? raw.reservedStock || 0 : raw.reservedQuantity || 0;
   const onHandQuantity =
     "onHandStock" in raw ? raw.onHandStock || quantity + reservedQuantity : quantity + reservedQuantity;
+  const matchedProduct =
+    "product" in raw
+      ? productsById.get(raw.product) ?? productsByName.get(normalizeLookupKey(raw.product))
+      : raw.product
+        ? normalizeProduct(raw.product)
+        : productsById.get(raw.productId);
+  const matchedWarehouse =
+    "location" in raw
+      ? warehousesById.get(raw.location) ?? warehousesByName.get(normalizeLookupKey(raw.location))
+      : raw.warehouse
+        ? normalizeWarehouse(raw.warehouse)
+        : warehousesById.get(raw.warehouseId);
+  const productId = "product" in raw ? matchedProduct?.id ?? raw.product : raw.productId;
+  const warehouseId = "location" in raw ? matchedWarehouse?.id ?? raw.location : raw.warehouseId;
 
   return {
     id: "id" in raw ? raw.id : `${productId}-${warehouseId}`,
@@ -754,14 +787,14 @@ export function normalizeInventoryItem(
     quantity,
     reservedQuantity,
     onHandQuantity,
-    minStock: "minStock" in raw ? raw.minStock || 0 : raw.product ? raw.product.minStock ?? 10 : productsById.get(productId)?.minStock ?? 10,
-    product: "product" in raw ? productsById.get(productId) : raw.product ? normalizeProduct(raw.product) : productsById.get(productId),
-    warehouse:
-      "warehouse" in raw
-        ? raw.warehouse
-          ? normalizeWarehouse(raw.warehouse)
-          : warehousesById.get(warehouseId)
-        : warehousesById.get(warehouseId),
+    minStock:
+      "minStock" in raw
+        ? raw.minStock || matchedProduct?.minStock || 0
+        : raw.product
+          ? raw.product.minStock ?? 10
+          : matchedProduct?.minStock ?? 10,
+    product: matchedProduct,
+    warehouse: matchedWarehouse,
   };
 }
 
@@ -1168,12 +1201,18 @@ export async function getDashboardSummary() {
 }
 
 export async function listProducts(params: Pick<ListPageParams, 'includeArchived'> = {}) {
-  const items = await apiRequest<BackendProduct[]>(`/products${buildListQuery(params)}`);
+  const response = await apiRequest<BackendProduct[] | PaginatedResponse<BackendProduct>>(
+    `/products${buildListQuery(params)}`,
+  );
+  const items = extractItems(response);
   return items.map(normalizeProduct);
 }
 
 export async function listRawProducts(params: Pick<ListPageParams, 'includeArchived'> = {}) {
-  return apiRequest<BackendProduct[]>(`/products${buildListQuery(params)}`);
+  const response = await apiRequest<BackendProduct[] | PaginatedResponse<BackendProduct>>(
+    `/products${buildListQuery(params)}`,
+  );
+  return extractItems(response);
 }
 
 export async function listPaginatedRawProducts(params: ListPageParams) {
@@ -1500,13 +1539,36 @@ export async function listInventory() {
 
   const productsById = new Map(rawProducts.map((product) => [product.id, normalizeProduct(product)]));
   const warehousesById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
+  const productsByName = new Map(
+    rawProducts.map((product) => [normalizeLookupKey(product.name), normalizeProduct(product)]),
+  );
+  const warehousesByName = new Map(
+    warehouses.map((warehouse) => [normalizeLookupKey(warehouse.name), warehouse]),
+  );
 
-  return summary.map((item) => normalizeInventoryItem(item, productsById, warehousesById));
+  return summary.map((item) =>
+    normalizeInventoryItem(item, productsById, warehousesById, productsByName, warehousesByName),
+  );
 }
 
 export async function listInventorySummary() {
-  const summary = await apiRequest<BackendInventorySummary[]>("/inventory");
-  return summary.map((item) => normalizeInventoryItem(item, new Map(), new Map()));
+  const [summary, rawProducts, warehouses] = await Promise.all([
+    apiRequest<BackendInventorySummary[]>("/inventory"),
+    listRawProducts({ includeArchived: true }),
+    listWarehouses(),
+  ]);
+  const productsById = new Map(rawProducts.map((product) => [product.id, normalizeProduct(product)]));
+  const warehousesById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse]));
+  const productsByName = new Map(
+    rawProducts.map((product) => [normalizeLookupKey(product.name), normalizeProduct(product)]),
+  );
+  const warehousesByName = new Map(
+    warehouses.map((warehouse) => [normalizeLookupKey(warehouse.name), warehouse]),
+  );
+
+  return summary.map((item) =>
+    normalizeInventoryItem(item, productsById, warehousesById, productsByName, warehousesByName),
+  );
 }
 
 export async function stockIn(payload: {

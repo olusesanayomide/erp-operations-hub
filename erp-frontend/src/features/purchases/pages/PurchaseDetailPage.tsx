@@ -1,16 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { Button } from '@/shared/ui/button';
 import { useAuth } from '@/app/providers/AuthContext';
 import { ArrowLeft, Truck, PackageCheck, CheckCircle, Send } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
-} from '@/shared/ui/alert-dialog';
 import {
   getPurchaseById,
   listSuppliers,
@@ -27,6 +24,7 @@ export default function PurchaseDetailPage() {
   const queryClient = useQueryClient();
   const receiveToastRef = useRef<string | number | null>(null);
   const statusToastRef = useRef<string | number | null>(null);
+  const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
 
   const { data: purchase, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['purchases', id],
@@ -130,33 +128,27 @@ export default function PurchaseDetailPage() {
           </Button>
         )}
         {purchase.status !== 'received' && purchase.status !== 'cancelled' && canPerform('purchases.receive') && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                requiresOnline
-                className="bg-success hover:bg-success/90"
-                disabled={purchase.status === 'draft' || isBusy}
-              >
-                <PackageCheck className="h-4 w-4 mr-2" />
-                {receiveMutation.isPending ? 'Receiving...' : 'Receive Goods'}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Receive goods for {purchase.purchaseNumber}?</AlertDialogTitle>
-                <AlertDialogDescription>This will add all items to {warehouse?.name} inventory. Stock levels will be updated immediately.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={receiveMutation.isPending}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  disabled={receiveMutation.isPending}
-                  onClick={() => receiveMutation.mutate()}
-                >
-                  {receiveMutation.isPending ? 'Receiving...' : 'Confirm Receipt'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <>
+            <Button
+              requiresOnline
+              className="bg-success hover:bg-success/90"
+              disabled={purchase.status === 'draft' || isBusy}
+              onClick={() => setIsReceiveDialogOpen(true)}
+            >
+              <PackageCheck className="h-4 w-4 mr-2" />
+              {receiveMutation.isPending ? 'Receiving...' : 'Receive Goods'}
+            </Button>
+            <ConfirmDialog
+              open={isReceiveDialogOpen}
+              onOpenChange={setIsReceiveDialogOpen}
+              title={`Receive goods for ${purchase.purchaseNumber}?`}
+              description={`This will add the items to ${warehouse?.name ?? 'the selected warehouse'}.`}
+              onConfirm={() => receiveMutation.mutate()}
+              isConfirming={receiveMutation.isPending}
+              confirmLabel="Receive"
+              confirmClassName="h-12 rounded-2xl bg-success text-base font-semibold text-white hover:bg-success/90"
+            />
+          </>
         )}
       </PageHeader>
 

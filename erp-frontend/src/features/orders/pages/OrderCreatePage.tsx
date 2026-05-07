@@ -77,7 +77,7 @@ export default function OrderCreatePage() {
         queryClient.invalidateQueries({ queryKey: ['orders'] }),
         queryClient.invalidateQueries({ queryKey: ['inventory'] })
       ]);
-      toast.success('Order created as draft');
+      toast.success('Sale created as draft');
       navigate('/orders');
     },
     onError: (error: Error) => toast.error(error.message),
@@ -134,8 +134,8 @@ export default function OrderCreatePage() {
   useEffect(() => {
     if (createMutation.isPending) {
       if (!createToastRef.current) {
-        createToastRef.current = toast.loading('Creating draft order...', {
-          description: 'You will be returned to the orders list automatically when it is ready.',
+        createToastRef.current = toast.loading('Creating draft sale...', {
+          description: 'You will be returned to the sales list automatically when it is ready.',
         });
       }
       return;
@@ -155,8 +155,8 @@ export default function OrderCreatePage() {
       </Button>
 
       <PageHeader
-        title="Create Order"
-        description="Create a new draft order now. Stock is only reserved when you confirm the order."
+        title="Create Sale"
+        description="Create a new draft sale now. Stock is only reserved when you confirm the sale."
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -180,7 +180,7 @@ export default function OrderCreatePage() {
       <div className="erp-card p-4 sm:p-5">
         <h3 className="erp-section-title">Line Items</h3>
         <p className="mb-4 text-sm text-muted-foreground">
-          Each line can be fulfilled from a different warehouse. Stock guidance is shown per product and warehouse pair, and the final reservation still happens when you confirm the order.
+          Each line can be fulfilled from a different warehouse. Stock guidance is shown per product and warehouse pair, and the final reservation still happens when you confirm the sale.
         </p>
 
         <div className="space-y-3">
@@ -303,7 +303,7 @@ export default function OrderCreatePage() {
           Cancel
         </Button>
         <Button requiresOnline className="w-full sm:w-auto" disabled={createMutation.isPending} onClick={handleSubmit}>
-          {createMutation.isPending ? 'Creating...' : 'Create Draft Order'}
+          {createMutation.isPending ? 'Creating...' : 'Create Draft Sale'}
         </Button>
       </div>
     </div>
