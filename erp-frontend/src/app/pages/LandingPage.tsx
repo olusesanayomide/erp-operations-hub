@@ -206,10 +206,6 @@ export default function LandingPage() {
               animate={prefersReducedMotion ? undefined : { opacity: [0.45, 0.72, 0.45] }}
               transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
             />
-            <div className="absolute left-0 top-[18%] h-px w-40 bg-border/80" />
-            <div className="absolute right-0 top-[18%] h-px w-40 bg-border/80" />
-            <div className="absolute left-[10%] top-[18%] h-16 w-16 rounded-bl-[28px] border-b border-l border-border/70" />
-            <div className="absolute right-[10%] top-[18%] h-16 w-16 rounded-br-[28px] border-b border-r border-border/70" />
             <div className="absolute left-0 bottom-[28%] h-px w-44 bg-border/70" />
             <div className="absolute right-0 bottom-[28%] h-px w-44 bg-border/70" />
           </div>
