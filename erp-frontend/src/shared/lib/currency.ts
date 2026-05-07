@@ -10,6 +10,10 @@ export const DEFAULT_CURRENCY_SETTINGS = {
   exchangeRate: 1,
 } as const;
 
+const CURRENCY_SYMBOL_FALLBACKS: Record<string, string> = {
+  NGN: '₦',
+};
+
 export function isValidLocale(locale: string) {
   const trimmed = locale.trim();
 
@@ -64,10 +68,24 @@ export function resolveCurrencySettings(settings: CurrencySettingsLike) {
 
 export function formatCurrencyAmount(amount: number, settings: CurrencySettingsLike) {
   const resolved = resolveCurrencySettings(settings);
-
-  return new Intl.NumberFormat(resolved.locale, {
+  const formatter = new Intl.NumberFormat(resolved.locale, {
     style: 'currency',
     currency: resolved.currencyCode,
+    currencyDisplay: 'narrowSymbol',
     maximumFractionDigits: 2,
-  }).format(amount * resolved.exchangeRate);
+  });
+  const parts = formatter.formatToParts(amount * resolved.exchangeRate);
+  const fallbackSymbol = CURRENCY_SYMBOL_FALLBACKS[resolved.currencyCode];
+
+  if (!fallbackSymbol) {
+    return parts.map((part) => part.value).join('');
+  }
+
+  return parts
+    .map((part) =>
+      part.type === 'currency' && part.value === resolved.currencyCode
+        ? fallbackSymbol
+        : part.value,
+    )
+    .join('');
 }

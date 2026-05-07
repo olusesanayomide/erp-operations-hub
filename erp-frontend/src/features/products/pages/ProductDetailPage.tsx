@@ -1,12 +1,22 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Package, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Package, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useSettings } from '@/app/providers/SettingsContext';
 import { PageHeader, EmptyState, DetailPageSkeleton, ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/ui/alert-dialog';
 import { Button } from '@/shared/ui/button';
 import { deleteProduct, getProductById, listOrders, listPurchases, listWarehouses } from '@/shared/lib/erp-api';
 import { getStockStatus } from '@/shared/types/erp';
@@ -17,6 +27,7 @@ export default function ProductDetailPage() {
   const { canPerform } = useAuth();
   const { id } = useParams();
   const { formatMoney } = useSettings();
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['products', id],
     queryFn: () => getProductById(id || ''),
@@ -77,30 +88,62 @@ export default function ProductDetailPage() {
   const relatedPurchases = purchases.filter((purchase) => purchase.items.some((item) => item.productId === product.id));
 
   function handleRemoveProduct() {
-    const confirmed = window.confirm(
-      `Remove ${product.name}?\n\nUnused products will be deleted permanently. Products linked to inventory, orders, purchases, or stock movements will be archived instead and removed from the active catalog.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    deleteMutation.mutate(product.id);
+    setRemoveDialogOpen(true);
   }
 
   return (
     <div className="animate-fade-in space-y-6">
+      <AlertDialog
+        open={removeDialogOpen}
+        onOpenChange={(open) => {
+          if (!deleteMutation.isPending) {
+            setRemoveDialogOpen(open);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {product.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Unused products will be deleted permanently. Products linked to inventory, orders, purchases, or stock
+              movements will be archived instead and removed from the active catalog.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate(product.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                'Remove Product'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-center justify-between gap-3">
         <Link to="/products"><Button variant="ghost" size="sm"><ArrowLeft className="mr-1 h-4 w-4" />Back</Button></Link>
         {canPerform('products.delete') && !product.isArchived && (
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
             requiresOnline
             disabled={deleteMutation.isPending}
             onClick={handleRemoveProduct}
           >
-            <Trash2 className="mr-2 h-4 w-4" />
+            {deleteMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="mr-2 h-4 w-4" />
+            )}
             {deleteMutation.isPending ? 'Removing...' : 'Remove Product'}
           </Button>
         )}

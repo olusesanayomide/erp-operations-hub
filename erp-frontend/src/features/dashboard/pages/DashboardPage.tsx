@@ -1,14 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
   Boxes,
   CalendarDays,
+  X,
   MoreHorizontal,
   ShoppingCart,
   TrendingUp,
@@ -17,6 +19,7 @@ import { useSettings } from '@/app/providers/SettingsContext';
 import { ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { getDashboardSummary } from '@/shared/lib/erp-api';
 import { cn } from '@/shared/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
 
@@ -40,6 +43,8 @@ type DashboardCardProps = {
   children: React.ReactNode;
   className?: string;
 };
+
+type RevenueRange = 'monthly' | 'quarterly' | 'annually';
 
 const ORDER_SOURCE_TONES = ['#4f6bff', '#151821', '#767f91', '#d2d7e2'];
 function DashboardCard({ children, className }: DashboardCardProps) {
@@ -105,8 +110,106 @@ function buildAxisTicks(maxValue: number) {
   return [0, roundedMax * 0.25, roundedMax * 0.5, roundedMax * 0.75, roundedMax];
 }
 
+function buildRevenueSeries(summary: DashboardSummary, range: RevenueRange) {
+  const monthly = summary.analytics?.monthly ?? [];
+
+  if (range === 'monthly') {
+    return monthly;
+  }
+
+  if (range === 'quarterly') {
+    const quarters = new Map<
+      string,
+      {
+        key: string;
+        label: string;
+        orders: number;
+        purchases: number;
+        net: number;
+      }
+    >();
+
+    monthly.forEach((item) => {
+      const [yearValue, monthValue] = item.key.split('-');
+      const year = Number(yearValue);
+      const month = Number(monthValue);
+      const quarter = Math.floor((month - 1) / 3) + 1;
+      const key = `${year}-Q${quarter}`;
+      const existing = quarters.get(key);
+
+      if (existing) {
+        existing.orders += item.orders;
+        existing.purchases += item.purchases;
+        existing.net += item.net;
+        return;
+      }
+
+      quarters.set(key, {
+        key,
+        label: `Q${quarter}`,
+        orders: item.orders,
+        purchases: item.purchases,
+        net: item.net,
+      });
+    });
+
+    return Array.from(quarters.values());
+  }
+
+  const years = new Map<
+    string,
+    {
+      key: string;
+      label: string;
+      orders: number;
+      purchases: number;
+      net: number;
+    }
+  >();
+
+  monthly.forEach((item) => {
+    const year = item.key.slice(0, 4);
+    const existing = years.get(year);
+
+    if (existing) {
+      existing.orders += item.orders;
+      existing.purchases += item.purchases;
+      existing.net += item.net;
+      return;
+    }
+
+    years.set(year, {
+      key: year,
+      label: year,
+      orders: item.orders,
+      purchases: item.purchases,
+      net: item.net,
+    });
+  });
+
+  return Array.from(years.values());
+}
+
+function getAnalyticsDegradationMessages(summary: DashboardSummary) {
+  const messages: string[] = [];
+
+  if (!summary.analytics?.monthly?.length) {
+    messages.push('Revenue and spend history is unavailable right now.');
+  }
+
+  if (!summary.analytics?.customerFunnel?.length) {
+    messages.push('Customer funnel analytics could not be loaded.');
+  }
+
+  if (!summary.analytics?.orderFrequency?.values?.length) {
+    messages.push('Order frequency heatmap data is unavailable.');
+  }
+
+  return messages;
+}
+
 function buildOrderSources(statuses: DashboardSummary['orders']['byStatus'], totalOrders: number) {
-  const rankedStatuses = [...statuses]
+  const rankedStatuses = [...(statuses ?? [])]
     .sort((left, right) => right.value - left.value)
     .slice(0, 4);
 
@@ -160,14 +263,21 @@ function MetricCard({
         </div>
       </div>
 
-      <div className="mt-6">
-        <p className="text-[2.15rem] font-bold tracking-[-0.04em] text-slate-950">{value}</p>
+      <div className="mt-6 min-w-0">
+        <p
+          className="overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.85rem,3.1vw,2.15rem)] font-bold tracking-[-0.05em] text-slate-950"
+          title={value}
+        >
+          {value}
+        </p>
       </div>
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <div className="flex min-w-0 items-center gap-2 text-sm text-slate-500">
           <DetailIcon className="h-4 w-4 shrink-0" />
-          <span className="truncate">{detail}</span>
+          <span className="truncate" title={detail}>
+            {detail}
+          </span>
         </div>
         <Button asChild variant="outline" className="h-9 rounded-[10px] border-slate-200 bg-white px-4 text-xs font-semibold shadow-none">
           <Link to={href}>View Details</Link>
@@ -184,10 +294,25 @@ function MonthlyExpensesCard({
   summary: DashboardSummary;
   formatMoney: (value: number) => string;
 }) {
-  const series = useMemo(() => summary.analytics.monthly, [summary]);
-  const peak = Math.max(...series.map((item) => Math.max(item.orders, item.purchases)), 1);
-  const activePoint = series[4];
+  const [range, setRange] = useState<RevenueRange>('monthly');
+  const series = useMemo(() => buildRevenueSeries(summary, range), [range, summary]);
+  const safeSeries =
+    series.length > 0
+      ? series
+      : [
+          {
+            key: 'empty',
+            label: 'No data',
+            orders: 0,
+            purchases: 0,
+            net: 0,
+          },
+        ];
+  const peak = Math.max(...safeSeries.map((item) => Math.max(item.orders, item.purchases)), 1);
+  const activePoint = safeSeries[safeSeries.length - 1];
   const ticks = buildAxisTicks(peak);
+  const gridColumnsClass =
+    safeSeries.length <= 2 ? 'grid-cols-2' : safeSeries.length <= 4 ? 'grid-cols-4' : 'grid-cols-12';
 
   return (
     <DashboardCard className="p-3.5">
@@ -198,16 +323,21 @@ function MonthlyExpensesCard({
         </div>
 
         <div className="inline-flex rounded-[10px] border border-slate-200 bg-slate-50 p-1">
-          {['Monthly', 'Quarterly', 'Annually'].map((label, index) => (
+          {[
+            { label: 'Monthly', value: 'monthly' as const },
+            { label: 'Quarterly', value: 'quarterly' as const },
+            { label: 'Annually', value: 'annually' as const },
+          ].map((option) => (
             <button
-              key={label}
+              key={option.value}
               type="button"
+              onClick={() => setRange(option.value)}
               className={cn(
                 'rounded-[8px] px-3 py-1.5 text-xs font-semibold',
-                index === 0 ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                range === option.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
               )}
             >
-              {label}
+              {option.label}
             </button>
           ))}
         </div>
@@ -233,8 +363,13 @@ function MonthlyExpensesCard({
             ))}
           </div>
 
-          <div className="relative grid h-[280px] grid-cols-12 items-end gap-3 rounded-[10px] bg-[linear-gradient(180deg,rgba(79,107,255,0.05),rgba(255,255,255,0.01))] px-1 pb-2 pt-7">
-            {series.map((item) => {
+          <div
+            className={cn(
+              'relative grid h-[280px] items-end gap-3 rounded-[10px] bg-[linear-gradient(180deg,rgba(79,107,255,0.05),rgba(255,255,255,0.01))] px-1 pb-2 pt-7',
+              gridColumnsClass,
+            )}
+          >
+            {safeSeries.map((item) => {
               const height = Math.max((Math.max(item.orders, item.purchases) / peak) * 100, 14);
               const isActive = item.key === activePoint?.key;
 
@@ -373,7 +508,19 @@ function CustomerFunnelCard({
 }: {
   summary: DashboardSummary;
 }) {
-  const funnelSteps = useMemo(() => summary.analytics.customerFunnel, [summary]);
+  const funnelSteps = useMemo(
+    () =>
+      summary.analytics?.customerFunnel?.length
+        ? summary.analytics.customerFunnel
+        : [
+            { label: 'Customers Created', count: 0, value: 0 },
+            { label: 'Customers With Orders', count: 0, value: 0 },
+            { label: 'Customers In Fulfillment', count: 0, value: 0 },
+            { label: 'Customers With Delivered Orders', count: 0, value: 0 },
+            { label: 'Repeat Buyers', count: 0, value: 0 },
+          ],
+    [summary],
+  );
 
   return (
     <DashboardCard className="p-4">
@@ -415,10 +562,16 @@ function OrderFrequencyCard({
   compact?: boolean;
   summary: DashboardSummary;
 }) {
-  const values = summary.analytics.orderFrequency.values;
-  const hours = summary.analytics.orderFrequency.hours;
-  const days = summary.analytics.orderFrequency.days;
-  const peak = Math.max(...values.flat(), 1);
+  const values = summary.analytics?.orderFrequency?.values ?? [];
+  const hours = summary.analytics?.orderFrequency?.hours ?? [];
+  const days = summary.analytics?.orderFrequency?.days ?? [];
+  const safeValues =
+    values.length > 0
+      ? values
+      : Array.from({ length: 6 }, () => Array.from({ length: 7 }, () => 0));
+  const safeHours = hours.length > 0 ? hours : ['9.00', '10.00', '11.00', '12.00', '13.00', '14.00'];
+  const safeDays = days.length > 0 ? days : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const peak = Math.max(...safeValues.flat(), 1);
 
   return (
     <DashboardCard className="h-full p-4">
@@ -440,14 +593,14 @@ function OrderFrequencyCard({
         )}
       >
         <div className={cn('grid pt-1 text-slate-400', compact ? 'gap-2 text-xs' : 'gap-3 text-sm')}>
-          {hours.map((hour) => (
+          {safeHours.map((hour) => (
             <span key={hour}>{hour}</span>
           ))}
         </div>
 
         <div className="space-y-3">
           <div className={cn('grid grid-cols-7', compact ? 'gap-1' : 'gap-1.5')}>
-            {values.flatMap((row, rowIndex) =>
+            {safeValues.flatMap((row, rowIndex) =>
               row.map((value, columnIndex) => (
                 <div
                   key={`${rowIndex}-${columnIndex}`}
@@ -461,7 +614,7 @@ function OrderFrequencyCard({
           </div>
 
           <div className={cn('grid grid-cols-7 text-center text-slate-400', compact ? 'gap-1 text-[11px]' : 'gap-1.5 text-xs')}>
-            {days.map((day, index) => (
+            {safeDays.map((day, index) => (
               <span key={`${day}-${index}`}>{day}</span>
             ))}
           </div>
@@ -482,6 +635,11 @@ function DashboardMainColumn({
   totalSales: number;
   inventoryValue: number;
 }) {
+  const monthRevenue = summary.analytics?.sales?.monthRevenue ?? 0;
+  const salesPeriodStart = summary.analytics?.sales?.periodStart;
+  const salesPeriodEnd = summary.analytics?.sales?.periodEnd;
+  const inventoryLowStockCount = summary.inventory?.lowStockCount ?? 0;
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-2">
@@ -489,8 +647,8 @@ function DashboardMainColumn({
           title="Total Sales"
           value={formatMoney(totalSales)}
           subtitle="Confirmed to delivered revenue"
-          detail={`This month: ${formatMoney(summary.analytics.sales.monthRevenue)}`}
-          trend={formatDateRange(summary.analytics.sales.periodStart, summary.analytics.sales.periodEnd)}
+          detail={`This month: ${formatMoney(monthRevenue)}`}
+          trend={salesPeriodStart && salesPeriodEnd ? formatDateRange(salesPeriodStart, salesPeriodEnd) : 'Current month'}
           trendTone="neutral"
           icon={TrendingUp}
           href="/orders"
@@ -500,9 +658,9 @@ function DashboardMainColumn({
           title="Inventory Values"
           value={formatMoney(inventoryValue)}
           subtitle="On-hand stock valuation"
-          detail={summary.inventory.lowStockCount > 0 ? 'Need Rebalance Inventory' : 'Healthy inventory balance'}
-          trend={summary.inventory.lowStockCount > 0 ? `${summary.inventory.lowStockCount} low stock` : 'Healthy'}
-          trendTone={summary.inventory.lowStockCount > 0 ? 'negative' : 'neutral'}
+          detail={inventoryLowStockCount > 0 ? 'Need Rebalance Inventory' : 'Healthy inventory balance'}
+          trend={inventoryLowStockCount > 0 ? `${inventoryLowStockCount} low stock` : 'Healthy'}
+          trendTone={inventoryLowStockCount > 0 ? 'negative' : 'neutral'}
           icon={Boxes}
           href="/inventory"
           detailIcon={Boxes}
@@ -534,6 +692,7 @@ function DashboardSidebarColumn({
 
 export default function DashboardPage() {
   const { formatMoney } = useSettings();
+  const [analyticsWarningDismissed, setAnalyticsWarningDismissed] = useState(false);
   const dashboardQuery = useQuery({
     queryKey: ['dashboard', 'summary'],
     queryFn: getDashboardSummary,
@@ -567,13 +726,34 @@ export default function DashboardPage() {
     return null;
   }
 
-  const totalSales = summary.analytics.sales.totalRevenue;
-  const inventoryValue = summary.inventory.estimatedValue;
-  const totalOrders = summary.orders.byStatus.reduce((sum, item) => sum + item.value, 0);
+  const totalSales = summary.analytics?.sales?.totalRevenue ?? 0;
+  const inventoryValue = summary.inventory?.estimatedValue ?? 0;
+  const totalOrders = (summary.orders?.byStatus ?? []).reduce((sum, item) => sum + item.value, 0);
+  const analyticsDegradationMessages = getAnalyticsDegradationMessages(summary);
+  const showAnalyticsWarning =
+    analyticsDegradationMessages.length > 0 && !analyticsWarningDismissed;
 
   return (
     <div className="animate-fade-in">
       <div className="font-['Inter']">
+        {showAnalyticsWarning && (
+          <Alert className="relative mb-4 border-warning/30 bg-warning/10 pr-12 text-slate-950 [&>svg]:text-warning">
+            <AlertTriangle className="h-4 w-4" />
+            <button
+              type="button"
+              onClick={() => setAnalyticsWarningDismissed(true)}
+              className="absolute right-4 top-4 inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-white/70 hover:text-slate-900"
+              aria-label="Dismiss analytics warning"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <AlertTitle>Dashboard analytics are partially unavailable</AlertTitle>
+            <AlertDescription className="text-slate-700">
+              {analyticsDegradationMessages.join(' ')}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="lg:hidden">
           <div className="space-y-4">
             <DashboardMainColumn

@@ -6,7 +6,17 @@ import { PaginationControls } from '@/shared/components/PaginationControls';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Download, FileSpreadsheet, Package, Plus, Search, Trash2 } from 'lucide-react';
+import { Download, FileSpreadsheet, Loader2, Package, Plus, Search, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/shared/ui/alert-dialog';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 } from '@/shared/ui/dialog';
@@ -50,6 +60,7 @@ export default function ProductsPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const createToastRef = useRef<string | number | null>(null);
   const [removingProductId, setRemovingProductId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -104,16 +115,12 @@ export default function ProductsPage() {
     },
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success(result.message, {
-        description:
-          result.action === 'deleted'
-            ? 'The product was permanently removed from the active catalog.'
-            : 'The product stays available in historical records but is no longer usable in new transactions.',
-      });
+      toast.success(result.message);
     },
     onError: (error: Error) => toast.error(error.message),
     onSettled: () => {
       setRemovingProductId(null);
+      setPendingRemoval(null);
     },
   });
 
@@ -197,15 +204,7 @@ export default function ProductsPage() {
   }
 
   function handleRemoveProduct(productId: string, productName: string) {
-    const confirmed = window.confirm(
-      `Remove ${productName}?\n\nUnused products will be deleted permanently. Products linked to inventory, orders, purchases, or stock movements will be archived instead and removed from the active catalog.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    deleteMutation.mutate(productId);
+    setPendingRemoval({ id: productId, name: productName });
   }
 
   useEffect(() => {
@@ -451,6 +450,44 @@ export default function ProductsPage() {
         )}
       </PageHeader>
 
+      <AlertDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) {
+            setPendingRemoval(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingRemoval ? `Remove ${pendingRemoval.name}?` : 'Remove product?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Unused products will be deleted permanently. Products linked to inventory, orders, purchases, or stock
+              movements will be archived instead and removed from the active catalog.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!pendingRemoval || deleteMutation.isPending}
+              onClick={() => pendingRemoval && deleteMutation.mutate(pendingRemoval.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                'Remove Product'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Search */}
       <div className="relative mb-4 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -488,13 +525,17 @@ export default function ProductsPage() {
                       {canPerform('products.delete') && (
                         <td className="p-3 text-right">
                           <Button
-                            variant="ghost"
+                            variant="destructive"
                             size="sm"
                             requiresOnline
                             disabled={deleteMutation.isPending && removingProductId === p.id}
                             onClick={() => handleRemoveProduct(p.id, p.name)}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
+                            {deleteMutation.isPending && removingProductId === p.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="mr-2 h-4 w-4" />
+                            )}
                             {deleteMutation.isPending && removingProductId === p.id ? 'Removing...' : 'Remove'}
                           </Button>
                         </td>

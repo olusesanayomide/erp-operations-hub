@@ -16,6 +16,11 @@ function toNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return Number(value);
 }
 
+function toDecimal(value: Prisma.Decimal | number | string | null | undefined) {
+  if (value == null) return new Prisma.Decimal(0);
+  return value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value);
+}
+
 function toCount(value: bigint | number | string | null | undefined) {
   if (value == null) return 0;
   return Number(value);
@@ -330,24 +335,25 @@ export class DashboardService {
 
     const firstMonth = startOfMonth(new Date(now.getFullYear(), now.getMonth() - 11, 1));
     const monthlyOrdersByKey = new Map(
-      monthlyOrderTotals.map((item) => [monthKey(new Date(item.month)), toNumber(item.total)]),
+      monthlyOrderTotals.map((item) => [monthKey(new Date(item.month)), toDecimal(item.total)]),
     );
     const monthlyPurchasesByKey = new Map(
-      monthlyPurchaseTotals.map((item) => [monthKey(new Date(item.month)), toNumber(item.total)]),
+      monthlyPurchaseTotals.map((item) => [monthKey(new Date(item.month)), toDecimal(item.total)]),
     );
 
     const monthly = Array.from({ length: 12 }, (_, index) => {
       const date = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + index, 1);
       const key = monthKey(date);
-      const orders = monthlyOrdersByKey.get(key) ?? 0;
-      const purchases = monthlyPurchasesByKey.get(key) ?? 0;
+      const orders = monthlyOrdersByKey.get(key) ?? new Prisma.Decimal(0);
+      const purchases = monthlyPurchasesByKey.get(key) ?? new Prisma.Decimal(0);
+      const net = orders.minus(purchases);
 
       return {
         key,
         label: monthLabel(date),
-        orders,
-        purchases,
-        net: orders - purchases,
+        orders: toNumber(orders),
+        purchases: toNumber(purchases),
+        net: toNumber(net),
       };
     });
 

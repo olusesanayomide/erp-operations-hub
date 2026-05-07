@@ -25,7 +25,20 @@ type SettingsContextType = {
 
 const defaultCurrency: CurrencySettings = DEFAULT_CURRENCY_SETTINGS;
 
-const SettingsContext = createContext<SettingsContextType | null>(null);
+const fallbackSettingsContext: SettingsContextType = {
+  currency: defaultCurrency,
+  updateCurrency: async () => {
+    if (import.meta.env.DEV) {
+      console.warn('SettingsProvider is unavailable. Currency settings changes are disabled until the provider is restored.');
+    }
+  },
+  convertAmount: (amount: number) => amount * defaultCurrency.exchangeRate,
+  formatMoney: (amount: number) => formatCurrencyAmount(amount, defaultCurrency),
+  isLoading: false,
+  isSaving: false,
+};
+
+const SettingsContext = createContext<SettingsContextType>(fallbackSettingsContext);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -69,6 +82,5 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
 export function useSettings() {
   const context = useContext(SettingsContext);
-  if (!context) throw new Error('useSettings must be used within SettingsProvider');
   return context;
 }
