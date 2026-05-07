@@ -93,6 +93,7 @@ type RequestInitWithJson = RequestInit & {
   body?: BodyInit | object | null;
   timeoutMessage?: string;
   timeoutMs?: number;
+  allowStatuses?: number[];
 };
 
 function hasErrorName(error: unknown, name: string) {
@@ -184,6 +185,7 @@ export async function apiRequest<T>(
     accessToken: _accessToken,
     timeoutMessage: _timeoutMessage,
     timeoutMs: _timeoutMs,
+    allowStatuses: _allowStatuses,
     signal: externalSignal,
     ...fetchInit
   } = init;
@@ -223,6 +225,12 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
+    const allowStatuses = init.allowStatuses ?? [];
+
+    if (allowStatuses.includes(response.status)) {
+      return (await response.json()) as T;
+    }
+
     let message = `Request failed with status ${response.status}`;
 
     try {

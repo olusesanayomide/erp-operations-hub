@@ -1163,6 +1163,7 @@ export async function getCurrencySettings() {
 export async function getSystemHealth() {
   return apiRequest<SystemHealth>("/health", {
     accessToken: null,
+    allowStatuses: [503],
   });
 }
 
