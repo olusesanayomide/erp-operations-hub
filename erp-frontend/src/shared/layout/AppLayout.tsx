@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
@@ -10,6 +10,7 @@ import { getSystemHealth } from '@/shared/lib/erp-api';
 import { motion, useReducedMotion } from 'framer-motion';
 import { DatabaseZap, RotateCw, ServerCrash } from 'lucide-react';
 import { useOnlineStatus } from '@/shared/lib/online-status';
+import { API_SUCCESS_EVENT } from '@/shared/lib/api';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Overview',
@@ -62,8 +63,26 @@ function AppContentFallback() {
 export function AppLayout() {
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [hasConfirmedApiConnection, setHasConfirmedApiConnection] = useState(false);
   const isOnline = useOnlineStatus();
   const title = getTitle(location.pathname);
+
+  useEffect(() => {
+    const handleApiSuccess = (event: Event) => {
+      const detail = (event as CustomEvent<{ path?: string }>).detail;
+
+      if (detail?.path !== '/health') {
+        setHasConfirmedApiConnection(true);
+      }
+    };
+
+    window.addEventListener(API_SUCCESS_EVENT, handleApiSuccess);
+
+    return () => {
+      window.removeEventListener(API_SUCCESS_EVENT, handleApiSuccess);
+    };
+  }, []);
+
   const healthQuery = useQuery({
     queryKey: ['system-health'],
     queryFn: getSystemHealth,
@@ -71,7 +90,7 @@ export function AppLayout() {
     retry: false,
     enabled: isOnline,
   });
-  const isApiUnreachable = isOnline && healthQuery.isError;
+  const isApiUnreachable = isOnline && healthQuery.isError && !hasConfirmedApiConnection;
   const isDatabaseUnavailable = healthQuery.data?.database === 'down';
   const showHealthBanner = isApiUnreachable || isDatabaseUnavailable;
   const healthMessage = isApiUnreachable

@@ -10,6 +10,7 @@ const API_TIMEOUT_MESSAGE =
   "The server is taking too long to respond. Please try again.";
 const API_CANCELLED_MESSAGE = "The request was cancelled before it completed.";
 export const AUTH_API_ERROR_EVENT = "manifest:auth-api-error";
+export const API_SUCCESS_EVENT = "manifest:api-success";
 
 export type AuthApiErrorEventDetail = {
   status: 401 | 403;
@@ -158,6 +159,17 @@ function notifyAuthApiError(detail: AuthApiErrorEventDetail) {
   );
 }
 
+function notifyApiSuccess(path: string, status: number) {
+  window.dispatchEvent(
+    new CustomEvent(API_SUCCESS_EVENT, {
+      detail: {
+        path,
+        status,
+      },
+    }),
+  );
+}
+
 export async function apiRequest<T>(
   path: string,
   init: RequestInitWithJson = {},
@@ -262,8 +274,10 @@ export async function apiRequest<T>(
   }
 
   if (response.status === 204) {
+    notifyApiSuccess(path, response.status);
     return undefined as T;
   }
 
+  notifyApiSuccess(path, response.status);
   return (await response.json()) as T;
 }
