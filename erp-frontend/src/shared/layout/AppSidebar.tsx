@@ -5,46 +5,9 @@ import { preloadRoute } from '@/app/routeModules';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Sheet, SheetContent } from '@/shared/ui/sheet';
-import {
-  LayoutDashboard, Package, Boxes, ShoppingCart, Truck,
-  Users, Factory, Warehouse, Settings, ChevronLeft, UserCircle, Building2, ChevronDown
-} from 'lucide-react';
-
-const navGroups = [
-  {
-    label: 'Overview',
-    items: [{ label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }],
-  },
-  {
-    label: 'Inventory',
-    items: [
-      { label: 'Products', path: '/products', icon: Package },
-      { label: 'Inventory', path: '/inventory', icon: Boxes },
-      { label: 'Warehouses', path: '/warehouses', icon: Warehouse },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { label: 'Sales', path: '/orders', icon: ShoppingCart },
-      { label: 'Purchases', path: '/purchases', icon: Truck },
-    ],
-  },
-  {
-    label: 'Directory',
-    items: [
-      { label: 'Customers', path: '/customers', icon: Users },
-      { label: 'Suppliers', path: '/suppliers', icon: Factory },
-    ],
-  },
-  {
-    label: 'Admin',
-    items: [
-      { label: 'Users', path: '/users', icon: UserCircle },
-      { label: 'Settings', path: '/settings', icon: Settings },
-    ],
-  },
-];
+import { ChevronDown, ChevronLeft, LogOut } from 'lucide-react';
+import { buildNavigationGroups } from './navigation';
+import { Button } from '@/shared/ui/button';
 
 export function AppSidebar({
   mobileOpen,
@@ -55,19 +18,10 @@ export function AppSidebar({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [closedGroups, setClosedGroups] = useState<string[]>([]);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const isMobile = useIsMobile();
-  const groups = user?.isPlatformAdmin
-    ? navGroups.map((group) =>
-        group.label === 'Admin'
-          ? {
-              ...group,
-              items: [...group.items, { label: 'Tenants', path: '/admin/tenants', icon: Building2 }],
-            }
-          : group,
-      )
-    : navGroups;
+  const groups = buildNavigationGroups(!!user?.isPlatformAdmin);
 
   const handleIntent = (path: string) => {
     void preloadRoute(path);
@@ -171,6 +125,24 @@ export function AppSidebar({
           );
         })}
       </nav>
+
+      {isMobile && user && (
+        <div className="border-t border-sidebar-border px-4 py-4">
+          <div className="rounded-xl border border-sidebar-border/70 bg-sidebar-accent/40 p-3">
+            <p className="truncate text-sm font-semibold text-sidebar-primary-foreground">{user.name}</p>
+            <p className="mt-0.5 truncate text-xs text-sidebar-muted">{user.email}</p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 h-11 w-full justify-center border-sidebar-border bg-sidebar text-sidebar-foreground hover:bg-sidebar-accent"
+              onClick={() => void logout()}
+            >
+              <LogOut className="h-4 w-4" />
+              Log out
+            </Button>
+          </div>
+        </div>
+      )}
 
     </aside>
   );

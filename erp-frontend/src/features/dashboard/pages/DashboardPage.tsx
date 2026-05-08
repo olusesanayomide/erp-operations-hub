@@ -246,21 +246,21 @@ function MetricCard({
   detailIcon: DetailIcon = CalendarDays,
 }: MetricCardProps) {
   return (
-    <DashboardCard className="flex h-full min-w-0 flex-col p-2">
+    <DashboardCard className="flex h-full min-w-0 flex-col p-3 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-slate-200 bg-slate-50 text-slate-500">
             <Icon className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-[0.98rem] font-semibold text-slate-900">{title}</p>
-            <p className="mt-1 truncate text-xs text-slate-400">{subtitle}</p>
+            <p className="truncate text-sm font-semibold text-slate-900 sm:text-[0.98rem]">{title}</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-400 sm:mt-1 sm:text-xs">{subtitle}</p>
           </div>
         </div>
 
         <div
           className={cn(
-            'inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold',
+            'inline-flex max-w-[8.5rem] shrink-0 items-center gap-1 truncate rounded-full px-2.5 py-1 text-xs font-semibold sm:max-w-none',
             trendTone === 'positive' ? 'bg-[#eef3ff] text-[#4f6bff]' : 'bg-[#fff1f1] text-[#e35d5d]',
             trendTone === 'neutral' && 'bg-slate-100 text-slate-600',
           )}
@@ -271,23 +271,23 @@ function MetricCard({
         </div>
       </div>
 
-      <div className="mt-6 min-w-0">
+      <div className="mt-4 min-w-0 sm:mt-5">
         <p
-          className="overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.85rem,3.1vw,2.15rem)] font-bold tracking-[-0.05em] text-slate-950"
+          className="overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.5rem,7vw,1.95rem)] font-bold tracking-[-0.05em] text-slate-950 sm:text-[clamp(1.85rem,3.1vw,2.15rem)]"
           title={value}
         >
           {value}
         </p>
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-        <div className="flex min-w-0 items-center gap-2 text-sm text-slate-500">
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3.5 sm:mt-5 sm:pt-4">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500 sm:text-sm">
           <DetailIcon className="h-4 w-4 shrink-0" />
           <span className="truncate" title={detail}>
             {detail}
           </span>
         </div>
-        <Button asChild variant="outline" className="h-9 rounded-[10px] border-slate-200 bg-white px-4 text-xs font-semibold shadow-none">
+        <Button asChild variant="outline" className="h-11 rounded-[10px] border-slate-200 bg-white px-3 text-xs font-semibold shadow-none sm:px-4">
           <Link to={href}>View Details</Link>
         </Button>
       </div>
@@ -323,14 +323,14 @@ function MonthlyExpensesCard({
     safeSeries.length <= 2 ? 'grid-cols-2' : safeSeries.length <= 4 ? 'grid-cols-4' : 'grid-cols-12';
 
   return (
-    <DashboardCard className="p-3.5">
+    <DashboardCard className="p-3 sm:p-3.5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-[1.1rem] font-semibold text-slate-900">Monthly Revenue & Spend</h3>
-          <p className="mt-1 text-sm text-slate-400">Real monthly sales revenue versus purchase spend.</p>
+          <h3 className="text-base font-semibold text-slate-900 sm:text-[1.1rem]">Monthly Revenue & Spend</h3>
+          <p className="mt-1 text-xs text-slate-400 sm:text-sm">Real monthly sales revenue versus purchase spend.</p>
         </div>
 
-        <div className="inline-flex rounded-[10px] border border-slate-200 bg-slate-50 p-1">
+        <div className="inline-flex w-full rounded-[10px] border border-slate-200 bg-slate-50 p-1 sm:w-auto">
           {[
             { label: 'Monthly', value: 'monthly' as const },
             { label: 'Quarterly', value: 'quarterly' as const },
@@ -341,7 +341,7 @@ function MonthlyExpensesCard({
               type="button"
               onClick={() => setRange(option.value)}
               className={cn(
-                'rounded-[8px] px-3 py-1.5 text-xs font-semibold',
+                'flex-1 rounded-[8px] px-2.5 py-2 text-xs font-semibold sm:flex-none sm:px-3 sm:py-1.5',
                 range === option.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
               )}
             >
@@ -351,7 +351,7 @@ function MonthlyExpensesCard({
         </div>
       </div>
 
-      <div className="mt-7 grid gap-4 md:grid-cols-[56px_minmax(0,1fr)]">
+      <div className="mt-5 grid gap-3 md:mt-7 md:grid-cols-[56px_minmax(0,1fr)]">
         <div className="hidden text-right text-sm text-slate-400 md:grid">
           {ticks.slice().reverse().map((tick) => (
             <span key={tick} className="flex h-[56px] items-start justify-end">
@@ -373,7 +373,7 @@ function MonthlyExpensesCard({
 
           <div
             className={cn(
-              'relative grid h-[280px] items-end gap-3 rounded-[10px] bg-[linear-gradient(180deg,rgba(79,107,255,0.05),rgba(255,255,255,0.01))] px-1 pb-2 pt-7',
+              'relative grid h-[240px] items-end gap-2 rounded-[10px] bg-[linear-gradient(180deg,rgba(79,107,255,0.05),rgba(255,255,255,0.01))] px-1 pb-2 pt-5 sm:h-[280px] sm:gap-3 sm:pt-7',
               gridColumnsClass,
             )}
           >
@@ -386,7 +386,7 @@ function MonthlyExpensesCard({
                   {isActive && (
                     <>
                       <div className="absolute inset-y-2 border-l border-dashed border-[#aac0ff]" />
-                      <div className="absolute left-1/2 top-0 z-20 w-[188px] -translate-x-1/2 rounded-[12px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
+                      <div className="absolute left-1/2 top-0 z-20 hidden w-[188px] -translate-x-1/2 rounded-[12px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:block">
                         <div className="space-y-2 text-xs">
                           <div className="flex items-center justify-between gap-4 text-slate-500">
                             <span>Sales Revenue</span>
@@ -417,12 +417,18 @@ function MonthlyExpensesCard({
                     )}
                   </div>
 
-                  <span className={cn('mt-3 text-sm', isActive ? 'font-semibold text-slate-900' : 'text-slate-400')}>
+                  <span className={cn('mt-2 text-xs sm:mt-3 sm:text-sm', isActive ? 'font-semibold text-slate-900' : 'text-slate-400')}>
                     {item.label}
                   </span>
                 </div>
               );
             })}
+          </div>
+
+          <div className="mt-3 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600 sm:hidden">
+            <span className="font-semibold text-slate-900">{activePoint?.label ?? 'Current period'}:</span>{' '}
+            Sales {formatMoney(activePoint?.orders ?? 0)}, Spend {formatMoney(activePoint?.purchases ?? 0)}, Net{' '}
+            {formatMoney(activePoint?.net ?? 0)}
           </div>
         </div>
       </div>
@@ -441,7 +447,7 @@ function TotalOrdersCard({
   const leadingSource = sources[0];
 
   return (
-    <DashboardCard className="p-4">
+    <DashboardCard className="p-3 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] border border-slate-200 bg-slate-50 text-slate-500">
@@ -458,7 +464,7 @@ function TotalOrdersCard({
         </div>
       </div>
 
-      <p className="mt-4 text-[2.1rem] font-bold tracking-[-0.04em] text-slate-950">{totalOrders.toLocaleString()}</p>
+      <p className="mt-3 text-[1.85rem] font-bold tracking-[-0.04em] text-slate-950 sm:mt-4 sm:text-[2.1rem]">{totalOrders.toLocaleString()}</p>
 
       <div className="mt-4 flex gap-2">
         {sources.map((source) => (
@@ -499,11 +505,11 @@ function TotalOrdersCard({
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 rounded-[10px] border border-slate-200 bg-slate-50 px-3.5 py-2.5">
-        <div className="flex min-w-0 items-center gap-2 text-sm text-slate-600">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-slate-600 sm:text-sm">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span className="truncate">Track your sales pipeline</span>
         </div>
-        <Button asChild variant="outline" className="h-8 rounded-[10px] border-slate-200 bg-white px-4 text-xs font-semibold shadow-none">
+        <Button asChild variant="outline" className="h-11 rounded-[10px] border-slate-200 bg-white px-3 text-xs font-semibold shadow-none sm:px-4">
           <Link to="/orders">View Details</Link>
         </Button>
       </div>
@@ -534,23 +540,42 @@ function CustomerFunnelCard({
   );
 
   return (
-    <DashboardCard className="p-4">
+    <DashboardCard className="p-3 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[1.1rem] font-semibold text-slate-900">Customer Funnel Analytics</h3>
-          <p className="mt-1 text-sm text-slate-400">Customer progression from account creation to sales execution risk.</p>
+          <h3 className="text-base font-semibold text-slate-900 sm:text-[1.1rem]">Customer Funnel Analytics</h3>
+          <p className="mt-1 text-xs text-slate-400 sm:text-sm">Customer progression from account creation to sales execution risk.</p>
         </div>
 
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-slate-200 bg-white text-slate-500"
+          className="flex h-11 w-11 items-center justify-center rounded-[10px] border border-slate-200 bg-white text-slate-500"
           aria-label="More customer funnel options"
         >
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="mt-8 grid gap-3 sm:grid-cols-5">
+      <div className="mt-5 space-y-2.5 sm:hidden">
+        {funnelSteps.map((step) => (
+          <div key={step.label} className="rounded-[12px] border border-slate-200 bg-white px-3 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  {step.label}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">{step.count.toLocaleString()} customers</p>
+              </div>
+              <p className="shrink-0 text-xl font-bold tracking-[-0.04em] text-[#4f6bff]">{step.value}%</p>
+            </div>
+            <div className="mt-3 h-2 rounded-full bg-[#eef3ff]">
+              <div className="h-2 rounded-full bg-[#4f6bff]" style={{ width: `${Math.max(Math.min(step.value, 100), 0)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-8 hidden gap-3 sm:grid sm:grid-cols-5">
         {funnelSteps.map((step, index) => (
           <div key={step.label} className="relative rounded-[12px] border border-slate-200 bg-white p-4 text-center">
             <p className="text-[1.72rem] font-bold tracking-[-0.04em] text-[#4f6bff]">{step.value}%</p>
@@ -583,13 +608,14 @@ function OrderFrequencyCard({
   const safeHours = hours.length > 0 ? hours : ['9.00', '10.00', '11.00', '12.00', '13.00', '14.00'];
   const safeDays = days.length > 0 ? days : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const peak = Math.max(...safeValues.flat(), 1);
+  const hasOrderFrequencyData = values.some((row) => row.some((value) => value > 0));
 
   return (
-    <DashboardCard className="h-full p-4">
+    <DashboardCard className="h-full p-3 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[1.1rem] font-semibold text-slate-900">Sales Frequency</h3>
-          <p className="mt-1 text-sm text-slate-400">Last 90 days</p>
+          <h3 className="text-base font-semibold text-slate-900 sm:text-[1.1rem]">Sales Frequency</h3>
+          <p className="mt-1 text-xs text-slate-400 sm:text-sm">Last 90 days</p>
         </div>
 
         <div className="rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
@@ -599,7 +625,7 @@ function OrderFrequencyCard({
 
       <div
         className={cn(
-          'mt-6 grid gap-3',
+          'mt-5 grid gap-3 sm:mt-6',
           compact ? 'grid-cols-[34px_minmax(0,1fr)]' : 'grid-cols-[44px_minmax(0,1fr)]',
         )}
       >
@@ -615,7 +641,11 @@ function OrderFrequencyCard({
               row.map((value, columnIndex) => (
                 <div
                   key={`${rowIndex}-${columnIndex}`}
-                  className={cn('aspect-square border border-slate-100', compact ? 'rounded-[5px]' : 'rounded-[6px]')}
+                  className={cn(
+                    'aspect-square border border-slate-100',
+                    compact ? 'rounded-[5px]' : 'rounded-[6px]',
+                    !hasOrderFrequencyData && 'border-dashed bg-slate-50',
+                  )}
                   style={{
                     backgroundColor: `rgba(79, 107, 255, ${0.05 + (value / peak) * 0.82})`,
                   }}
@@ -629,6 +659,12 @@ function OrderFrequencyCard({
               <span key={`${day}-${index}`}>{day}</span>
             ))}
           </div>
+
+          {!hasOrderFrequencyData && (
+            <div className="rounded-[10px] border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
+              Sales data will appear here once your first order is confirmed.
+            </div>
+          )}
         </div>
       </div>
     </DashboardCard>
@@ -653,7 +689,7 @@ function DashboardMainColumn({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 xs:grid-cols-2 lg:grid-cols-2">
         <MetricCard
           title="Total Sales"
           value={formatMoney(totalSales)}

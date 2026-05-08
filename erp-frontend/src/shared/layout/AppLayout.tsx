@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -11,6 +11,11 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { DatabaseZap, RotateCw, ServerCrash } from 'lucide-react';
 import { useOnlineStatus } from '@/shared/lib/online-status';
 import { API_SUCCESS_EVENT } from '@/shared/lib/api';
+import { NotificationBell } from '@/shared/components/NotificationBell';
+import { cn } from '@/shared/lib/utils';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { mobileTabItems } from './navigation';
+import { useAuth } from '@/app/providers/AuthContext';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Overview',
@@ -65,6 +70,8 @@ export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [hasConfirmedApiConnection, setHasConfirmedApiConnection] = useState(false);
   const isOnline = useOnlineStatus();
+  const isMobile = useIsMobile();
+  const { user } = useAuth();
   const title = getTitle(location.pathname);
 
   useEffect(() => {
@@ -103,7 +110,7 @@ export function AppLayout() {
       <AppSidebar mobileOpen={mobileNavOpen} onMobileOpenChange={setMobileNavOpen} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AppHeader title={title} onMenuClick={() => setMobileNavOpen(true)} />
-        <main className="flex-1 overflow-auto bg-background p-4 xs:p-5 lg:p-6">
+        <main className={cn('flex-1 overflow-auto bg-background p-4 xs:p-5 lg:p-6', isMobile && 'pb-24')}>
           {showHealthBanner && (
             <Alert className="mb-5 border-warning/30 bg-warning/10 text-slate-950 [&>svg]:text-warning">
               {isApiUnreachable ? (
@@ -137,6 +144,58 @@ export function AppLayout() {
             <Outlet />
           </Suspense>
         </main>
+
+        {isMobile && (
+          <nav className="border-t border-border bg-card/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur">
+            <div className="grid grid-cols-5 gap-1">
+              {mobileTabItems.map((item) => {
+                const isActive = item.path ? location.pathname.startsWith(item.path) : false;
+                const Icon = item.icon;
+
+                if (item.label === 'Alerts') {
+                  return (
+                    <div key={item.label} className="flex">
+                      <NotificationBell enabled={!!user} showLabel />
+                    </div>
+                  );
+                }
+
+                if (item.label === 'Menu') {
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={() => setMobileNavOpen(true)}
+                      className="flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium text-muted-foreground transition-colors active:bg-accent"
+                      aria-label="Open full navigation"
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                }
+
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive: navIsActive }) =>
+                      cn(
+                        'flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium transition-colors',
+                        navIsActive || isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground active:bg-accent',
+                      )
+                    }
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          </nav>
+        )}
       </div>
     </div>
   );

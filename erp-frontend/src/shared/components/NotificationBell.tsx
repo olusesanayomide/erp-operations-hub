@@ -59,7 +59,13 @@ function groupNotifications(notifications: NotificationItem[]) {
   return Array.from(groups.entries());
 }
 
-export function NotificationBell({ enabled }: { enabled: boolean }) {
+export function NotificationBell({
+  enabled,
+  showLabel = false,
+}: {
+  enabled: boolean;
+  showLabel?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const {
@@ -99,10 +105,14 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="relative rounded-lg p-2 transition-colors hover:bg-muted"
+          className={cn(
+            'relative flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 transition-colors hover:bg-muted',
+            showLabel && 'w-full flex-col gap-1 px-1 py-2 text-[11px] font-medium',
+          )}
           aria-label="Notifications"
         >
           <Bell className="h-4.5 w-4.5 text-muted-foreground" />
+          {showLabel && <span className="text-muted-foreground">Alerts</span>}
           {unreadLabel && (
             <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
               {unreadLabel}
