@@ -3,20 +3,91 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '@/shared/components/PageComponents';
 import { ReferenceDataWarning } from '@/shared/components/ReferenceDataWarning';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/shared/ui/sheet';
 import { Textarea } from '@/shared/ui/textarea';
+import { cn } from '@/shared/lib/utils';
 import { getStockStatus, type InventoryItem } from '@/shared/types/erp';
 import { useAuth } from '@/app/providers/AuthContext';
-import { Search, Boxes, ArrowDownRight, ArrowUpRight, ArrowRightLeft, AlertTriangle } from 'lucide-react';
+import { Search, Boxes, ArrowDownRight, ArrowUpRight, ArrowRightLeft, AlertTriangle, Filter, Package2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { listInventorySummary, listProducts, listWarehouses, stockIn, stockOut, transferStock } from '@/shared/lib/erp-api';
 import { validatePositiveInteger } from '@/shared/lib/number-validation';
 
 const EMPTY_INVENTORY: InventoryItem[] = [];
+
+function StockLevelChip({
+  quantity,
+  minStock,
+  stockStatus,
+}: {
+  quantity: number;
+  minStock: number;
+  stockStatus: ReturnType<typeof getStockStatus>;
+}) {
+  return (
+    <div
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold',
+        stockStatus === 'out-of-stock' && 'bg-rose-50 text-rose-700',
+        stockStatus === 'low-stock' && 'bg-amber-50 text-amber-700',
+        stockStatus === 'in-stock' && 'bg-emerald-50 text-emerald-700',
+      )}
+    >
+      {stockStatus !== 'in-stock' && <AlertTriangle className="h-3.5 w-3.5" />}
+      <span>{quantity} available</span>
+      <span className="text-[10px] font-medium opacity-75">min {minStock}</span>
+    </div>
+  );
+}
+
+function InventoryCard({
+  item,
+}: {
+  item: InventoryItem & {
+    stockStatus: ReturnType<typeof getStockStatus>;
+  };
+}) {
+  return (
+    <article className="rounded-[14px] border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-slate-900">{item.product?.name ?? 'Unknown product'}</h3>
+          <p className="mt-1 text-xs text-slate-500">{item.product?.sku ?? 'Unknown SKU'}</p>
+        </div>
+        <StatusBadge status={item.stockStatus} className="shrink-0" />
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <StockLevelChip quantity={item.quantity} minStock={item.minStock} stockStatus={item.stockStatus} />
+        <div className="text-right">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">On Hand</p>
+          <p className="text-sm font-semibold text-slate-900">{item.onHandQuantity}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2 rounded-[12px] bg-slate-50 p-2.5">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Warehouse</p>
+          <p className="mt-1 truncate text-xs font-medium text-slate-700">{item.warehouse?.name ?? 'Unknown warehouse'}</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Reserved</p>
+          <p className="mt-1 text-xs font-medium text-slate-700">{item.reservedQuantity}</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Min Stock</p>
+          <p className="mt-1 text-xs font-medium text-slate-700">{item.minStock}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
 
 function StockDialog({
   type,
@@ -193,6 +264,7 @@ function TransferDialog({
 
 export default function InventoryPage() {
   const { canPerform } = useAuth();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [whFilter, setWhFilter] = useState('all');
@@ -200,6 +272,8 @@ export default function InventoryPage() {
   const [stockInOpen, setStockInOpen] = useState(false);
   const [stockOutOpen, setStockOutOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [stockInForm, setStockInForm] = useState({ productId: '', warehouseId: '', quantity: '1' });
   const [stockOutForm, setStockOutForm] = useState({ productId: '', warehouseId: '', quantity: '1' });
   const [transferForm, setTransferForm] = useState({
@@ -337,6 +411,12 @@ export default function InventoryPage() {
     return matchSearch && matchWarehouse && matchStatus;
   });
 
+  const lowStockCount = enriched.filter((item) => item.stockStatus === 'low-stock').length;
+  const outOfStockCount = enriched.filter((item) => item.stockStatus === 'out-of-stock').length;
+  const canStockIn = canPerform('inventory.stock-in');
+  const canStockOut = canPerform('inventory.stock-out');
+  const canTransfer = canPerform('inventory.transfer');
+
   const handleSubmit = (
     type: 'in' | 'out',
     form: { productId: string; warehouseId: string; quantity: string },
@@ -466,24 +546,124 @@ export default function InventoryPage() {
   }, [transferMutation.isPending]);
 
   return (
-    <div className="animate-fade-in">
-      <PageHeader title="Inventory" description={`${inventory.length} records across ${warehouses.length} warehouses`}>
-        {canPerform('inventory.stock-in') && (
-          <Button variant="outline" requiresOnline onClick={() => setStockInOpen(true)}>
-            <ArrowDownRight className="h-4 w-4 mr-2" />Stock In
-          </Button>
-        )}
-        {canPerform('inventory.stock-out') && (
-          <Button variant="outline" requiresOnline onClick={() => setStockOutOpen(true)}>
-            <ArrowUpRight className="h-4 w-4 mr-2" />Stock Out
-          </Button>
-        )}
-        {canPerform('inventory.transfer') && (
-          <Button variant="outline" requiresOnline onClick={() => setTransferOpen(true)}>
-            <ArrowRightLeft className="h-4 w-4 mr-2" />Transfer Stock
-          </Button>
-        )}
-      </PageHeader>
+    <div className="animate-fade-in pb-28 sm:pb-0">
+      <div className="hidden sm:block">
+        <PageHeader title="Inventory" description={`${inventory.length} records across ${warehouses.length} warehouses`}>
+          {canStockIn && (
+            <Button variant="outline" requiresOnline onClick={() => setStockInOpen(true)}>
+              <ArrowDownRight className="h-4 w-4 mr-2" />Stock In
+            </Button>
+          )}
+          {canStockOut && (
+            <Button variant="outline" requiresOnline onClick={() => setStockOutOpen(true)}>
+              <ArrowUpRight className="h-4 w-4 mr-2" />Stock Out
+            </Button>
+          )}
+          {canTransfer && (
+            <Button variant="outline" requiresOnline onClick={() => setTransferOpen(true)}>
+              <ArrowRightLeft className="h-4 w-4 mr-2" />Transfer Stock
+            </Button>
+          )}
+        </PageHeader>
+      </div>
+
+      <div className="space-y-4 sm:hidden">
+        <section className="rounded-[16px] border border-slate-200 bg-[linear-gradient(135deg,rgba(59,107,255,0.08),rgba(255,255,255,0.98))] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Inventory Health</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{filtered.length} visible items across {warehouses.length} warehouses</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-600 shadow-sm"
+              aria-label="Open inventory filters"
+            >
+              <Filter className="h-4.5 w-4.5" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
+            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">{search ? `Search: ${search}` : 'All products'}</div>
+            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">{whFilter === 'all' ? 'All warehouses' : warehouses.find((warehouse) => warehouse.id === whFilter)?.name ?? 'Warehouse'}</div>
+            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">{statusFilter === 'all' ? 'All statuses' : statusFilter.replace(/-/g, ' ')}</div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-[12px] bg-white p-2.5 shadow-sm">
+              <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Healthy</p>
+              <p className="mt-1 text-base font-semibold text-emerald-700">{enriched.length - lowStockCount - outOfStockCount}</p>
+            </div>
+            <div className="rounded-[12px] bg-white p-2.5 shadow-sm">
+              <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Low</p>
+              <p className="mt-1 text-base font-semibold text-amber-700">{lowStockCount}</p>
+            </div>
+            <div className="rounded-[12px] bg-white p-2.5 shadow-sm">
+              <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Out</p>
+              <p className="mt-1 text-base font-semibold text-rose-700">{outOfStockCount}</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <SheetContent side="bottom" className="rounded-t-[20px] px-4 pb-6 pt-8 sm:hidden">
+          <SheetHeader>
+            <SheetTitle>Filter Inventory</SheetTitle>
+            <SheetDescription>Search products and narrow the list without taking up screen space.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-5 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="inventory-mobile-search">Search product</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="inventory-mobile-search"
+                  placeholder="Product name or SKU"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Warehouse</Label>
+              <Select value={whFilter} onValueChange={setWhFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Warehouses</SelectItem>
+                  {warehouses.map((warehouse) => <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="in-stock">In Stock</SelectItem>
+                  <SelectItem value="low-stock">Low Stock</SelectItem>
+                  <SelectItem value="out-of-stock">Out of Stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 w-full"
+              onClick={() => {
+                setSearch('');
+                setWhFilter('all');
+                setStatusFilter('all');
+              }}
+            >
+              Reset Filters
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <StockDialog
         type="in"
@@ -527,7 +707,7 @@ export default function InventoryPage() {
         }}
       />
 
-      <div className="flex flex-wrap gap-3 mb-4">
+      <div className="mb-4 hidden flex-wrap gap-3 sm:flex">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search product..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
@@ -550,10 +730,6 @@ export default function InventoryPage() {
         </Select>
       </div>
 
-	      <p className="mb-4 text-sm text-muted-foreground">
-	        Available stock can be sold immediately. Reserved stock is committed to confirmed or picked orders.
-	      </p>
-
       {isReferenceDataError && <ReferenceDataWarning />}
       {shouldShowInventoryRefreshWarning && (
         <div className="mb-4 flex flex-col gap-3 rounded-md border border-warning/30 bg-warning/10 p-4 text-sm text-warning-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -570,9 +746,9 @@ export default function InventoryPage() {
         </div>
       )}
 		
-		      <div className="erp-card overflow-hidden">
-		        {isInventoryLoading ? (
-		          <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>
+      <div className="erp-card overflow-hidden">
+        {isInventoryLoading ? (
+          <div className="p-6"><TableSkeleton rows={6} cols={8} /></div>
 	        ) : shouldShowInventoryErrorState ? (
           <ErrorState
             title="Unable to load inventory"
@@ -580,8 +756,15 @@ export default function InventoryPage() {
             action={<RetryButton onClick={() => void refetchInventory()} />}
           />
         ) : (
-	          <div className="overflow-x-auto">
-	            <table className="w-full">
+          <>
+            <div className="space-y-3 p-3 sm:hidden">
+              {filtered.map((item) => (
+                <InventoryCard key={item.id} item={item} />
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="w-full">
               <thead><tr className="erp-table-header">
                 <th className="text-left p-3">Product</th>
                 <th className="text-left p-3">SKU</th>
@@ -608,11 +791,73 @@ export default function InventoryPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          </>
         )}
-		        {!isInventoryLoading && !isInventoryError && filtered.length === 0 && <EmptyState icon={Boxes} title="No inventory found" description="Adjust your filters" />}
-	      </div>
+        {!isInventoryLoading && !isInventoryError && filtered.length === 0 && <EmptyState icon={Boxes} title="No inventory found" description="Adjust your filters" />}
+      </div>
+
+      {isMobile && (canStockIn || canStockOut || canTransfer) && (
+        <>
+          {mobileActionsOpen && (
+            <div className="fixed inset-0 z-30 bg-slate-950/10" onClick={() => setMobileActionsOpen(false)} aria-hidden="true" />
+          )}
+          <div className="fixed bottom-24 right-4 z-40 flex flex-col items-end gap-2">
+            {mobileActionsOpen && canTransfer && (
+              <Button
+                variant="outline"
+                requiresOnline
+                className="h-11 rounded-full border-slate-200 bg-white px-4 shadow-lg"
+                onClick={() => {
+                  setTransferOpen(true);
+                  setMobileActionsOpen(false);
+                }}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Transfer Stock
+              </Button>
+            )}
+            {mobileActionsOpen && canStockOut && (
+              <Button
+                variant="outline"
+                requiresOnline
+                className="h-11 rounded-full border-slate-200 bg-white px-4 shadow-lg"
+                onClick={() => {
+                  setStockOutOpen(true);
+                  setMobileActionsOpen(false);
+                }}
+              >
+                <ArrowUpRight className="h-4 w-4 mr-2" />
+                Stock Out
+              </Button>
+            )}
+            {mobileActionsOpen && canStockIn && (
+              <Button
+                variant="outline"
+                requiresOnline
+                className="h-11 rounded-full border-slate-200 bg-white px-4 shadow-lg"
+                onClick={() => {
+                  setStockInOpen(true);
+                  setMobileActionsOpen(false);
+                }}
+              >
+                <ArrowDownRight className="h-4 w-4 mr-2" />
+                Stock In
+              </Button>
+            )}
+            <Button
+              type="button"
+              requiresOnline={false}
+              className="h-14 w-14 rounded-full shadow-[0_18px_38px_rgba(59,107,255,0.35)]"
+              onClick={() => setMobileActionsOpen((current) => !current)}
+              aria-label={mobileActionsOpen ? 'Close inventory actions' : 'Open inventory actions'}
+            >
+              {mobileActionsOpen ? <Package2 className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

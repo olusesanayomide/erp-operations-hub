@@ -20,6 +20,7 @@ import { ErrorState, RetryButton } from '@/shared/components/PageComponents';
 import { getDashboardSummary } from '@/shared/lib/erp-api';
 import { cn } from '@/shared/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/ui/accordion';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
 
@@ -44,6 +45,13 @@ type DashboardCardProps = {
   className?: string;
 };
 
+type DashboardSectionProps = {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+  accentClassName?: string;
+};
+
 type RevenueRange = 'monthly' | 'quarterly' | 'annually';
 
 const ORDER_SOURCE_TONES = ['#4f6bff', '#151821', '#767f91', '#d2d7e2'];
@@ -56,6 +64,28 @@ function DashboardCard({ children, className }: DashboardCardProps) {
       )}
     >
       {children}
+    </section>
+  );
+}
+
+function DashboardSection({
+  title,
+  description,
+  children,
+  accentClassName = 'from-[#4f6bff]/10 via-white to-white',
+}: DashboardSectionProps) {
+  return (
+    <section
+      className={cn(
+        'rounded-[16px] border border-slate-200/80 bg-gradient-to-br p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none',
+        accentClassName,
+      )}
+    >
+      <div className="mb-3 px-1 sm:hidden">
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+      </div>
+      <div className="space-y-4">{children}</div>
     </section>
   );
 }
@@ -245,42 +275,61 @@ function MetricCard({
   href,
   detailIcon: DetailIcon = CalendarDays,
 }: MetricCardProps) {
+  const trendClasses =
+    trendTone === 'positive'
+      ? 'bg-emerald-50 text-emerald-700'
+      : trendTone === 'negative'
+        ? 'bg-rose-50 text-rose-700'
+        : 'bg-slate-100 text-slate-600';
+
   return (
     <DashboardCard className="flex h-full min-w-0 flex-col p-3 sm:p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-slate-200 bg-slate-50 text-slate-500">
+      <div className="sm:flex sm:items-start sm:justify-between sm:gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-slate-200 bg-slate-50 text-slate-500">
             <Icon className="h-4 w-4" />
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-900 sm:text-[0.98rem]">{title}</p>
-            <p className="mt-0.5 truncate text-[11px] text-slate-400 sm:mt-1 sm:text-xs">{subtitle}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900 sm:text-[0.98rem]">{title}</p>
+                <p className="mt-0.5 truncate text-[11px] text-slate-400 sm:mt-1 sm:text-xs">{subtitle}</p>
+              </div>
+              <div
+                className={cn(
+                  'inline-flex max-w-[8.75rem] shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold sm:max-w-none sm:text-xs',
+                  trendClasses,
+                )}
+              >
+                {trendTone === 'positive' && <ArrowUpRight className="h-3.5 w-3.5" />}
+                {trendTone === 'negative' && <ArrowDownRight className="h-3.5 w-3.5" />}
+                <span className="truncate">{trend}</span>
+              </div>
+            </div>
+
+            <div className="mt-3 min-w-0 sm:mt-4">
+              <p
+                className="overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.5rem,7vw,1.95rem)] font-bold tracking-[-0.05em] text-slate-950 sm:text-[clamp(1.85rem,3.1vw,2.15rem)]"
+                title={value}
+              >
+                {value}
+              </p>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
+              <div className="inline-flex min-w-0 items-center gap-2 rounded-full bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600">
+                <DetailIcon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{detail}</span>
+              </div>
+              <Button asChild variant="outline" className="h-11 rounded-[10px] border-slate-200 bg-white px-3 text-xs font-semibold shadow-none">
+                <Link to={href}>View Details</Link>
+              </Button>
+            </div>
           </div>
         </div>
-
-        <div
-          className={cn(
-            'inline-flex max-w-[8.5rem] shrink-0 items-center gap-1 truncate rounded-full px-2.5 py-1 text-xs font-semibold sm:max-w-none',
-            trendTone === 'positive' ? 'bg-[#eef3ff] text-[#4f6bff]' : 'bg-[#fff1f1] text-[#e35d5d]',
-            trendTone === 'neutral' && 'bg-slate-100 text-slate-600',
-          )}
-        >
-          {trendTone === 'positive' && <ArrowUpRight className="h-3.5 w-3.5" />}
-          {trendTone === 'negative' && <ArrowDownRight className="h-3.5 w-3.5" />}
-          {trend}
-        </div>
       </div>
 
-      <div className="mt-4 min-w-0 sm:mt-5">
-        <p
-          className="overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.5rem,7vw,1.95rem)] font-bold tracking-[-0.05em] text-slate-950 sm:text-[clamp(1.85rem,3.1vw,2.15rem)]"
-          title={value}
-        >
-          {value}
-        </p>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3.5 sm:mt-5 sm:pt-4">
+      <div className="mt-4 hidden items-center justify-between gap-3 border-t border-slate-100 pt-3.5 sm:mt-5 sm:flex sm:pt-4">
         <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500 sm:text-sm">
           <DetailIcon className="h-4 w-4 shrink-0" />
           <span className="truncate" title={detail}>
@@ -458,13 +507,20 @@ function TotalOrdersCard({
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-1 rounded-full bg-[#eef3ff] px-2.5 py-1 text-xs font-semibold text-[#4f6bff]">
+        <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
           <ArrowUpRight className="h-3.5 w-3.5" />
-          {leadingSource ? `${leadingSource.percent}%` : '0%'}
+          {leadingSource ? `${leadingSource.percent}% leading` : '0% leading'}
         </div>
       </div>
 
       <p className="mt-3 text-[1.85rem] font-bold tracking-[-0.04em] text-slate-950 sm:mt-4 sm:text-[2.1rem]">{totalOrders.toLocaleString()}</p>
+
+      <div className="mt-2 flex items-center gap-2 sm:hidden">
+        <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">Pipeline summary</div>
+        <Button asChild variant="outline" className="h-11 rounded-[10px] border-slate-200 bg-white px-3 text-xs font-semibold shadow-none">
+          <Link to="/orders">View Details</Link>
+        </Button>
+      </div>
 
       <div className="mt-4 flex gap-2">
         {sources.map((source) => (
@@ -480,7 +536,7 @@ function TotalOrdersCard({
         <div className="h-8 w-2 rounded-[8px] bg-slate-300" />
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 hidden space-y-3 sm:block">
         {sources.map((source) => (
           <div key={source.label} className="space-y-1.5">
             <div className="flex items-center justify-between gap-3 text-sm">
@@ -504,7 +560,40 @@ function TotalOrdersCard({
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 rounded-[10px] border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+      <div className="mt-4 sm:hidden">
+        <Accordion type="single" collapsible className="rounded-[12px] border border-slate-200 bg-slate-50 px-3">
+          <AccordionItem value="sales-breakdown" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold text-slate-900 hover:no-underline">
+              Detailed Breakdown
+            </AccordionTrigger>
+            <AccordionContent className="pb-3">
+              <div className="space-y-3">
+                {sources.map((source) => (
+                  <div key={source.label} className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: source.color }} />
+                        <span>{source.label}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-slate-900">{source.value.toLocaleString()}</span>
+                        <span className="rounded-full bg-[#eef3ff] px-2 py-0.5 text-xs font-semibold text-[#4f6bff]">
+                          {source.percent}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white">
+                      <div className="h-1.5 rounded-full bg-[#4f6bff]" style={{ width: `${Math.min(source.percent, 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </div>
+
+      <div className="mt-4 hidden items-center justify-between gap-3 rounded-[10px] border border-slate-200 bg-slate-50 px-3.5 py-2.5 sm:flex">
         <div className="flex min-w-0 items-center gap-2 text-xs text-slate-600 sm:text-sm">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span className="truncate">Track your sales pipeline</span>
@@ -543,8 +632,8 @@ function CustomerFunnelCard({
     <DashboardCard className="p-3 sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold text-slate-900 sm:text-[1.1rem]">Customer Funnel Analytics</h3>
-          <p className="mt-1 text-xs text-slate-400 sm:text-sm">Customer progression from account creation to sales execution risk.</p>
+          <h3 className="text-base font-semibold text-slate-900 sm:text-[1.1rem]">Funnel Summary</h3>
+          <p className="mt-1 text-xs text-slate-400 sm:text-sm">Customer progression from account creation to repeat buyers in one scan.</p>
         </div>
 
         <button
@@ -556,23 +645,32 @@ function CustomerFunnelCard({
         </button>
       </div>
 
-      <div className="mt-5 space-y-2.5 sm:hidden">
-        {funnelSteps.map((step) => (
-          <div key={step.label} className="rounded-[12px] border border-slate-200 bg-white px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  {step.label}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">{step.count.toLocaleString()} customers</p>
+      <div className="mt-5 rounded-[14px] border border-slate-200 bg-slate-50 p-3 sm:hidden">
+        <div className="grid grid-cols-5 gap-1.5">
+          {funnelSteps.map((step, index) => (
+            <div key={step.label} className="min-w-0 rounded-[10px] bg-white px-2 py-2 text-center">
+              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                {step.label.replace('Customers ', '').replace('With ', '')}
+              </p>
+              <p className="mt-1 text-lg font-bold tracking-[-0.04em] text-[#4f6bff]">{step.value}%</p>
+              <p className="mt-1 truncate text-[10px] text-slate-500">{step.count.toLocaleString()}</p>
+              {index < funnelSteps.length - 1 && <div className="mx-auto mt-2 h-1 w-6 rounded-full bg-[#dbe3ff]" />}
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 space-y-2">
+          {funnelSteps.map((step) => (
+            <div key={`${step.label}-bar`} className="space-y-1">
+              <div className="flex items-center justify-between gap-3 text-[11px]">
+                <span className="truncate font-medium text-slate-600">{step.label}</span>
+                <span className="shrink-0 font-semibold text-slate-900">{step.value}%</span>
               </div>
-              <p className="shrink-0 text-xl font-bold tracking-[-0.04em] text-[#4f6bff]">{step.value}%</p>
+              <div className="h-1.5 rounded-full bg-white">
+                <div className="h-1.5 rounded-full bg-[#4f6bff]" style={{ width: `${Math.max(Math.min(step.value, 100), 0)}%` }} />
+              </div>
             </div>
-            <div className="mt-3 h-2 rounded-full bg-[#eef3ff]">
-              <div className="h-2 rounded-full bg-[#4f6bff]" style={{ width: `${Math.max(Math.min(step.value, 100), 0)}%` }} />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <div className="mt-8 hidden gap-3 sm:grid sm:grid-cols-5">
@@ -689,33 +787,45 @@ function DashboardMainColumn({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xs:grid-cols-2 lg:grid-cols-2">
-        <MetricCard
-          title="Total Sales"
-          value={formatMoney(totalSales)}
-          subtitle="Confirmed to delivered revenue"
-          detail={`This month: ${formatMoney(monthRevenue)}`}
-          trend={salesPeriodStart && salesPeriodEnd ? formatDateRange(salesPeriodStart, salesPeriodEnd) : 'Current month'}
-          trendTone="neutral"
-          icon={TrendingUp}
-          href="/orders"
-          detailIcon={TrendingUp}
-        />
-        <MetricCard
-          title="Inventory Values"
-          value={formatMoney(inventoryValue)}
-          subtitle="On-hand stock valuation"
-          detail={inventoryLowStockCount > 0 ? 'Need Rebalance Inventory' : 'Healthy inventory balance'}
-          trend={inventoryLowStockCount > 0 ? `${inventoryLowStockCount} low stock` : 'Healthy'}
-          trendTone={inventoryLowStockCount > 0 ? 'negative' : 'neutral'}
-          icon={Boxes}
-          href="/inventory"
-          detailIcon={Boxes}
-        />
-      </div>
+      <DashboardSection
+        title="Performance"
+        description="Revenue and inventory health grouped together for faster scanning."
+        accentClassName="from-[#4f6bff]/10 via-white to-white"
+      >
+        <div className="grid gap-4 xs:grid-cols-2 lg:grid-cols-2">
+          <MetricCard
+            title="Total Sales"
+            value={formatMoney(totalSales)}
+            subtitle="Confirmed to delivered revenue"
+            detail={`This month: ${formatMoney(monthRevenue)}`}
+            trend={salesPeriodStart && salesPeriodEnd ? formatDateRange(salesPeriodStart, salesPeriodEnd) : 'Current month'}
+            trendTone="positive"
+            icon={TrendingUp}
+            href="/orders"
+            detailIcon={TrendingUp}
+          />
+          <MetricCard
+            title="Inventory Values"
+            value={formatMoney(inventoryValue)}
+            subtitle="On-hand stock valuation"
+            detail={inventoryLowStockCount > 0 ? 'Need Rebalance Inventory' : 'Healthy inventory balance'}
+            trend={inventoryLowStockCount > 0 ? `${inventoryLowStockCount} low stock` : 'Healthy'}
+            trendTone={inventoryLowStockCount > 0 ? 'negative' : 'positive'}
+            icon={Boxes}
+            href="/inventory"
+            detailIcon={Boxes}
+          />
+        </div>
+      </DashboardSection>
 
-      <MonthlyExpensesCard summary={summary} formatMoney={formatMoney} />
-      <CustomerFunnelCard summary={summary} />
+      <DashboardSection
+        title="Revenue Flow"
+        description="Trend and funnel context stay within the same visual region."
+        accentClassName="from-slate-100 via-white to-white"
+      >
+        <MonthlyExpensesCard summary={summary} formatMoney={formatMoney} />
+        <CustomerFunnelCard summary={summary} />
+      </DashboardSection>
     </div>
   );
 }
@@ -730,10 +840,14 @@ function DashboardSidebarColumn({
   summary: DashboardSummary;
 }) {
   return (
-    <div className="space-y-4">
+    <DashboardSection
+      title="Operations"
+      description="Sales pipeline and activity patterns sit together to reduce context switching."
+      accentClassName="from-emerald-50/70 via-white to-white"
+    >
       <TotalOrdersCard totalOrders={totalOrders} statuses={statuses} />
       <OrderFrequencyCard compact summary={summary} />
-    </div>
+    </DashboardSection>
   );
 }
 
