@@ -4,6 +4,7 @@ import { PageHeader, EmptyState, ErrorState, RetryButton, TableSkeleton } from '
 import { ReferenceDataWarning } from '@/shared/components/ReferenceDataWarning';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/ui/accordion';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
@@ -48,10 +49,22 @@ function StockLevelChip({
 
 function InventoryCard({
   item,
+  canStockIn,
+  canStockOut,
+  canTransfer,
+  onStockIn,
+  onStockOut,
+  onTransfer,
 }: {
   item: InventoryItem & {
     stockStatus: ReturnType<typeof getStockStatus>;
   };
+  canStockIn: boolean;
+  canStockOut: boolean;
+  canTransfer: boolean;
+  onStockIn: () => void;
+  onStockOut: () => void;
+  onTransfer: () => void;
 }) {
   return (
     <article className="rounded-[14px] border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -60,31 +73,85 @@ function InventoryCard({
           <h3 className="truncate text-sm font-semibold text-slate-900">{item.product?.name ?? 'Unknown product'}</h3>
           <p className="mt-1 text-xs text-slate-500">{item.product?.sku ?? 'Unknown SKU'}</p>
         </div>
-        <StatusBadge status={item.stockStatus} className="shrink-0" />
+        <div
+          className={cn(
+            'mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full',
+            item.stockStatus === 'out-of-stock' && 'bg-rose-500',
+            item.stockStatus === 'low-stock' && 'bg-amber-500',
+            item.stockStatus === 'in-stock' && 'bg-emerald-500',
+          )}
+          aria-label={item.stockStatus.replace(/-/g, ' ')}
+          title={item.stockStatus.replace(/-/g, ' ')}
+        />
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <StockLevelChip quantity={item.quantity} minStock={item.minStock} stockStatus={item.stockStatus} />
-        <div className="text-right">
-          <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">On Hand</p>
-          <p className="text-sm font-semibold text-slate-900">{item.onHandQuantity}</p>
+      <div className="mt-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <p
+            className={cn(
+              'text-[1.6rem] font-bold tracking-[-0.04em]',
+              item.stockStatus === 'out-of-stock' && 'text-rose-700',
+              item.stockStatus === 'low-stock' && 'text-amber-700',
+              item.stockStatus === 'in-stock' && 'text-emerald-700',
+            )}
+          >
+            {item.quantity}
+          </p>
+          <StockLevelChip quantity={item.quantity} minStock={item.minStock} stockStatus={item.stockStatus} />
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 rounded-[12px] bg-slate-50 p-2.5">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Warehouse</p>
-          <p className="mt-1 truncate text-xs font-medium text-slate-700">{item.warehouse?.name ?? 'Unknown warehouse'}</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Reserved</p>
-          <p className="mt-1 text-xs font-medium text-slate-700">{item.reservedQuantity}</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Min Stock</p>
-          <p className="mt-1 text-xs font-medium text-slate-700">{item.minStock}</p>
-        </div>
+      <div className="mt-3 rounded-[12px] bg-slate-50 px-3 py-2.5">
+        <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Warehouse</p>
+        <p className="mt-1 text-xs font-medium leading-5 text-slate-700">{item.warehouse?.name ?? 'Unknown warehouse'}</p>
       </div>
+
+      <Accordion type="single" collapsible className="mt-3 rounded-[12px] border border-slate-200 bg-slate-50 px-3">
+        <AccordionItem value={`inventory-${item.id}`} className="border-b-0">
+          <AccordionTrigger className="py-3.5 text-xs font-semibold text-slate-700 hover:no-underline">
+            More details
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Reserved</p>
+                <p className="mt-1 text-xs font-medium text-slate-700">{item.reservedQuantity}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">On Hand</p>
+                <p className="mt-1 text-xs font-medium text-slate-700">{item.onHandQuantity}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400">Min Stock</p>
+                <p className="mt-1 text-xs font-medium text-slate-700">{item.minStock}</p>
+              </div>
+            </div>
+
+            {(canStockIn || canStockOut || canTransfer) && (
+              <div className="mt-4 flex flex-wrap gap-2.5">
+                {canStockIn && (
+                  <Button variant="outline" className="h-11 rounded-full px-4 text-xs" onClick={onStockIn}>
+                    <ArrowDownRight className="h-3.5 w-3.5 mr-1" />
+                    Stock In
+                  </Button>
+                )}
+                {canStockOut && (
+                  <Button variant="outline" className="h-11 rounded-full px-4 text-xs" onClick={onStockOut}>
+                    <ArrowUpRight className="h-3.5 w-3.5 mr-1" />
+                    Stock Out
+                  </Button>
+                )}
+                {canTransfer && (
+                  <Button variant="outline" className="h-11 rounded-full px-4 text-xs" onClick={onTransfer}>
+                    <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />
+                    Transfer
+                  </Button>
+                )}
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </article>
   );
 }
@@ -497,6 +564,38 @@ export default function InventoryPage() {
     });
   };
 
+  const openStockInForItem = (item: InventoryItem) => {
+    setStockInForm({
+      productId: item.productId,
+      warehouseId: item.warehouseId,
+      quantity: '1',
+    });
+    setStockInOpen(true);
+  };
+
+  const openStockOutForItem = (item: InventoryItem) => {
+    setStockOutForm({
+      productId: item.productId,
+      warehouseId: item.warehouseId,
+      quantity: '1',
+    });
+    setStockOutOpen(true);
+  };
+
+  const openTransferForItem = (item: InventoryItem) => {
+    const alternateWarehouseId =
+      warehouses.find((warehouse) => warehouse.id !== item.warehouseId)?.id ?? item.warehouseId;
+
+    setTransferForm({
+      productId: item.productId,
+      sourceWarehouseId: item.warehouseId,
+      destinationWarehouseId: alternateWarehouseId,
+      quantity: '1',
+      note: '',
+    });
+    setTransferOpen(true);
+  };
+
   useEffect(() => {
     if (stockInMutation.isPending) {
       if (!stockInToastRef.current) {
@@ -584,11 +683,11 @@ export default function InventoryPage() {
             </button>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
-            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">{search ? `Search: ${search}` : 'All products'}</div>
-            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">{whFilter === 'all' ? 'All warehouses' : warehouses.find((warehouse) => warehouse.id === whFilter)?.name ?? 'Warehouse'}</div>
-            <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">{statusFilter === 'all' ? 'All statuses' : statusFilter.replace(/-/g, ' ')}</div>
-          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-600">
+            {search ? `Searching "${search}". ` : ''}
+            {whFilter === 'all' ? 'All warehouses. ' : `${warehouses.find((warehouse) => warehouse.id === whFilter)?.name ?? 'Warehouse'} selected. `}
+            {statusFilter === 'all' ? 'Showing every stock state.' : `Showing ${statusFilter.replace(/-/g, ' ')} items.`}
+          </p>
 
           <div className="mt-3 grid grid-cols-3 gap-2">
             <div className="rounded-[12px] bg-white p-2.5 shadow-sm">
@@ -759,7 +858,16 @@ export default function InventoryPage() {
           <>
             <div className="space-y-3 p-3 sm:hidden">
               {filtered.map((item) => (
-                <InventoryCard key={item.id} item={item} />
+                <InventoryCard
+                  key={item.id}
+                  item={item}
+                  canStockIn={canStockIn}
+                  canStockOut={canStockOut}
+                  canTransfer={canTransfer}
+                  onStockIn={() => openStockInForItem(item)}
+                  onStockOut={() => openStockOutForItem(item)}
+                  onTransfer={() => openTransferForItem(item)}
+                />
               ))}
             </div>
 

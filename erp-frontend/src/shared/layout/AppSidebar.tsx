@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthContext';
 import { preloadRoute } from '@/app/routeModules';
@@ -23,6 +23,18 @@ export function AppSidebar({
   const isMobile = useIsMobile();
   const groups = buildNavigationGroups(!!user?.isPlatformAdmin);
 
+  useEffect(() => {
+    if (!isMobile || !mobileOpen) {
+      return;
+    }
+
+    setClosedGroups(
+      groups
+        .filter((group) => !group.items.some((item) => location.pathname.startsWith(item.path)))
+        .map((group) => group.label),
+    );
+  }, [groups, isMobile, location.pathname, mobileOpen]);
+
   const handleIntent = (path: string) => {
     void preloadRoute(path);
   };
@@ -33,6 +45,28 @@ export function AppSidebar({
         ? current.filter((groupLabel) => groupLabel !== label)
         : [...current, label],
     );
+  };
+
+  const getGroupAccentClasses = (label: string) => {
+    if (label === 'Overview') return 'bg-white/70 border-white/70';
+    if (label === 'Inventory') return 'bg-sky-400/10 border-sky-300/20';
+    if (label === 'Operations') return 'bg-emerald-400/10 border-emerald-300/20';
+    if (label === 'Directory') return 'bg-amber-400/10 border-amber-300/20';
+    return 'bg-slate-400/10 border-slate-300/20';
+  };
+
+  const getItemIconClasses = (groupLabel: string, isActive: boolean) => {
+    if (isActive) return 'bg-white text-slate-900';
+    if (groupLabel === 'Inventory') return 'bg-sky-400/15 text-sky-100';
+    if (groupLabel === 'Operations') return 'bg-emerald-400/15 text-emerald-100';
+    if (groupLabel === 'Directory') return 'bg-amber-400/15 text-amber-100';
+    if (groupLabel === 'Admin') return 'bg-slate-200/15 text-slate-100';
+    return 'bg-white/15 text-white';
+  };
+
+  const getItemIconStrokeWidth = (groupLabel: string) => {
+    if (groupLabel === 'Inventory') return 1.9;
+    return 2;
   };
 
   const navContent = (
@@ -69,12 +103,18 @@ export function AppSidebar({
           const isOpen = collapsed || isGroupActive || !closedGroups.includes(group.label);
 
           return (
-            <div key={group.label} className={cn(!collapsed && 'mb-3')}>
+            <div
+              key={group.label}
+              className={cn(
+                !collapsed && 'mb-3 rounded-2xl border p-1.5',
+                !collapsed && getGroupAccentClasses(group.label),
+              )}
+            >
               {!collapsed && (
                 <button
                   type="button"
                   onClick={() => toggleGroup(group.label)}
-                  className="mb-1 flex w-full items-center justify-between px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted transition-colors hover:text-sidebar-foreground"
+                  className="mb-1 flex w-full items-center justify-between rounded-xl px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/80 transition-colors hover:text-sidebar-foreground"
                   aria-expanded={isOpen}
                 >
                   <span>{group.label}</span>
@@ -89,7 +129,7 @@ export function AppSidebar({
                 )}
               >
                 <div className="overflow-hidden">
-                  <div className="space-y-0.5 pt-0.5">
+                  <div className="space-y-1 pt-0.5">
                     {group.items.map(item => {
                       const isActive = location.pathname.startsWith(item.path);
                       return (
@@ -105,16 +145,28 @@ export function AppSidebar({
                           onFocus={() => handleIntent(item.path)}
                           onTouchStart={() => handleIntent(item.path)}
                           className={cn(
-                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                            'flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors',
                             isActive
-                              ? 'bg-sidebar-accent text-sidebar-primary-foreground'
+                              ? 'bg-white text-slate-950 shadow-[0_8px_20px_rgba(15,23,42,0.18)]'
                               : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                             collapsed && 'justify-center px-2'
                           )}
                           title={collapsed ? item.label : undefined}
                         >
-                          <item.icon className="h-4.5 w-4.5 shrink-0" strokeWidth={2} />
-                          {!collapsed && <span className="truncate">{item.label}</span>}
+                          <span
+                            className={cn(
+                              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                              getItemIconClasses(group.label, isActive),
+                            )}
+                          >
+                            <item.icon className="h-4.5 w-4.5 shrink-0" strokeWidth={2} />
+                          </span>
+                          {!collapsed && (
+                            <span className="truncate">
+                              <item.icon className="hidden" strokeWidth={getItemIconStrokeWidth(group.label)} />
+                              {item.label}
+                            </span>
+                          )}
                         </NavLink>
                       );
                     })}
@@ -127,14 +179,21 @@ export function AppSidebar({
       </nav>
 
       {isMobile && user && (
-        <div className="border-t border-sidebar-border px-4 py-4">
-          <div className="rounded-xl border border-sidebar-border/70 bg-sidebar-accent/40 p-3">
-            <p className="truncate text-sm font-semibold text-sidebar-primary-foreground">{user.name}</p>
-            <p className="mt-0.5 truncate text-xs text-sidebar-muted">{user.email}</p>
+        <div className="border-t border-sidebar-border px-4 py-3">
+          <div className="rounded-xl border border-sidebar-border/70 bg-sidebar-accent/35 p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white">
+                {user.name.split(' ').map((segment) => segment[0]).join('').slice(0, 2)}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-sidebar-primary-foreground">{user.name}</p>
+                <p className="mt-0.5 truncate text-xs text-sidebar-muted">{user.email}</p>
+              </div>
+            </div>
             <Button
               type="button"
-              variant="outline"
-              className="mt-3 h-11 w-full justify-center border-sidebar-border bg-sidebar text-sidebar-foreground hover:bg-sidebar-accent"
+              variant="ghost"
+              className="mt-2 h-9 w-full justify-center text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
               onClick={() => void logout()}
             >
               <LogOut className="h-4 w-4" />
@@ -150,7 +209,7 @@ export function AppSidebar({
   if (isMobile) {
     return (
       <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
-        <SheetContent side="left" className="border-r border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:right-3 [&>button]:top-3">
+        <SheetContent side="left" className="border-r border-sidebar-border bg-sidebar p-0 text-sidebar-foreground [&>button]:right-3 [&>button]:top-3 [&>button]:h-11 [&>button]:w-11 [&>button]:rounded-full">
           {navContent}
         </SheetContent>
       </Sheet>
